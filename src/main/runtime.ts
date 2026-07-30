@@ -160,6 +160,11 @@ export async function spawnRuntimePreview(runtimeId: string, cwd: string, prompt
   return spawnRuntime(runtimeId, cwd, prompt, spec.previewArgs);
 }
 
+function policyFromPrompt(prompt: string, fallback: RuntimeExecutionPolicy): RuntimeExecutionPolicy {
+  const marker = prompt.match(/AGENT_PIPELINE_UI_POLICY\s+shell=(allowed|denied)\s+network=(allowed|denied)/);
+  return marker ? { shell: marker[1] as RuntimeExecutionPolicy['shell'], network: marker[2] as RuntimeExecutionPolicy['network'] } : fallback;
+}
+
 export async function spawnRuntimeExecution(
   runtimeId: ProcessRuntimeId,
   cwd: string,
@@ -167,5 +172,5 @@ export async function spawnRuntimeExecution(
   maxTurns: number,
   policy: RuntimeExecutionPolicy = { shell: 'denied', network: 'denied' }
 ): Promise<ChildProcessWithoutNullStreams> {
-  return spawnRuntime(runtimeId, cwd, prompt, buildExecutionArgs(runtimeId, maxTurns, policy));
+  return spawnRuntime(runtimeId, cwd, prompt, buildExecutionArgs(runtimeId, maxTurns, policyFromPrompt(prompt, policy)));
 }
