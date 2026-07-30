@@ -18,7 +18,7 @@ import { isProcessRuntimeId } from '../shared/settings';
 import { createAgentExecutionPack, discoverAgents } from './agents';
 import { listPipelineManifests, listRuntimeAdapters } from './catalog';
 import { ExecutionController } from './execution-controller';
-import { installPipelinePackFromDialog, resolvePipelinePack } from './packs';
+import { installPipelinePackFromDialog, resolvePipelinePack, type ResolvedPipelinePack } from './packs';
 import { PreviewRunController } from './run-controller';
 import { clearRuntimeExecutableOverride, loadSettings, setRuntimeExecutableOverride } from './settings';
 
@@ -43,14 +43,6 @@ async function selectDirectory(title: string): Promise<ProjectSelection | null> 
   return selectionFromPath(result.filePaths[0]);
 }
 
-async function selectProjectDirectory(): Promise<ProjectSelection | null> {
-  return selectDirectory('Choose a local project repository');
-}
-
-async function selectAgentLibraryDirectory(): Promise<ProjectSelection | null> {
-  return selectDirectory('Choose an agent library repository');
-}
-
 async function configureRuntimeExecutable(runtimeId: ProcessRuntimeId) {
   if (!isProcessRuntimeId(runtimeId)) throw new Error(`Unsupported process runtime: ${String(runtimeId)}`);
   const result = await dialog.showOpenDialog({
@@ -58,7 +50,6 @@ async function configureRuntimeExecutable(runtimeId: ProcessRuntimeId) {
     properties: ['openFile']
   });
   if (result.canceled || result.filePaths.length === 0) return listRuntimeAdapters();
-
   const selectedPath = await fs.realpath(path.resolve(result.filePaths[0]));
   const details = await fs.stat(selectedPath);
   if (!details.isFile()) throw new Error('The selected runtime executable is not a file');
@@ -100,7 +91,6 @@ async function createRunDraft(request: CreateRunDraftRequest): Promise<RunDraft>
     throw new Error('Project, pipeline and runtime are required');
   }
   const manifest = await resolveManifest(request);
-
   const id = randomUUID();
   const runDirectory = path.join(app.getPath('userData'), 'runs', id);
   await fs.mkdir(runDirectory, { recursive: true });
@@ -122,6 +112,40 @@ function rendererEmitter(event: Electron.IpcMainInvokeEvent): (runEvent: RunEven
   };
 }
 
+function frozenAgentPack(record: Awaited<ReturnType<ExecutionController['get']>>): ResolvedPipelinePack {
+  if (!record) throw new Error('Execution run was not found');
+  return {
+    directory: record.storagePath,
+    manifest: {
+      schemaVersion: '1.1',
+      id: record.pipelineId,
+      name: record.pipelineId.replace(/^agent-/, ''),
+      description: 'Standalone agent execution',
+      version: record.pipelineVersion,
+      inputSchema: { type: 'object', properties: {} },
+      requiredCapabilities: ['repository.read', 'repository.write', 'git.worktree'],
+      supportedRuntimes: [record.runtimeId],
+      stages: [{
+        id: 'agent',
+        name: 'Standalone agent',
+        description: 'Run the frozen standalone agent prompt',
+        order: 1,
+        role: 'agent',
+        requiredCapabilities: ['repository.read', 'repository.write']
+      }],
+      execution: {
+        mode: 'runtime-prompt',
+        isolation: 'git-worktree',
+        promptTemplate: 'prompt.txt',
+        maxTurns: record.runtimePolicy.maxTurns,
+        validationCommands: record.runtimePolicy.validationCommands,
+        modelShell: record.runtimePolicy.shell === 'allowed-to-model' ? 'allowed' : 'denied',
+        modelNetwork: record.runtimePolicy.network === 'allowed-to-model' ? 'allowed' : 'denied'
+      }
+    }
+  };
+}
+
 export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.getSystemInfo, (): SystemInfo => ({
     platform: process.platform,
@@ -136,8 +160,8 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.listRuntimes, listRuntimeAdapters);
   ipcMain.handle(IPC_CHANNELS.configureRuntimeExecutable, (_event, runtimeId: ProcessRuntimeId) => configureRuntimeExecutable(runtimeId));
   ipcMain.handle(IPC_CHANNELS.clearRuntimeExecutable, (_event, runtimeId: ProcessRuntimeId) => clearRuntimeExecutable(runtimeId));
-  ipcMain.handle(IPC_CHANNELS.selectProjectDirectory, selectProjectDirectory);
-  ipcMain.handle(IPC_CHANNELS.selectAgentLibraryDirectory, selectAgentLibraryDirectory);
+  ipcMain.handle(IPC_CHANNELS.selectProjectDirectory, () => selectDirectory('Choose a local project repository'));
+  ipcMain.handle(IPC_CHANNELS.selectAgentLibraryDirectory, () => selectDirectory('Choose an agent library repository'));
   ipcMain.handle(IPC_CHANNELS.discoverAgents, (_event, request: DiscoverAgentsRequest) => discoverAgents(request.sourceRepository));
   ipcMain.handle(IPC_CHANNELS.prepareAgentExecution, async (event, request: PrepareAgentExecutionRequest) => {
     await ensureRuntimeAvailable(request.runtimeId);
@@ -168,45 +192,9 @@ export function registerIpcHandlers(): void {
     const record = await executionRuns.get(runId);
     if (!record) throw new Error('Execution run was not found');
     await ensureRuntimeAvailable(record.runtimeId);
-    const generatedAgentPack = path.join(app.getPath('userData'), 'generated-agent-packs');
-    let pack;
-    if (record.pipelineId.startsWith('agent-')) {
-      const promptPath = path.join(record.storagePath, 'prompt.txt');
-      const prompt = await fs.readFile(promptPath, 'utf8');
-      const directory = path.dirname((await fs.readdir(generatedAgentPack, { withFileTypes: true }))
-        .filter((entry) => entry.isDirectory())
-        .map((entry) => path.join(generatedAgentPack, entry.name, 'agent-prompt.md'))
-        .find(async () => false) ?? promptPath);
-      const ephemeralDirectory = path.join(record.storagePath, 'agent-pack');
-      await fs.mkdir(ephemeralDirectory, { recursive: true });
-      await fs.writeFile(path.join(ephemeralDirectory, 'agent-prompt.md'), prompt, 'utf8');
-      pack = {
-        directory: ephemeralDirectory,
-        manifest: {
-          schemaVersion: '1.1' as const,
-          id: record.pipelineId,
-          name: record.pipelineId.replace(/^agent-/, ''),
-          description: 'Standalone agent execution',
-          version: record.pipelineVersion,
-          inputSchema: { type: 'object' as const, properties: {} },
-          requiredCapabilities: ['repository.read' as const, 'repository.write' as const],
-          supportedRuntimes: [record.runtimeId],
-          stages: [{ id: 'agent', name: 'Agent', description: 'Standalone agent', order: 1, role: 'agent', requiredCapabilities: ['repository.read' as const] }],
-          execution: {
-            mode: 'runtime-prompt' as const,
-            isolation: 'git-worktree' as const,
-            promptTemplate: 'agent-prompt.md',
-            maxTurns: record.runtimePolicy.maxTurns,
-            validationCommands: record.runtimePolicy.validationCommands,
-            modelShell: record.runtimePolicy.shell === 'allowed-to-model' ? 'allowed' as const : 'denied' as const,
-            modelNetwork: record.runtimePolicy.network === 'allowed-to-model' ? 'allowed' as const : 'denied' as const
-          }
-        }
-      };
-      void directory;
-    } else {
-      pack = await resolvePipelinePack(record.pipelineId, record.pipelineVersion);
-    }
+    const pack = record.pipelineId.startsWith('agent-')
+      ? frozenAgentPack(record)
+      : await resolvePipelinePack(record.pipelineId, record.pipelineVersion);
     return executionRuns.start(runId, pack, rendererEmitter(event));
   });
   ipcMain.handle(IPC_CHANNELS.getExecutionRun, (_event, runId: string) => executionRuns.get(runId));
