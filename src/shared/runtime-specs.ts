@@ -69,7 +69,7 @@ export function buildExecutionArgs(
   }
   const availableTools = ['view', 'grep', 'glob', 'edit', 'create', 'apply_patch'];
   const allowedTools = ['write'];
-  const deniedTools = ['memory'];
+  const deniedTools: string[] = [];
   if (policy.shell === 'allowed') {
     availableTools.push('shell');
     allowedTools.push('shell');
@@ -77,6 +77,7 @@ export function buildExecutionArgs(
     deniedTools.push('shell');
   }
   if (policy.network !== 'allowed') deniedTools.push('url');
+  deniedTools.push('memory');
   return [
     '--output-format=json',
     '--no-ask-user',
