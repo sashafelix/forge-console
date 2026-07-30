@@ -3,6 +3,7 @@ import type {
   PipelineInputProperty,
   PipelineManifest,
   PreviewRun,
+  ProcessRuntimeId,
   ProjectSelection,
   RunEvent,
   RuntimeAdapterDescriptor,
@@ -11,6 +12,14 @@ import type {
 
 function statusLabel(status: RuntimeAdapterDescriptor['status']): string {
   return status === 'available' ? 'Ready' : status === 'unavailable' ? 'Unavailable' : 'Configure';
+}
+
+function pipelineKey(pipeline: Pick<PipelineManifest, 'id' | 'version'>): string {
+  return `${pipeline.id}@${pipeline.version}`;
+}
+
+function isConfigurableRuntime(runtime: RuntimeAdapterDescriptor | null): runtime is RuntimeAdapterDescriptor & { id: ProcessRuntimeId } {
+  return runtime?.kind === 'process' && (runtime.id === 'claude-code' || runtime.id === 'github-copilot');
 }
 
 function runStatusFromEvent(event: RunEvent): PreviewRun['status'] | null {
@@ -80,7 +89,7 @@ export function App() {
   const [runtimes, setRuntimes] = useState<RuntimeAdapterDescriptor[]>([]);
   const [system, setSystem] = useState<SystemInfo | null>(null);
   const [project, setProject] = useState<ProjectSelection | null>(null);
-  const [pipelineId, setPipelineId] = useState('');
+  const [selectedPipelineKey, setSelectedPipelineKey] = useState('');
   const [runtimeId, setRuntimeId] = useState('');
   const [inputs, setInputs] = useState<Record<string, unknown>>({});
   const [previewRun, setPreviewRun] = useState<PreviewRun | null>(null);
@@ -89,18 +98,27 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [catalogBusy, setCatalogBusy] = useState(false);
 
-  async function refreshPipelines(preferredId?: string): Promise<void> {
+  async function refreshPipelines(preferredKey?: string): Promise<void> {
     const pipelineList = await window.agentPipeline.listPipelines();
     setPipelines(pipelineList);
-    setPipelineId((current) => preferredId ?? (pipelineList.some((pipeline) => pipeline.id === current) ? current : pipelineList[0]?.id ?? ''));
+    setSelectedPipelineKey((current) => {
+      if (preferredKey && pipelineList.some((pipeline) => pipelineKey(pipeline) === preferredKey)) return preferredKey;
+      if (pipelineList.some((pipeline) => pipelineKey(pipeline) === current)) return current;
+      return pipelineList[0] ? pipelineKey(pipelineList[0]) : '';
+    });
+  }
+
+  function applyRuntimeList(runtimeList: RuntimeAdapterDescriptor[]): void {
+    setRuntimes(runtimeList);
+    setRuntimeId((current) => runtimeList.some((runtime) => runtime.id === current)
+      ? current
+      : runtimeList.find((runtime) => runtime.status === 'available')?.id ?? runtimeList[0]?.id ?? '');
   }
 
   async function refreshRuntimes(): Promise<void> {
     setCatalogBusy(true);
     try {
-      const runtimeList = await window.agentPipeline.listRuntimes();
-      setRuntimes(runtimeList);
-      setRuntimeId((current) => runtimeList.some((runtime) => runtime.id === current) ? current : runtimeList.find((runtime) => runtime.status === 'available')?.id ?? runtimeList[0]?.id ?? '');
+      applyRuntimeList(await window.agentPipeline.listRuntimes());
     } finally {
       setCatalogBusy(false);
     }
@@ -115,7 +133,7 @@ export function App() {
       setPipelines(pipelineList);
       setRuntimes(runtimeList);
       setSystem(info);
-      setPipelineId(pipelineList[0]?.id ?? '');
+      setSelectedPipelineKey(pipelineList[0] ? pipelineKey(pipelineList[0]) : '');
       setRuntimeId(runtimeList.find((runtime) => runtime.status === 'available')?.id ?? runtimeList[0]?.id ?? '');
     }).catch((reason: unknown) => setError(reason instanceof Error ? reason.message : String(reason)));
   }, []);
@@ -129,8 +147,8 @@ export function App() {
   }), []);
 
   const selectedPipeline = useMemo(
-    () => pipelines.find((pipeline) => pipeline.id === pipelineId) ?? null,
-    [pipelineId, pipelines]
+    () => pipelines.find((pipeline) => pipelineKey(pipeline) === selectedPipelineKey) ?? null,
+    [selectedPipelineKey, pipelines]
   );
   const selectedRuntime = useMemo(
     () => runtimes.find((runtime) => runtime.id === runtimeId) ?? null,
@@ -162,7 +180,33 @@ export function App() {
     setError('');
     try {
       const installed = await window.agentPipeline.installPipelinePack();
-      if (installed) await refreshPipelines(installed.id);
+      if (installed) await refreshPipelines(pipelineKey(installed));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      setCatalogBusy(false);
+    }
+  }
+
+  async function configureSelectedRuntime(): Promise<void> {
+    if (!isConfigurableRuntime(selectedRuntime)) return;
+    setCatalogBusy(true);
+    setError('');
+    try {
+      applyRuntimeList(await window.agentPipeline.configureRuntimeExecutable(selectedRuntime.id));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      setCatalogBusy(false);
+    }
+  }
+
+  async function clearSelectedRuntime(): Promise<void> {
+    if (!isConfigurableRuntime(selectedRuntime)) return;
+    setCatalogBusy(true);
+    setError('');
+    try {
+      applyRuntimeList(await window.agentPipeline.clearRuntimeExecutable(selectedRuntime.id));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
     } finally {
@@ -242,17 +286,20 @@ export function App() {
           <section>
             <div className="sidebar-title"><h2>Pipeline</h2><button type="button" onClick={installPack} disabled={catalogBusy}>Install</button></div>
             <div className="option-list">
-              {pipelines.map((pipeline) => (
-                <button
-                  className={pipeline.id === pipelineId ? 'option active' : 'option'}
-                  key={`${pipeline.id}@${pipeline.version}`}
-                  type="button"
-                  onClick={() => setPipelineId(pipeline.id)}
-                >
-                  <strong>{pipeline.name}</strong>
-                  <small>v{pipeline.version} · {pipeline.stages.length} stages</small>
-                </button>
-              ))}
+              {pipelines.map((pipeline) => {
+                const key = pipelineKey(pipeline);
+                return (
+                  <button
+                    className={key === selectedPipelineKey ? 'option active' : 'option'}
+                    key={key}
+                    type="button"
+                    onClick={() => setSelectedPipelineKey(key)}
+                  >
+                    <strong>{pipeline.name}</strong>
+                    <small>v{pipeline.version} · {pipeline.stages.length} stages</small>
+                  </button>
+                );
+              })}
             </div>
           </section>
 
@@ -313,8 +360,20 @@ export function App() {
                   ))}
                 </div>
 
-                {selectedRuntime && selectedRuntime.status !== 'available' && (
-                  <div className="runtime-hint">{selectedRuntime.configurationHint ?? 'This runtime is not available.'}</div>
+                {selectedRuntime && (
+                  <div className={`runtime-configuration ${selectedRuntime.status}`}>
+                    <div>
+                      <strong>{selectedRuntime.name}</strong>
+                      <small>{selectedRuntime.executablePath ?? selectedRuntime.configurationHint ?? 'No executable path configured.'}</small>
+                      {selectedRuntime.executableSource && <span>{selectedRuntime.executableSource === 'configured' ? 'Manual executable' : 'Automatically discovered'}</span>}
+                    </div>
+                    {isConfigurableRuntime(selectedRuntime) && (
+                      <div>
+                        {selectedRuntime.executableSource === 'configured' && <button type="button" onClick={clearSelectedRuntime} disabled={catalogBusy}>Use automatic</button>}
+                        <button type="button" onClick={configureSelectedRuntime} disabled={catalogBusy}>Choose executable</button>
+                      </div>
+                    )}
+                  </div>
                 )}
                 {selectedRuntime && !runtimeSupported && (
                   <div className="runtime-hint">This pipeline does not declare support for {selectedRuntime.name}.</div>
@@ -335,7 +394,7 @@ export function App() {
                   </div>
                   <div className="console-output" aria-live="polite">
                     {visibleEvents.length === 0 ? <span>Waiting for runtime output…</span> : visibleEvents.map((event) => (
-                      <div className={`console-line ${event.type}`} key={`${event.runId}-${event.sequence}`}>
+                      <div className={`console-line ${event.type.replaceAll('.', '-')}`} key={`${event.runId}-${event.sequence}`}>
                         <time>{new Date(event.timestamp).toLocaleTimeString()}</time>
                         <span>{event.message}</span>
                       </div>
