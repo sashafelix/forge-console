@@ -1,0 +1,31 @@
+.workbench-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  gap: 8px;
+  padding: 10px 20px;
+  border-bottom: 1px solid #22304a;
+  background: rgba(7, 12, 24, 0.96);
+  backdrop-filter: blur(12px);
+}
+
+.workbench-tabs button {
+  border: 1px solid #2a3958;
+  border-radius: 999px;
+  padding: 8px 16px;
+  background: #10182b;
+  color: #aebbd4;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.workbench-tabs button.active {
+  border-color: #65a0ff;
+  background: #182b4d;
+  color: #ffffff;
+}
+
+.agent-workbench {
+  min-height: calc(100vh - 54px);
+}
