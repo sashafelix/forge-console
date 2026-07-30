@@ -4,31 +4,14 @@ import os from 'node:os';
 import path from 'node:path';
 import type { ProcessRuntimeId, RuntimeAdapterDescriptor } from '../shared/contracts';
 import { PROCESS_RUNTIME_SPECS, getProcessRuntimeSpec } from '../shared/runtime-specs';
+import { buildSearchPath } from '../shared/search-paths';
 import { loadSettings } from './settings';
 
 const PROBE_TIMEOUT_MS = 5_000;
 const MAX_VERSION_OUTPUT = 4_096;
 
-export function defaultSearchDirectories(home: string, platform: NodeJS.Platform): string[] {
-  const common = [
-    path.join(home, '.local', 'bin'),
-    path.join(home, '.npm-global', 'bin'),
-    path.join(home, '.volta', 'bin')
-  ];
-  if (platform === 'darwin') {
-    return [...common, path.join(home, 'Library', 'pnpm'), '/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin'];
-  }
-  if (platform === 'linux') return [...common, path.join(home, '.local', 'share', 'pnpm'), '/usr/local/bin', '/usr/bin', '/bin'];
-  return common;
-}
-
-export function buildSearchPath(
-  configuredPath = process.env.PATH ?? '',
-  home = os.homedir(),
-  platform: NodeJS.Platform = process.platform
-): string {
-  const entries = [...configuredPath.split(path.delimiter).filter(Boolean), ...defaultSearchDirectories(home, platform)];
-  return [...new Set(entries.map((entry) => path.resolve(entry)))].join(path.delimiter);
+function runtimeSearchPath(): string {
+  return buildSearchPath(process.env.PATH ?? '', os.homedir(), process.platform, path.delimiter);
 }
 
 function executableExtensions(): string[] {
@@ -46,7 +29,7 @@ async function isExecutable(candidate: string): Promise<boolean> {
   }
 }
 
-export async function findExecutable(candidates: string[], pathValue = buildSearchPath()): Promise<string | null> {
+export async function findExecutable(candidates: string[], pathValue = runtimeSearchPath()): Promise<string | null> {
   const pathEntries = pathValue.split(path.delimiter).filter(Boolean);
   const extensions = executableExtensions();
 
@@ -69,7 +52,7 @@ function requiresShell(executable: string): boolean {
 function probeVersion(executable: string, args: string[]): Promise<string | undefined> {
   return new Promise((resolve) => {
     const child = spawn(executable, args, {
-      env: { ...process.env, PATH: buildSearchPath(), NO_COLOR: '1' },
+      env: { ...process.env, PATH: runtimeSearchPath(), NO_COLOR: '1' },
       shell: requiresShell(executable),
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe']
@@ -163,7 +146,7 @@ export async function spawnRuntimePreview(runtimeId: string, cwd: string, prompt
 
   const child = spawn(resolved.path, spec.previewArgs, {
     cwd,
-    env: { ...process.env, PATH: buildSearchPath(), NO_COLOR: '1' },
+    env: { ...process.env, PATH: runtimeSearchPath(), NO_COLOR: '1' },
     shell: requiresShell(resolved.path),
     windowsHide: true,
     stdio: ['pipe', 'pipe', 'pipe']
