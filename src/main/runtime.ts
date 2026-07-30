@@ -98,18 +98,18 @@ export async function discoverRuntimeAdapters(): Promise<RuntimeAdapterDescripto
     });
   }
 
-  const bmwEndpoint = process.env.BMW_LLM_ENDPOINT?.trim();
+  const bmwEndpointDetected = Boolean(process.env.BMW_LLM_ENDPOINT?.trim());
   discovered.push({
     id: 'bmw-llm',
     name: 'BMW LLM',
     description: 'Controller-mediated HTTP adapter for the internal BMW model gateway.',
     kind: 'http',
-    status: bmwEndpoint ? 'available' : 'unconfigured',
+    status: 'unconfigured',
     capabilities: ['structured.output', 'mcp.tools'],
     checkedAt: new Date().toISOString(),
-    configurationHint: bmwEndpoint
-      ? 'Endpoint discovered from BMW_LLM_ENDPOINT; authenticated execution is implemented in a later adapter milestone.'
-      : 'Configure the internal endpoint and credentials in desktop settings.'
+    configurationHint: bmwEndpointDetected
+      ? 'An endpoint was detected, but authenticated HTTP execution is not enabled in this milestone.'
+      : 'Configure the internal endpoint and credentials in desktop settings when the HTTP adapter is enabled.'
   });
 
   return discovered;
