@@ -12,6 +12,12 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist/renderer',
-    emptyOutDir: true
+    emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        pipeline: path.resolve(__dirname, 'index.html'),
+        agent: path.resolve(__dirname, 'agent.html')
+      }
+    }
   }
 });
