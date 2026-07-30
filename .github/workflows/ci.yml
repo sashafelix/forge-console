@@ -11,6 +11,8 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,3 +26,5 @@ jobs:
         run: npm test
       - name: Build
         run: npm run build
+      - name: Package smoke test
+        run: npx electron-builder --linux --x64 --dir --publish never
