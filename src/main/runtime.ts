@@ -1,11 +1,35 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { constants as fsConstants, promises as fs } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
-import type { RuntimeAdapterDescriptor } from '../shared/contracts';
+import type { ProcessRuntimeId, RuntimeAdapterDescriptor } from '../shared/contracts';
 import { PROCESS_RUNTIME_SPECS, getProcessRuntimeSpec } from '../shared/runtime-specs';
+import { loadSettings } from './settings';
 
 const PROBE_TIMEOUT_MS = 5_000;
 const MAX_VERSION_OUTPUT = 4_096;
+
+export function defaultSearchDirectories(home: string, platform: NodeJS.Platform): string[] {
+  const common = [
+    path.join(home, '.local', 'bin'),
+    path.join(home, '.npm-global', 'bin'),
+    path.join(home, '.volta', 'bin')
+  ];
+  if (platform === 'darwin') {
+    return [...common, path.join(home, 'Library', 'pnpm'), '/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin'];
+  }
+  if (platform === 'linux') return [...common, path.join(home, '.local', 'share', 'pnpm'), '/usr/local/bin', '/usr/bin', '/bin'];
+  return common;
+}
+
+export function buildSearchPath(
+  configuredPath = process.env.PATH ?? '',
+  home = os.homedir(),
+  platform: NodeJS.Platform = process.platform
+): string {
+  const entries = [...configuredPath.split(path.delimiter).filter(Boolean), ...defaultSearchDirectories(home, platform)];
+  return [...new Set(entries.map((entry) => path.resolve(entry)))].join(path.delimiter);
+}
 
 function executableExtensions(): string[] {
   if (process.platform !== 'win32') return [''];
@@ -22,7 +46,7 @@ async function isExecutable(candidate: string): Promise<boolean> {
   }
 }
 
-export async function findExecutable(candidates: string[], pathValue = process.env.PATH ?? ''): Promise<string | null> {
+export async function findExecutable(candidates: string[], pathValue = buildSearchPath()): Promise<string | null> {
   const pathEntries = pathValue.split(path.delimiter).filter(Boolean);
   const extensions = executableExtensions();
 
@@ -45,7 +69,7 @@ function requiresShell(executable: string): boolean {
 function probeVersion(executable: string, args: string[]): Promise<string | undefined> {
   return new Promise((resolve) => {
     const child = spawn(executable, args, {
-      env: { ...process.env, NO_COLOR: '1' },
+      env: { ...process.env, PATH: buildSearchPath(), NO_COLOR: '1' },
       shell: requiresShell(executable),
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe']
@@ -71,13 +95,25 @@ function probeVersion(executable: string, args: string[]): Promise<string | unde
   });
 }
 
+async function resolveRuntimeExecutable(runtimeId: ProcessRuntimeId): Promise<{ path: string | null; source?: 'configured' | 'path' }> {
+  const spec = getProcessRuntimeSpec(runtimeId);
+  if (!spec) return { path: null };
+  const settings = await loadSettings();
+  const override = settings.runtimeExecutableOverrides[runtimeId];
+  if (override && await isExecutable(override)) return { path: override, source: 'configured' };
+  const discovered = await findExecutable(spec.executableCandidates);
+  return { path: discovered, source: discovered ? 'path' : undefined };
+}
+
 export async function discoverRuntimeAdapters(): Promise<RuntimeAdapterDescriptor[]> {
   const discovered: RuntimeAdapterDescriptor[] = [];
+  const settings = await loadSettings();
 
   for (const spec of PROCESS_RUNTIME_SPECS) {
-    const executablePath = await findExecutable(spec.executableCandidates);
-    const version = executablePath ? await probeVersion(executablePath, spec.versionArgs) : undefined;
+    const resolved = await resolveRuntimeExecutable(spec.id);
+    const version = resolved.path ? await probeVersion(resolved.path, spec.versionArgs) : undefined;
     const isClaude = spec.id === 'claude-code';
+    const configuredButInvalid = Boolean(settings.runtimeExecutableOverrides[spec.id] && resolved.source !== 'configured');
     discovered.push({
       id: spec.id,
       name: isClaude ? 'Claude Code' : 'GitHub Copilot',
@@ -85,16 +121,19 @@ export async function discoverRuntimeAdapters(): Promise<RuntimeAdapterDescripto
         ? 'Local process adapter using Claude Code print mode and structured streaming output.'
         : 'Local process adapter using GitHub Copilot CLI programmatic JSONL output.',
       kind: 'process',
-      status: executablePath && version ? 'available' : 'unavailable',
+      status: resolved.path && version ? 'available' : 'unavailable',
       capabilities: isClaude
         ? ['repository.read', 'repository.write', 'command.execute', 'git.worktree', 'mcp.tools', 'structured.output']
         : ['repository.read', 'repository.write', 'command.execute', 'mcp.tools', 'structured.output'],
-      executablePath: executablePath ?? undefined,
+      executablePath: resolved.path ?? settings.runtimeExecutableOverrides[spec.id],
+      executableSource: resolved.source,
       version,
       checkedAt: new Date().toISOString(),
-      configurationHint: executablePath
+      configurationHint: resolved.path
         ? version ? undefined : 'The executable was found but did not complete a version probe.'
-        : `Install ${isClaude ? 'Claude Code' : 'GitHub Copilot CLI'} and ensure its executable is on PATH.`
+        : configuredButInvalid
+          ? 'The configured executable no longer exists or is not executable.'
+          : `Install ${isClaude ? 'Claude Code' : 'GitHub Copilot CLI'} or choose its executable manually.`
     });
   }
 
@@ -119,13 +158,13 @@ export async function spawnRuntimePreview(runtimeId: string, cwd: string, prompt
   const spec = getProcessRuntimeSpec(runtimeId);
   if (!spec) throw new Error(`Runtime ${runtimeId} does not support local process previews`);
 
-  const executable = await findExecutable(spec.executableCandidates);
-  if (!executable) throw new Error(`Runtime executable for ${runtimeId} was not found on PATH`);
+  const resolved = await resolveRuntimeExecutable(spec.id);
+  if (!resolved.path) throw new Error(`Runtime executable for ${runtimeId} was not found or configured`);
 
-  const child = spawn(executable, spec.previewArgs, {
+  const child = spawn(resolved.path, spec.previewArgs, {
     cwd,
-    env: { ...process.env, NO_COLOR: '1' },
-    shell: requiresShell(executable),
+    env: { ...process.env, PATH: buildSearchPath(), NO_COLOR: '1' },
+    shell: requiresShell(resolved.path),
     windowsHide: true,
     stdio: ['pipe', 'pipe', 'pipe']
   });
