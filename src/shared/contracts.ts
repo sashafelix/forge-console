@@ -172,6 +172,8 @@ export interface ExecutionRun extends CreateRunDraftRequest {
   updatedAt: string;
   status: ExecutionRunStatus;
   storagePath: string;
+  repositoryRoot: string;
+  baseRevision: string;
   worktreePath: string;
   workingDirectory: string;
   branchName: string;
