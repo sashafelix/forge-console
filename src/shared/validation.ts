@@ -1,3 +1,4 @@
+import path from 'node:path';
 import type { PipelineManifest } from './contracts';
 
 export interface ValidationResult<T> {
@@ -14,6 +15,77 @@ function nonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+function safeRelativePath(value: unknown): value is string {
+  if (!nonEmptyString(value) || path.isAbsolute(value) || value.includes('\0') || /[\r\n]/.test(value)) return false;
+  return !value.replaceAll('\\', '/').split('/').some((segment) => segment === '..' || segment === '');
+}
+
+const DISALLOWED_VALIDATION_EXECUTABLES = new Set([
+  'sh', 'bash', 'zsh', 'fish', 'cmd', 'cmd.exe', 'powershell', 'powershell.exe', 'pwsh', 'pwsh.exe',
+  'sudo', 'su', 'rm', 'del', 'erase', 'format', 'diskpart', 'curl', 'wget', 'ssh', 'scp',
+  'python', 'python3', 'node', 'ruby', 'perl'
+]);
+const ALLOWED_GIT_VALIDATIONS = new Set(['status', 'diff', 'log', 'show']);
+
+function validateExecution(value: unknown, errors: string[]): void {
+  if (!isRecord(value)) {
+    errors.push('execution must be an object');
+    return;
+  }
+  if (value.mode !== 'runtime-prompt') errors.push('execution.mode must be runtime-prompt');
+  if (value.isolation !== 'git-worktree') errors.push('execution.isolation must be git-worktree');
+  if (!safeRelativePath(value.promptTemplate)) errors.push('execution.promptTemplate must be a safe relative path');
+  if (!Number.isInteger(value.maxTurns) || Number(value.maxTurns) < 1 || Number(value.maxTurns) > 100) {
+    errors.push('execution.maxTurns must be an integer from 1 to 100');
+  }
+
+  if (!Array.isArray(value.validationCommands) || value.validationCommands.length > 20) {
+    errors.push('execution.validationCommands must be an array with at most 20 commands');
+    return;
+  }
+
+  const ids = new Set<string>();
+  for (const [index, command] of value.validationCommands.entries()) {
+    const prefix = `execution.validationCommands[${index}]`;
+    if (!isRecord(command)) {
+      errors.push(`${prefix} must be an object`);
+      continue;
+    }
+    if (!nonEmptyString(command.id)) errors.push(`${prefix}.id must be non-empty`);
+    if (!nonEmptyString(command.name)) errors.push(`${prefix}.name must be non-empty`);
+    if (nonEmptyString(command.id)) {
+      if (ids.has(command.id)) errors.push(`duplicate validation command id: ${command.id}`);
+      ids.add(command.id);
+    }
+
+    for (const field of ['executable', 'windowsExecutable'] as const) {
+      const executable = command[field];
+      if (field === 'windowsExecutable' && executable === undefined) continue;
+      if (!nonEmptyString(executable) || /[\s\0]/.test(executable)) {
+        errors.push(`${prefix}.${field} must be one executable path without whitespace`);
+        continue;
+      }
+      const base = path.basename(executable).toLowerCase();
+      if (DISALLOWED_VALIDATION_EXECUTABLES.has(base)) errors.push(`${prefix}.${field} uses a disallowed shell or interpreter`);
+    }
+
+    if (!Array.isArray(command.args) || command.args.length > 64 || !command.args.every((arg) => typeof arg === 'string' && arg.length <= 512 && !/[\0\r\n]/.test(arg))) {
+      errors.push(`${prefix}.args must contain at most 64 bounded strings without control characters`);
+    }
+    const base = nonEmptyString(command.executable) ? path.basename(command.executable).toLowerCase() : '';
+    if (base === 'git' && (!Array.isArray(command.args) || !ALLOWED_GIT_VALIDATIONS.has(String(command.args[0])))) {
+      errors.push(`${prefix} may use git only for status, diff, log or show validation`);
+    }
+    if (command.cwd !== undefined && command.cwd !== '.' && !safeRelativePath(command.cwd)) {
+      errors.push(`${prefix}.cwd must be a safe relative path`);
+    }
+    if (!Number.isInteger(command.timeoutSeconds) || Number(command.timeoutSeconds) < 1 || Number(command.timeoutSeconds) > 1800) {
+      errors.push(`${prefix}.timeoutSeconds must be an integer from 1 to 1800`);
+    }
+    if (typeof command.required !== 'boolean') errors.push(`${prefix}.required must be boolean`);
+  }
+}
+
 export function validatePipelineManifest(value: unknown): ValidationResult<PipelineManifest> {
   const errors: string[] = [];
   if (!isRecord(value)) {
@@ -23,7 +95,7 @@ export function validatePipelineManifest(value: unknown): ValidationResult<Pipel
   for (const field of ['id', 'name', 'description', 'version']) {
     if (!nonEmptyString(value[field])) errors.push(`${field} must be a non-empty string`);
   }
-  if (value.schemaVersion !== '1.0') errors.push('schemaVersion must be 1.0');
+  if (value.schemaVersion !== '1.0' && value.schemaVersion !== '1.1') errors.push('schemaVersion must be 1.0 or 1.1');
 
   if (!isRecord(value.inputSchema) || value.inputSchema.type !== 'object' || !isRecord(value.inputSchema.properties)) {
     errors.push('inputSchema must be an object schema with properties');
@@ -64,6 +136,11 @@ export function validatePipelineManifest(value: unknown): ValidationResult<Pipel
         orders.add(order);
       }
     }
+  }
+
+  if (value.execution !== undefined) {
+    if (value.schemaVersion !== '1.1') errors.push('execution requires schemaVersion 1.1');
+    validateExecution(value.execution, errors);
   }
 
   return errors.length === 0
