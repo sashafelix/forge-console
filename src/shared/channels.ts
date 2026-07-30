@@ -7,6 +7,7 @@ export const IPC_CHANNELS = {
   configureRuntimeExecutable: 'settings:configure-runtime-executable',
   clearRuntimeExecutable: 'settings:clear-runtime-executable',
   selectProjectDirectory: 'projects:select-directory',
+  selectAgentLibrary: 'agents:select-library',
   createRunDraft: 'runs:create-draft',
   startPreviewRun: 'runs:start-preview',
   getPreviewRun: 'runs:get-preview',
@@ -15,6 +16,11 @@ export const IPC_CHANNELS = {
   approveAndStartExecution: 'runs:approve-start-execution',
   getExecutionRun: 'runs:get-execution',
   cancelExecution: 'runs:cancel-execution',
+  prepareAgentExecution: 'agents:prepare-execution',
+  approveAndStartAgentExecution: 'agents:approve-start-execution',
+  getAgentExecutionRun: 'agents:get-execution',
+  cancelAgentExecution: 'agents:cancel-execution',
+  openAgentWorkbench: 'windows:open-agent-workbench',
   runEvent: 'runs:event',
   openPath: 'shell:open-path'
 } as const;
