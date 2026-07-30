@@ -20,7 +20,11 @@ import {
   runtimeSearchPath,
   spawnRuntimeExecution
 } from './runtime';
-import { createIsolatedWorktree } from './worktrees';
+import {
+  createIsolatedWorktree,
+  discardPreparedWorktree,
+  type PreparedWorktree
+} from './worktrees';
 
 const MAX_EVENT_LINE_CHARS = 16_384;
 const MAX_OUTPUT_EVENTS = 5_000;
@@ -188,6 +192,12 @@ function ensureWithin(root: string, candidate: string, label: string): string {
   return resolvedCandidate;
 }
 
+async function resolveRealWithin(root: string, candidate: string, label: string): Promise<string> {
+  const realRoot = await fs.realpath(root);
+  const realCandidate = await fs.realpath(candidate);
+  return ensureWithin(realRoot, realCandidate, label);
+}
+
 async function resolveValidationExecutable(
   command: PipelineValidationCommand,
   cwd: string,
@@ -199,9 +209,9 @@ async function resolveValidationExecutable(
   if (path.isAbsolute(configured)) throw new Error(`Validation executable must not be absolute: ${configured}`);
 
   if (configured.includes('/') || configured.includes('\\') || configured.startsWith('.')) {
-    const candidate = ensureWithin(worktreePath, path.resolve(cwd, configured), 'Validation executable');
-    const details = await fs.stat(candidate);
-    if (!details.isFile()) throw new Error(`Validation executable is not a file: ${configured}`);
+    const candidate = await resolveRealWithin(worktreePath, path.resolve(cwd, configured), 'Validation executable');
+    const details = await fs.lstat(candidate);
+    if (!details.isFile() || details.isSymbolicLink()) throw new Error(`Validation executable must be a regular file: ${configured}`);
     await fs.access(candidate, process.platform === 'win32' ? fsConstants.F_OK : fsConstants.X_OK);
     return candidate;
   }
@@ -215,7 +225,6 @@ function runValidationCommand(
   executable: string,
   command: PipelineValidationCommand,
   cwd: string,
-  worktreePath: string,
   writer: EventWriter,
   setChild: (child: ChildProcessWithoutNullStreams) => void,
   cancelled: () => boolean
@@ -223,7 +232,7 @@ function runValidationCommand(
   return new Promise((resolve, reject) => {
     const startedAt = new Date().toISOString();
     const child = spawn(executable, command.args, {
-      cwd: ensureWithin(worktreePath, cwd, 'Validation working directory'),
+      cwd,
       env: { ...process.env, PATH: runtimeSearchPath(), NO_COLOR: '1', CI: '1' },
       shell: requiresCommandShell(executable),
       windowsHide: true,
@@ -289,12 +298,17 @@ export class ExecutionController {
     const writer = await createEventWriter(id, storagePath, emitToRenderer);
     writer.publish('run.started', `Preparing isolated execution for ${pack.manifest.name}`);
 
+    let worktree: PreparedWorktree | undefined;
+    let committed = false;
     try {
       const sanitizedRequest: CreateRunDraftRequest = {
         ...request,
         inputs: sanitizeInputs(pack.manifest, request.inputs)
       };
-      const worktree = await createIsolatedWorktree(sanitizedRequest.project, id, sanitizedRequest.inputs);
+      const template = await readPipelineTextAsset(pack, execution.promptTemplate);
+      renderExecutionPrompt(template, pack.manifest, sanitizedRequest, '<isolated-worktree>');
+
+      worktree = await createIsolatedWorktree(sanitizedRequest.project, id, sanitizedRequest.inputs);
       writer.publish('worktree.created', `Created isolated worktree ${worktree.branchName}`, {
         worktreePath: worktree.worktreePath,
         workingDirectory: worktree.workingDirectory,
@@ -302,7 +316,6 @@ export class ExecutionController {
         baseRevision: worktree.baseRevision
       });
 
-      const template = await readPipelineTextAsset(pack, execution.promptTemplate);
       const prompt = renderExecutionPrompt(template, pack.manifest, sanitizedRequest, worktree.workingDirectory);
       await fs.writeFile(path.join(storagePath, 'prompt.txt'), prompt, { encoding: 'utf8', mode: 0o600 });
 
@@ -322,6 +335,7 @@ export class ExecutionController {
           fileWrites: 'worktree-only',
           shell: 'denied-to-model',
           network: 'denied-to-model',
+          maxTurns: execution.maxTurns,
           validationCommands: execution.validationCommands
         },
         validationResults: []
@@ -330,11 +344,16 @@ export class ExecutionController {
       writer.publish('approval.required', 'Execution is prepared and requires explicit operator approval.', {
         branchName: record.branchName,
         worktreePath: record.worktreePath,
+        maxTurns: record.runtimePolicy.maxTurns,
         validationCommands: record.runtimePolicy.validationCommands
       });
       await writer.flush();
+      committed = true;
       return record;
     } catch (error) {
+      if (worktree && !committed) await discardPreparedWorktree(worktree);
+      await fs.rm(path.join(storagePath, 'run.json'), { force: true });
+      await fs.rm(path.join(storagePath, 'prompt.txt'), { force: true });
       const message = error instanceof Error ? error.message : String(error);
       writer.publish('run.failed', message);
       await writer.flush();
@@ -349,8 +368,7 @@ export class ExecutionController {
   ): Promise<ExecutionRun> {
     assertRunId(runId);
     if (this.active.has(runId)) throw new Error('Execution is already active');
-    const execution = pack.manifest.execution;
-    if (!execution) throw new Error(`Pipeline ${pack.manifest.id} does not declare an execution contract`);
+    if (!pack.manifest.execution) throw new Error(`Pipeline ${pack.manifest.id} does not declare an execution contract`);
 
     const record = await this.get(runId);
     if (!record) throw new Error('Execution run was not found');
@@ -360,19 +378,29 @@ export class ExecutionController {
     if (record.status !== 'awaiting_approval') throw new Error(`Execution cannot start from status ${record.status}`);
     if (!isProcessRuntimeId(record.runtimeId)) throw new Error(`Runtime ${record.runtimeId} does not support local execution`);
 
+    const worktreePath = await fs.realpath(record.worktreePath);
+    const workingDirectory = await resolveRealWithin(worktreePath, record.workingDirectory, 'Execution working directory');
     const prompt = await fs.readFile(path.join(record.storagePath, 'prompt.txt'), 'utf8');
     const writer = await createEventWriter(runId, record.storagePath, emitToRenderer);
+    record.worktreePath = worktreePath;
+    record.workingDirectory = workingDirectory;
     record.approvedAt = new Date().toISOString();
     record.updatedAt = record.approvedAt;
     record.status = 'running';
     await atomicJsonWrite(path.join(record.storagePath, 'run.json'), record);
     writer.publish('execution.started', `Approved execution started with ${record.runtimeId}`, {
       approvedAt: record.approvedAt,
-      worktreePath: record.worktreePath
+      worktreePath: record.worktreePath,
+      maxTurns: record.runtimePolicy.maxTurns
     });
 
     try {
-      const child = await spawnRuntimeExecution(record.runtimeId, record.workingDirectory, prompt, execution.maxTurns);
+      const child = await spawnRuntimeExecution(
+        record.runtimeId,
+        record.workingDirectory,
+        prompt,
+        record.runtimePolicy.maxTurns
+      );
       const active: ActiveExecution = { child, record, cancelRequested: false };
       this.active.set(runId, active);
 
@@ -424,7 +452,8 @@ export class ExecutionController {
     const active = this.active.get(runId);
     if (!active) return false;
     active.cancelRequested = true;
-    return active.child.kill();
+    active.child.kill();
+    return true;
   }
 
   private async persist(record: ExecutionRun): Promise<void> {
@@ -468,15 +497,15 @@ export class ExecutionController {
       for (const command of active.record.runtimePolicy.validationCommands) {
         if (active.cancelRequested) throw new Error('Execution cancelled');
         writer.publish('validation.started', `Starting validation: ${command.name}`, { commandId: command.id });
-        const cwd = command.cwd && command.cwd !== '.'
-          ? ensureWithin(active.record.worktreePath, path.resolve(active.record.workingDirectory, command.cwd), 'Validation working directory')
+        const cwdCandidate = command.cwd && command.cwd !== '.'
+          ? path.resolve(active.record.workingDirectory, command.cwd)
           : active.record.workingDirectory;
+        const cwd = await resolveRealWithin(active.record.worktreePath, cwdCandidate, 'Validation working directory');
         const executable = await resolveValidationExecutable(command, cwd, active.record.worktreePath);
         const result = await runValidationCommand(
           executable,
           command,
           cwd,
-          active.record.worktreePath,
           writer,
           (child) => { active.child = child; },
           () => active.cancelRequested
