@@ -3,14 +3,14 @@ import { constants as fsConstants, promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { ProcessRuntimeId, RuntimeAdapterDescriptor } from '../shared/contracts';
-import { PROCESS_RUNTIME_SPECS, getProcessRuntimeSpec } from '../shared/runtime-specs';
+import { PROCESS_RUNTIME_SPECS, buildExecutionArgs, getProcessRuntimeSpec } from '../shared/runtime-specs';
 import { buildSearchPath } from '../shared/search-paths';
 import { loadSettings } from './settings';
 
 const PROBE_TIMEOUT_MS = 5_000;
 const MAX_VERSION_OUTPUT = 4_096;
 
-function runtimeSearchPath(): string {
+export function runtimeSearchPath(): string {
   return buildSearchPath(process.env.PATH ?? '', os.homedir(), process.platform, path.delimiter);
 }
 
@@ -45,7 +45,7 @@ export async function findExecutable(candidates: string[], pathValue = runtimeSe
   return null;
 }
 
-function requiresShell(executable: string): boolean {
+export function requiresCommandShell(executable: string): boolean {
   return process.platform === 'win32' && /\.(cmd|bat)$/i.test(executable);
 }
 
@@ -53,7 +53,7 @@ function probeVersion(executable: string, args: string[]): Promise<string | unde
   return new Promise((resolve) => {
     const child = spawn(executable, args, {
       env: { ...process.env, PATH: runtimeSearchPath(), NO_COLOR: '1' },
-      shell: requiresShell(executable),
+      shell: requiresCommandShell(executable),
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe']
     });
@@ -137,21 +137,34 @@ export async function discoverRuntimeAdapters(): Promise<RuntimeAdapterDescripto
   return discovered;
 }
 
-export async function spawnRuntimePreview(runtimeId: string, cwd: string, prompt: string): Promise<ChildProcessWithoutNullStreams> {
+async function spawnRuntime(runtimeId: string, cwd: string, prompt: string, args: string[]): Promise<ChildProcessWithoutNullStreams> {
   const spec = getProcessRuntimeSpec(runtimeId);
-  if (!spec) throw new Error(`Runtime ${runtimeId} does not support local process previews`);
-
+  if (!spec) throw new Error(`Runtime ${runtimeId} does not support local process sessions`);
   const resolved = await resolveRuntimeExecutable(spec.id);
   if (!resolved.path) throw new Error(`Runtime executable for ${runtimeId} was not found or configured`);
 
-  const child = spawn(resolved.path, spec.previewArgs, {
+  const child = spawn(resolved.path, args, {
     cwd,
     env: { ...process.env, PATH: runtimeSearchPath(), NO_COLOR: '1' },
-    shell: requiresShell(resolved.path),
+    shell: requiresCommandShell(resolved.path),
     windowsHide: true,
     stdio: ['pipe', 'pipe', 'pipe']
   });
-
   child.stdin.end(prompt, 'utf8');
   return child;
+}
+
+export async function spawnRuntimePreview(runtimeId: string, cwd: string, prompt: string): Promise<ChildProcessWithoutNullStreams> {
+  const spec = getProcessRuntimeSpec(runtimeId);
+  if (!spec) throw new Error(`Runtime ${runtimeId} does not support local process previews`);
+  return spawnRuntime(runtimeId, cwd, prompt, spec.previewArgs);
+}
+
+export async function spawnRuntimeExecution(
+  runtimeId: ProcessRuntimeId,
+  cwd: string,
+  prompt: string,
+  maxTurns: number
+): Promise<ChildProcessWithoutNullStreams> {
+  return spawnRuntime(runtimeId, cwd, prompt, buildExecutionArgs(runtimeId, maxTurns));
 }
