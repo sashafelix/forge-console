@@ -18,9 +18,13 @@ The user independently selects:
 
 A pipeline pack declares its identity, version, dynamic input schema, required capabilities, compatible runtimes and ordered stages. The renderer does not hard-code stage names or task fields.
 
+Packs may be bundled with the application or installed into the per-user application-data directory. Installation validates the manifest and copies a bounded, symlink-free pack snapshot while excluding repository and build state.
+
 ### Runtime adapters
 
 Runtime adapters translate a generic agent request into provider-specific execution. Initial targets are Claude Code, GitHub Copilot and BMW LLM. A runtime may be a local process, HTTP endpoint or MCP/ACP connection.
+
+Version 0.2 implements executable discovery and read-only local process previews for Claude Code and GitHub Copilot. Provider arguments are fixed adapter data, prompts are passed over standard input, and the renderer cannot construct command lines.
 
 ### Tool adapters
 
@@ -28,33 +32,46 @@ Tool adapters expose constrained capabilities such as local Git, Jira, GitHub, C
 
 ### Execution adapters
 
-Execution adapters decide where work runs. Version 0.1 starts with the local machine; containers and remote workers remain future adapters.
+Execution adapters decide where work runs. The current execution environment is the local machine. Write-capable pipeline execution will add isolated Git worktrees before containers or remote workers are considered.
+
+## Run boundary
+
+A preview run is stored under Electron's per-user application-data directory and contains:
+
+- `run.json` — current preview state with secret-declared inputs redacted;
+- `prompt.txt` — the exact read-only prompt sent to the runtime;
+- `events.jsonl` — append-only lifecycle and provider-output events.
+
+The controller owns process lifecycle and cancellation. The selected pipeline still owns any future canonical execution evidence; the desktop application must not manufacture stage success.
 
 ## Security boundary
 
 The React renderer has no Node.js access. Electron runs with `contextIsolation`, `nodeIntegration: false` and a narrow preload API. Renderer input cannot request arbitrary shell execution.
 
-Canonical pipeline artifacts should remain owned by the selected pipeline. The desktop application provides presentation, process control and human input without silently rewriting pipeline evidence.
+Read-only preview mode does not grant Claude permission bypass or Copilot write/shell tools. Write-capable execution requires a separate explicit permission model and cannot be inferred from a pipeline's compatibility declaration.
 
-## Initial source layout
+## Source layout
 
 ```text
 src/
-├── main/       Electron controller and IPC
-├── renderer/   React user interface
-└── shared/     provider-neutral contracts
+├── main/
+│   ├── ipc.ts             narrow renderer boundary
+│   ├── packs.ts           pack validation and installation
+│   ├── runtime.ts         runtime discovery and process spawning
+│   └── run-controller.ts  persisted preview lifecycle
+├── renderer/              React user interface
+└── shared/                provider-neutral contracts and runtime specs
 
-packs/examples/ Example pipeline manifests
+packs/examples/            bundled example manifests
 ```
 
-## Near-term milestones
+## Next milestones
 
-1. executable discovery and runtime health checks;
-2. generic local process runtime adapter;
-3. pipeline-pack installation from folder, archive and Git repository;
-4. generic run-event stream and stage monitoring;
-5. Claude Code adapter;
-6. GitHub Copilot adapter;
-7. BMW LLM HTTP adapter;
-8. Jira, GitHub and IntelliJ MCP tool adapters;
-9. signed macOS, Windows and Linux packages.
+1. provider configuration and executable overrides for GUI-launched macOS applications;
+2. install packs from archives and private Git repositories;
+3. generic pipeline-owned event/artifact monitoring;
+4. permission-gated write execution in isolated worktrees;
+5. Copilot ACP session adapter;
+6. BMW LLM authenticated HTTP adapter;
+7. Jira, GitHub, Confluence and IntelliJ MCP tool adapters;
+8. signed and notarised macOS, Windows and Linux packages.
