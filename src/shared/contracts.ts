@@ -50,6 +50,7 @@ export interface PipelineManifest {
 
 export type RuntimeKind = 'process' | 'http' | 'mcp';
 export type AdapterStatus = 'available' | 'unconfigured' | 'unavailable';
+export type ProcessRuntimeId = 'claude-code' | 'github-copilot';
 
 export interface RuntimeAdapterDescriptor {
   id: string;
@@ -60,8 +61,14 @@ export interface RuntimeAdapterDescriptor {
   capabilities: Capability[];
   configurationHint?: string;
   executablePath?: string;
+  executableSource?: 'configured' | 'path';
   version?: string;
   checkedAt?: string;
+}
+
+export interface AppSettings {
+  schemaVersion: '1.0';
+  runtimeExecutableOverrides: Partial<Record<ProcessRuntimeId, string>>;
 }
 
 export interface SystemInfo {
@@ -119,9 +126,12 @@ export type RunEventListener = (event: RunEvent) => void;
 
 export interface DesktopApi {
   getSystemInfo(): Promise<SystemInfo>;
+  getSettings(): Promise<AppSettings>;
   listPipelines(): Promise<PipelineManifest[]>;
   installPipelinePack(): Promise<PipelineManifest | null>;
   listRuntimes(): Promise<RuntimeAdapterDescriptor[]>;
+  configureRuntimeExecutable(runtimeId: ProcessRuntimeId): Promise<RuntimeAdapterDescriptor[]>;
+  clearRuntimeExecutable(runtimeId: ProcessRuntimeId): Promise<RuntimeAdapterDescriptor[]>;
   selectProjectDirectory(): Promise<ProjectSelection | null>;
   createRunDraft(request: CreateRunDraftRequest): Promise<RunDraft>;
   startPreviewRun(request: CreateRunDraftRequest): Promise<PreviewRun>;
