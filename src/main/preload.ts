@@ -21,6 +21,10 @@ const api: DesktopApi = {
   startPreviewRun: (request: CreateRunDraftRequest) => ipcRenderer.invoke(IPC_CHANNELS.startPreviewRun, request),
   getPreviewRun: (runId: string) => ipcRenderer.invoke(IPC_CHANNELS.getPreviewRun, runId),
   cancelPreviewRun: (runId: string) => ipcRenderer.invoke(IPC_CHANNELS.cancelPreviewRun, runId),
+  prepareExecution: (request: CreateRunDraftRequest) => ipcRenderer.invoke(IPC_CHANNELS.prepareExecution, request),
+  approveAndStartExecution: (runId: string) => ipcRenderer.invoke(IPC_CHANNELS.approveAndStartExecution, runId),
+  getExecutionRun: (runId: string) => ipcRenderer.invoke(IPC_CHANNELS.getExecutionRun, runId),
+  cancelExecution: (runId: string) => ipcRenderer.invoke(IPC_CHANNELS.cancelExecution, runId),
   onRunEvent: (listener: RunEventListener) => {
     const handler = (_event: Electron.IpcRendererEvent, runEvent: RunEvent) => listener(runEvent);
     ipcRenderer.on(IPC_CHANNELS.runEvent, handler);

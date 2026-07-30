@@ -9,15 +9,18 @@ import type {
   ProcessRuntimeId,
   ProjectSelection,
   RunDraft,
+  RunEvent,
   SystemInfo
 } from '../shared/contracts';
 import { isProcessRuntimeId } from '../shared/settings';
 import { listPipelineManifests, listRuntimeAdapters } from './catalog';
-import { installPipelinePackFromDialog } from './packs';
+import { ExecutionController } from './execution-controller';
+import { installPipelinePackFromDialog, resolvePipelinePack } from './packs';
 import { PreviewRunController } from './run-controller';
 import { clearRuntimeExecutableOverride, loadSettings, setRuntimeExecutableOverride } from './settings';
 
 const previewRuns = new PreviewRunController();
+const executionRuns = new ExecutionController();
 
 async function selectProjectDirectory(): Promise<ProjectSelection | null> {
   const result = await dialog.showOpenDialog({
@@ -74,6 +77,14 @@ async function resolveManifest(request: CreateRunDraftRequest): Promise<Pipeline
   return manifest;
 }
 
+async function ensureRuntimeAvailable(runtimeId: string): Promise<void> {
+  const runtime = (await listRuntimeAdapters()).find((candidate) => candidate.id === runtimeId);
+  if (!runtime) throw new Error(`Runtime ${runtimeId} is not registered`);
+  if (runtime.status !== 'available') {
+    throw new Error(runtime.configurationHint ?? `Runtime ${runtime.name} is not available`);
+  }
+}
+
 function sanitizedInputs(manifest: PipelineManifest, inputs: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(inputs).map(([name, value]) => [name, manifest.inputSchema.properties[name]?.secret ? '[REDACTED]' : value])
@@ -101,6 +112,12 @@ async function createRunDraft(request: CreateRunDraftRequest): Promise<RunDraft>
   return draft;
 }
 
+function rendererEmitter(event: Electron.IpcMainInvokeEvent): (runEvent: RunEvent) => void {
+  return (runEvent) => {
+    if (!event.sender.isDestroyed()) event.sender.send(IPC_CHANNELS.runEvent, runEvent);
+  };
+}
+
 export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.getSystemInfo, (): SystemInfo => ({
     platform: process.platform,
@@ -119,11 +136,27 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.createRunDraft, (_event, request: CreateRunDraftRequest) => createRunDraft(request));
   ipcMain.handle(IPC_CHANNELS.startPreviewRun, async (event, request: CreateRunDraftRequest) => {
     const manifest = await resolveManifest(request);
-    return previewRuns.start(request, manifest, (runEvent) => {
-      if (!event.sender.isDestroyed()) event.sender.send(IPC_CHANNELS.runEvent, runEvent);
-    });
+    await ensureRuntimeAvailable(request.runtimeId);
+    return previewRuns.start(request, manifest, rendererEmitter(event));
   });
   ipcMain.handle(IPC_CHANNELS.getPreviewRun, (_event, runId: string) => previewRuns.get(runId));
   ipcMain.handle(IPC_CHANNELS.cancelPreviewRun, (_event, runId: string) => previewRuns.cancel(runId));
+  ipcMain.handle(IPC_CHANNELS.prepareExecution, async (event, request: CreateRunDraftRequest) => {
+    const pack = await resolvePipelinePack(request.pipelineId, request.pipelineVersion);
+    if (!pack.manifest.supportedRuntimes.includes(request.runtimeId)) {
+      throw new Error(`Pipeline ${pack.manifest.id} does not support runtime ${request.runtimeId}`);
+    }
+    await ensureRuntimeAvailable(request.runtimeId);
+    return executionRuns.prepare(request, pack, rendererEmitter(event));
+  });
+  ipcMain.handle(IPC_CHANNELS.approveAndStartExecution, async (event, runId: string) => {
+    const record = await executionRuns.get(runId);
+    if (!record) throw new Error('Execution run was not found');
+    await ensureRuntimeAvailable(record.runtimeId);
+    const pack = await resolvePipelinePack(record.pipelineId, record.pipelineVersion);
+    return executionRuns.start(runId, pack, rendererEmitter(event));
+  });
+  ipcMain.handle(IPC_CHANNELS.getExecutionRun, (_event, runId: string) => executionRuns.get(runId));
+  ipcMain.handle(IPC_CHANNELS.cancelExecution, (event, runId: string) => executionRuns.cancel(runId, rendererEmitter(event)));
   ipcMain.handle(IPC_CHANNELS.openPath, async (_event, targetPath: string) => shell.openPath(path.resolve(targetPath)));
 }
