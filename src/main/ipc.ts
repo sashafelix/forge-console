@@ -146,6 +146,20 @@ function frozenAgentPack(record: Awaited<ReturnType<ExecutionController['get']>>
   };
 }
 
+async function alignAgentPromptWithPolicy(record: Awaited<ReturnType<ExecutionController['get']>>): Promise<void> {
+  if (!record) throw new Error('Execution run was not found');
+  const promptPath = path.join(record.storagePath, 'prompt.txt');
+  const prompt = await fs.readFile(promptPath, 'utf8');
+  const shell = record.runtimePolicy.shell === 'allowed-to-model' ? 'available' : 'unavailable';
+  const network = record.runtimePolicy.network === 'allowed-to-model' ? 'available' : 'unavailable';
+  const replacement = `- Shell access is ${shell}; network access is ${network}. Use only the permissions explicitly approved for this standalone agent run.`;
+  const aligned = prompt.replace(
+    '- Shell and network tools are intentionally unavailable. Do not attempt to bypass those restrictions.',
+    replacement
+  );
+  await fs.writeFile(promptPath, aligned, { encoding: 'utf8', mode: 0o600 });
+}
+
 export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.getSystemInfo, (): SystemInfo => ({
     platform: process.platform,
@@ -170,6 +184,7 @@ export function registerIpcHandlers(): void {
     record.runtimePolicy.shell = request.agent.requiresShell ? 'allowed-to-model' : 'denied-to-model';
     record.runtimePolicy.network = request.agent.requiresNetwork ? 'allowed-to-model' : 'denied-to-model';
     await fs.writeFile(path.join(record.storagePath, 'run.json'), `${JSON.stringify(record, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
+    await alignAgentPromptWithPolicy(record);
     return record;
   });
   ipcMain.handle(IPC_CHANNELS.createRunDraft, (_event, request: CreateRunDraftRequest) => createRunDraft(request));
