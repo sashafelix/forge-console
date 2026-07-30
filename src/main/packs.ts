@@ -7,6 +7,7 @@ import { validatePipelineManifest } from '../shared/validation';
 
 const MAX_PACK_FILES = 2_000;
 const MAX_PACK_BYTES = 50 * 1024 * 1024;
+const EXCLUDED_PACK_ENTRIES = new Set(['.git', 'node_modules', 'dist', 'release', '.agent-runs', 'docs/agent/runs']);
 
 function bundledRoot(): string {
   return app.isPackaged
@@ -64,18 +65,21 @@ interface CopyState {
   bytes: number;
 }
 
-async function copyPackDirectory(source: string, destination: string, state: CopyState): Promise<void> {
+async function copyPackDirectory(source: string, destination: string, state: CopyState, relative = ''): Promise<void> {
   await fs.mkdir(destination, { recursive: true });
   const entries = await fs.readdir(source, { withFileTypes: true });
 
   for (const entry of entries) {
+    const relativePath = relative ? path.posix.join(relative.replaceAll('\\', '/'), entry.name) : entry.name;
+    if (EXCLUDED_PACK_ENTRIES.has(entry.name) || EXCLUDED_PACK_ENTRIES.has(relativePath)) continue;
+
     const sourcePath = path.join(source, entry.name);
     const destinationPath = path.join(destination, entry.name);
     const details = await fs.lstat(sourcePath);
 
     if (details.isSymbolicLink()) throw new Error(`Pipeline packs may not contain symbolic links: ${sourcePath}`);
     if (details.isDirectory()) {
-      await copyPackDirectory(sourcePath, destinationPath, state);
+      await copyPackDirectory(sourcePath, destinationPath, state, relativePath);
       continue;
     }
     if (!details.isFile()) throw new Error(`Unsupported pack entry: ${sourcePath}`);
@@ -95,7 +99,7 @@ export async function installPipelinePackFromDialog(): Promise<PipelineManifest 
   });
   if (result.canceled || result.filePaths.length === 0) return null;
 
-  const source = path.resolve(result.filePaths[0]);
+  const source = await fs.realpath(path.resolve(result.filePaths[0]));
   const manifest = await readPipelineManifest(source);
   const root = installedRoot();
   await fs.mkdir(root, { recursive: true });
