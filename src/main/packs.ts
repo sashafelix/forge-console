@@ -7,7 +7,13 @@ import { validatePipelineManifest } from '../shared/validation';
 
 const MAX_PACK_FILES = 2_000;
 const MAX_PACK_BYTES = 50 * 1024 * 1024;
+const MAX_TEXT_ASSET_BYTES = 1024 * 1024;
 const EXCLUDED_PACK_ENTRIES = new Set(['.git', 'node_modules', 'dist', 'release', '.agent-runs', 'docs/agent/runs']);
+
+export interface ResolvedPipelinePack {
+  manifest: PipelineManifest;
+  directory: string;
+}
 
 function bundledRoot(): string {
   return app.isPackaged
@@ -24,6 +30,13 @@ function safeSegment(value: string, label: string): string {
     throw new Error(`${label} may contain only letters, numbers, dot, underscore and hyphen`);
   }
   return value;
+}
+
+function assertSafeRelativePath(relativePath: string): void {
+  const normalized = relativePath.replaceAll('\\', '/');
+  if (!relativePath || path.isAbsolute(relativePath) || normalized.split('/').some((segment) => !segment || segment === '..')) {
+    throw new Error(`Unsafe pipeline asset path: ${relativePath}`);
+  }
 }
 
 export async function readPipelineManifest(packDirectory: string): Promise<PipelineManifest> {
@@ -48,16 +61,40 @@ async function packDirectories(root: string): Promise<string[]> {
   }
 }
 
-export async function listPipelineManifests(): Promise<PipelineManifest[]> {
+async function pipelinePackRecords(): Promise<Map<string, ResolvedPipelinePack>> {
   const directories = [...await packDirectories(bundledRoot()), ...await packDirectories(installedRoot())];
-  const manifests = new Map<string, PipelineManifest>();
-
+  const records = new Map<string, ResolvedPipelinePack>();
   for (const directory of directories) {
     const manifest = await readPipelineManifest(directory);
-    manifests.set(`${manifest.id}@${manifest.version}`, manifest);
+    records.set(`${manifest.id}@${manifest.version}`, { manifest, directory });
   }
+  return records;
+}
 
-  return [...manifests.values()].sort((a, b) => a.name.localeCompare(b.name) || a.version.localeCompare(b.version));
+export async function listPipelineManifests(): Promise<PipelineManifest[]> {
+  const records = await pipelinePackRecords();
+  return [...records.values()]
+    .map((record) => record.manifest)
+    .sort((a, b) => a.name.localeCompare(b.name) || a.version.localeCompare(b.version));
+}
+
+export async function resolvePipelinePack(id: string, version: string): Promise<ResolvedPipelinePack> {
+  const record = (await pipelinePackRecords()).get(`${safeSegment(id, 'Pipeline id')}@${safeSegment(version, 'Pipeline version')}`);
+  if (!record) throw new Error(`Pipeline ${id}@${version} is not installed`);
+  return record;
+}
+
+export async function readPipelineTextAsset(pack: ResolvedPipelinePack, relativePath: string): Promise<string> {
+  assertSafeRelativePath(relativePath);
+  const root = await fs.realpath(pack.directory);
+  const candidate = await fs.realpath(path.join(root, relativePath));
+  if (candidate !== root && !candidate.startsWith(`${root}${path.sep}`)) {
+    throw new Error(`Pipeline asset escapes pack root: ${relativePath}`);
+  }
+  const details = await fs.lstat(candidate);
+  if (!details.isFile() || details.isSymbolicLink()) throw new Error(`Pipeline asset must be a regular file: ${relativePath}`);
+  if (details.size > MAX_TEXT_ASSET_BYTES) throw new Error(`Pipeline text asset exceeds ${MAX_TEXT_ASSET_BYTES} bytes`);
+  return fs.readFile(candidate, 'utf8');
 }
 
 interface CopyState {
@@ -118,6 +155,9 @@ export async function installPipelinePackFromDialog(): Promise<PipelineManifest 
     const copiedManifest = await readPipelineManifest(temporary);
     if (copiedManifest.id !== manifest.id || copiedManifest.version !== manifest.version) {
       throw new Error('Copied manifest identity changed during installation');
+    }
+    if (copiedManifest.execution) {
+      await readPipelineTextAsset({ manifest: copiedManifest, directory: temporary }, copiedManifest.execution.promptTemplate);
     }
     await fs.rename(temporary, destination);
     return copiedManifest;
