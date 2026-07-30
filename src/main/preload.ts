@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type {
   CreateRunDraftRequest,
   DesktopApi,
+  DiscoverAgentsRequest,
+  PrepareAgentExecutionRequest,
   ProcessRuntimeId,
   RunEvent,
   RunEventListener
@@ -19,6 +21,9 @@ const IPC_CHANNELS = {
   configureRuntimeExecutable: 'settings:configure-runtime-executable',
   clearRuntimeExecutable: 'settings:clear-runtime-executable',
   selectProjectDirectory: 'projects:select-directory',
+  selectAgentLibraryDirectory: 'agents:select-library',
+  discoverAgents: 'agents:discover',
+  prepareAgentExecution: 'agents:prepare-execution',
   createRunDraft: 'runs:create-draft',
   startPreviewRun: 'runs:start-preview',
   getPreviewRun: 'runs:get-preview',
@@ -40,6 +45,9 @@ const api: DesktopApi = {
   configureRuntimeExecutable: (runtimeId: ProcessRuntimeId) => ipcRenderer.invoke(IPC_CHANNELS.configureRuntimeExecutable, runtimeId),
   clearRuntimeExecutable: (runtimeId: ProcessRuntimeId) => ipcRenderer.invoke(IPC_CHANNELS.clearRuntimeExecutable, runtimeId),
   selectProjectDirectory: () => ipcRenderer.invoke(IPC_CHANNELS.selectProjectDirectory),
+  selectAgentLibraryDirectory: () => ipcRenderer.invoke(IPC_CHANNELS.selectAgentLibraryDirectory),
+  discoverAgents: (request: DiscoverAgentsRequest) => ipcRenderer.invoke(IPC_CHANNELS.discoverAgents, request),
+  prepareAgentExecution: (request: PrepareAgentExecutionRequest) => ipcRenderer.invoke(IPC_CHANNELS.prepareAgentExecution, request),
   createRunDraft: (request: CreateRunDraftRequest) => ipcRenderer.invoke(IPC_CHANNELS.createRunDraft, request),
   startPreviewRun: (request: CreateRunDraftRequest) => ipcRenderer.invoke(IPC_CHANNELS.startPreviewRun, request),
   getPreviewRun: (runId: string) => ipcRenderer.invoke(IPC_CHANNELS.getPreviewRun, runId),
