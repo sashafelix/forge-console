@@ -157,6 +157,6 @@ export function registerIpcHandlers(): void {
     return executionRuns.start(runId, pack, rendererEmitter(event));
   });
   ipcMain.handle(IPC_CHANNELS.getExecutionRun, (_event, runId: string) => executionRuns.get(runId));
-  ipcMain.handle(IPC_CHANNELS.cancelExecution, (_event, runId: string) => executionRuns.cancel(runId));
+  ipcMain.handle(IPC_CHANNELS.cancelExecution, (event, runId: string) => executionRuns.cancel(runId, rendererEmitter(event)));
   ipcMain.handle(IPC_CHANNELS.openPath, async (_event, targetPath: string) => shell.openPath(path.resolve(targetPath)));
 }
