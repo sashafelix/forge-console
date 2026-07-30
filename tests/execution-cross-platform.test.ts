@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import type { PipelineManifest } from '../src/shared/contracts';
 import { validatePipelineManifest } from '../src/shared/validation';
 
-function fixture() {
+function fixture(): PipelineManifest {
   return {
     schemaVersion: '1.1',
     id: 'windows-path-fixture',
@@ -36,7 +37,7 @@ function fixture() {
 
 test('Windows drive-letter executable is rejected on non-Windows CI', () => {
   const manifest = fixture();
-  manifest.execution.validationCommands[0].executable = 'C:\\Tools\\git.exe';
+  manifest.execution!.validationCommands[0].executable = 'C:\\Tools\\git.exe';
   const result = validatePipelineManifest(manifest);
   assert.equal(result.valid, false);
   assert.ok(result.errors.some((error) => error.includes('non-absolute executable')));
@@ -44,7 +45,7 @@ test('Windows drive-letter executable is rejected on non-Windows CI', () => {
 
 test('Windows UNC executable is rejected on non-Windows CI', () => {
   const manifest = fixture();
-  manifest.execution.validationCommands[0].windowsExecutable = '\\\\server\\share\\tool.cmd';
+  manifest.execution!.validationCommands[0].windowsExecutable = '\\\\server\\share\\tool.cmd';
   const result = validatePipelineManifest(manifest);
   assert.equal(result.valid, false);
   assert.ok(result.errors.some((error) => error.includes('non-absolute executable')));
@@ -52,7 +53,7 @@ test('Windows UNC executable is rejected on non-Windows CI', () => {
 
 test('Windows absolute prompt template is rejected on non-Windows CI', () => {
   const manifest = fixture();
-  manifest.execution.promptTemplate = 'C:\\packs\\prompt.md';
+  manifest.execution!.promptTemplate = 'C:\\packs\\prompt.md';
   const result = validatePipelineManifest(manifest);
   assert.equal(result.valid, false);
   assert.ok(result.errors.some((error) => error.includes('promptTemplate')));
