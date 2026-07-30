@@ -15,8 +15,16 @@ function nonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+function isAbsoluteOnAnyPlatform(value: string): boolean {
+  return path.posix.isAbsolute(value) || path.win32.isAbsolute(value);
+}
+
+function portableBasename(value: string): string {
+  return path.posix.basename(value.replaceAll('\\', '/'));
+}
+
 function safeRelativePath(value: unknown): value is string {
-  if (!nonEmptyString(value) || path.isAbsolute(value) || value.includes('\0') || /[\r\n]/.test(value)) return false;
+  if (!nonEmptyString(value) || isAbsoluteOnAnyPlatform(value) || value.includes('\0') || /[\r\n]/.test(value)) return false;
   return !value.replaceAll('\\', '/').split('/').some((segment) => segment === '..' || segment === '');
 }
 
@@ -62,14 +70,14 @@ function validateExecution(value: unknown, errors: string[]): void {
     for (const field of ['executable', 'windowsExecutable'] as const) {
       const executable = command[field];
       if (field === 'windowsExecutable' && executable === undefined) continue;
-      if (!nonEmptyString(executable) || /[\s\0]/.test(executable) || path.isAbsolute(executable)) {
+      if (!nonEmptyString(executable) || /[\s\0]/.test(executable) || isAbsoluteOnAnyPlatform(executable)) {
         errors.push(`${prefix}.${field} must be one non-absolute executable path without whitespace`);
         continue;
       }
       if ((executable.includes('/') || executable.includes('\\') || executable.startsWith('.')) && !safeRelativePath(executable)) {
         errors.push(`${prefix}.${field} must be a safe relative executable path`);
       }
-      const base = path.basename(executable).toLowerCase();
+      const base = portableBasename(executable).toLowerCase();
       if (DISALLOWED_VALIDATION_EXECUTABLES.has(base)) errors.push(`${prefix}.${field} uses a disallowed shell or interpreter`);
     }
 
@@ -78,7 +86,7 @@ function validateExecution(value: unknown, errors: string[]): void {
     )) {
       errors.push(`${prefix}.args must contain at most 64 bounded strings without control or shell metacharacters`);
     }
-    const base = nonEmptyString(command.executable) ? path.basename(command.executable).toLowerCase() : '';
+    const base = nonEmptyString(command.executable) ? portableBasename(command.executable).toLowerCase() : '';
     if (base === 'git' && (!Array.isArray(command.args) || !ALLOWED_GIT_VALIDATIONS.has(String(command.args[0])))) {
       errors.push(`${prefix} may use git only for status, diff, log or show validation`);
     }
