@@ -36,8 +36,27 @@ export interface PipelineStage {
   requiredCapabilities: Capability[];
 }
 
+export interface PipelineValidationCommand {
+  id: string;
+  name: string;
+  executable: string;
+  windowsExecutable?: string;
+  args: string[];
+  cwd?: string;
+  timeoutSeconds: number;
+  required: boolean;
+}
+
+export interface PipelineExecutionContract {
+  mode: 'runtime-prompt';
+  isolation: 'git-worktree';
+  promptTemplate: string;
+  maxTurns: number;
+  validationCommands: PipelineValidationCommand[];
+}
+
 export interface PipelineManifest {
-  schemaVersion: '1.0';
+  schemaVersion: '1.0' | '1.1';
   id: string;
   name: string;
   description: string;
@@ -46,6 +65,7 @@ export interface PipelineManifest {
   requiredCapabilities: Capability[];
   supportedRuntimes: string[];
   stages: PipelineStage[];
+  execution?: PipelineExecutionContract;
 }
 
 export type RuntimeKind = 'process' | 'http' | 'mcp';
@@ -101,7 +121,21 @@ export interface RunDraft extends CreateRunDraftRequest {
 }
 
 export type PreviewRunStatus = 'starting' | 'running' | 'completed' | 'failed' | 'cancelled';
-export type RunEventType = 'run.started' | 'runtime.stdout' | 'runtime.stderr' | 'run.completed' | 'run.failed' | 'run.cancelled';
+export type ExecutionRunStatus = 'preparing' | 'awaiting_approval' | 'running' | 'validating' | 'completed' | 'failed' | 'cancelled';
+export type RunEventType =
+  | 'run.started'
+  | 'runtime.stdout'
+  | 'runtime.stderr'
+  | 'worktree.created'
+  | 'approval.required'
+  | 'execution.started'
+  | 'validation.started'
+  | 'validation.stdout'
+  | 'validation.stderr'
+  | 'validation.completed'
+  | 'run.completed'
+  | 'run.failed'
+  | 'run.cancelled';
 
 export interface RunEvent {
   runId: string;
@@ -122,6 +156,37 @@ export interface PreviewRun extends CreateRunDraftRequest {
   error?: string;
 }
 
+export interface ValidationCommandResult {
+  commandId: string;
+  startedAt: string;
+  completedAt: string;
+  exitCode?: number;
+  timedOut: boolean;
+  passed: boolean;
+  required: boolean;
+}
+
+export interface ExecutionRun extends CreateRunDraftRequest {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  status: ExecutionRunStatus;
+  storagePath: string;
+  worktreePath: string;
+  branchName: string;
+  approvalRequired: true;
+  approvedAt?: string;
+  runtimePolicy: {
+    fileWrites: 'worktree-only';
+    shell: 'denied-to-model';
+    network: 'denied-to-model';
+    validationCommands: PipelineValidationCommand[];
+  };
+  validationResults: ValidationCommandResult[];
+  exitCode?: number;
+  error?: string;
+}
+
 export type RunEventListener = (event: RunEvent) => void;
 
 export interface DesktopApi {
@@ -137,6 +202,10 @@ export interface DesktopApi {
   startPreviewRun(request: CreateRunDraftRequest): Promise<PreviewRun>;
   getPreviewRun(runId: string): Promise<PreviewRun | null>;
   cancelPreviewRun(runId: string): Promise<boolean>;
+  prepareExecution(request: CreateRunDraftRequest): Promise<ExecutionRun>;
+  approveAndStartExecution(runId: string): Promise<ExecutionRun>;
+  getExecutionRun(runId: string): Promise<ExecutionRun | null>;
+  cancelExecution(runId: string): Promise<boolean>;
   onRunEvent(listener: RunEventListener): () => void;
   openPath(path: string): Promise<string>;
 }
