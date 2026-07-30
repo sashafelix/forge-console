@@ -169,7 +169,10 @@ export async function createAgentExecutionPack(request: PrepareAgentExecutionReq
   const directory = path.join(app.getPath('userData'), 'generated-agent-packs', randomUUID());
   await fs.mkdir(directory, { recursive: true });
   const promptTemplate = 'agent-prompt.md';
+  const shellPolicy = request.agent.requiresShell ? 'allowed' : 'denied';
+  const networkPolicy = request.agent.requiresNetwork ? 'allowed' : 'denied';
   const guardrails = [
+    `AGENT_PIPELINE_UI_POLICY shell=${shellPolicy} network=${networkPolicy}`,
     `You are running the standalone agent ${parsed.name} from ${request.agent.sourceRepository.name}.`,
     `The target code repository is {{workingDirectory}}.`,
     'Follow the agent definition below exactly.',
@@ -219,8 +222,8 @@ export async function createAgentExecutionPack(request: PrepareAgentExecutionReq
         timeoutSeconds: 60,
         required: true
       }],
-      modelShell: request.agent.requiresShell ? 'allowed' : 'denied',
-      modelNetwork: request.agent.requiresNetwork ? 'allowed' : 'denied'
+      modelShell: shellPolicy,
+      modelNetwork: networkPolicy
     }
   };
   return {
