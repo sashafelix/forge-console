@@ -53,6 +53,8 @@ export interface PipelineExecutionContract {
   promptTemplate: string;
   maxTurns: number;
   validationCommands: PipelineValidationCommand[];
+  modelShell?: 'denied' | 'allowed';
+  modelNetwork?: 'denied' | 'allowed';
 }
 
 export interface PipelineManifest {
@@ -66,6 +68,31 @@ export interface PipelineManifest {
   supportedRuntimes: string[];
   stages: PipelineStage[];
   execution?: PipelineExecutionContract;
+}
+
+export interface AgentDefinition {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  sourcePath: string;
+  sourceRepository: ProjectSelection;
+  tools: string[];
+  inputs: string[];
+  writes: string[];
+  requiresShell: boolean;
+  requiresNetwork: boolean;
+}
+
+export interface DiscoverAgentsRequest {
+  sourceRepository: ProjectSelection;
+}
+
+export interface PrepareAgentExecutionRequest {
+  agent: AgentDefinition;
+  targetProject: ProjectSelection;
+  runtimeId: ProcessRuntimeId;
+  inputs: Record<string, unknown>;
 }
 
 export type RuntimeKind = 'process' | 'http' | 'mcp';
@@ -181,8 +208,8 @@ export interface ExecutionRun extends CreateRunDraftRequest {
   approvedAt?: string;
   runtimePolicy: {
     fileWrites: 'worktree-only';
-    shell: 'denied-to-model';
-    network: 'denied-to-model';
+    shell: 'denied-to-model' | 'allowed-to-model';
+    network: 'denied-to-model' | 'allowed-to-model';
     maxTurns: number;
     validationCommands: PipelineValidationCommand[];
   };
@@ -202,6 +229,9 @@ export interface DesktopApi {
   configureRuntimeExecutable(runtimeId: ProcessRuntimeId): Promise<RuntimeAdapterDescriptor[]>;
   clearRuntimeExecutable(runtimeId: ProcessRuntimeId): Promise<RuntimeAdapterDescriptor[]>;
   selectProjectDirectory(): Promise<ProjectSelection | null>;
+  selectAgentLibraryDirectory(): Promise<ProjectSelection | null>;
+  discoverAgents(request: DiscoverAgentsRequest): Promise<AgentDefinition[]>;
+  prepareAgentExecution(request: PrepareAgentExecutionRequest): Promise<ExecutionRun>;
   createRunDraft(request: CreateRunDraftRequest): Promise<RunDraft>;
   startPreviewRun(request: CreateRunDraftRequest): Promise<PreviewRun>;
   getPreviewRun(runId: string): Promise<PreviewRun | null>;
