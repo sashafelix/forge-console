@@ -6,13 +6,16 @@ import { IPC_CHANNELS } from '../shared/channels';
 import type {
   CreateRunDraftRequest,
   PipelineManifest,
+  ProcessRuntimeId,
   ProjectSelection,
   RunDraft,
   SystemInfo
 } from '../shared/contracts';
+import { isProcessRuntimeId } from '../shared/settings';
 import { listPipelineManifests, listRuntimeAdapters } from './catalog';
 import { installPipelinePackFromDialog } from './packs';
 import { PreviewRunController } from './run-controller';
+import { clearRuntimeExecutableOverride, loadSettings, setRuntimeExecutableOverride } from './settings';
 
 const previewRuns = new PreviewRunController();
 
@@ -37,6 +40,27 @@ async function selectProjectDirectory(): Promise<ProjectSelection | null> {
     path: selectedPath,
     isGitRepository
   };
+}
+
+async function configureRuntimeExecutable(runtimeId: ProcessRuntimeId) {
+  if (!isProcessRuntimeId(runtimeId)) throw new Error(`Unsupported process runtime: ${String(runtimeId)}`);
+  const result = await dialog.showOpenDialog({
+    title: `Choose the ${runtimeId === 'claude-code' ? 'Claude Code' : 'GitHub Copilot'} executable`,
+    properties: ['openFile']
+  });
+  if (result.canceled || result.filePaths.length === 0) return listRuntimeAdapters();
+
+  const selectedPath = await fs.realpath(path.resolve(result.filePaths[0]));
+  const details = await fs.stat(selectedPath);
+  if (!details.isFile()) throw new Error('The selected runtime executable is not a file');
+  await setRuntimeExecutableOverride(runtimeId, selectedPath);
+  return listRuntimeAdapters();
+}
+
+async function clearRuntimeExecutable(runtimeId: ProcessRuntimeId) {
+  if (!isProcessRuntimeId(runtimeId)) throw new Error(`Unsupported process runtime: ${String(runtimeId)}`);
+  await clearRuntimeExecutableOverride(runtimeId);
+  return listRuntimeAdapters();
 }
 
 async function resolveManifest(request: CreateRunDraftRequest): Promise<PipelineManifest> {
@@ -85,9 +109,12 @@ export function registerIpcHandlers(): void {
     electronVersion: process.versions.electron,
     nodeVersion: process.versions.node
   }));
+  ipcMain.handle(IPC_CHANNELS.getSettings, loadSettings);
   ipcMain.handle(IPC_CHANNELS.listPipelines, listPipelineManifests);
   ipcMain.handle(IPC_CHANNELS.installPipelinePack, installPipelinePackFromDialog);
   ipcMain.handle(IPC_CHANNELS.listRuntimes, listRuntimeAdapters);
+  ipcMain.handle(IPC_CHANNELS.configureRuntimeExecutable, (_event, runtimeId: ProcessRuntimeId) => configureRuntimeExecutable(runtimeId));
+  ipcMain.handle(IPC_CHANNELS.clearRuntimeExecutable, (_event, runtimeId: ProcessRuntimeId) => clearRuntimeExecutable(runtimeId));
   ipcMain.handle(IPC_CHANNELS.selectProjectDirectory, selectProjectDirectory);
   ipcMain.handle(IPC_CHANNELS.createRunDraft, (_event, request: CreateRunDraftRequest) => createRunDraft(request));
   ipcMain.handle(IPC_CHANNELS.startPreviewRun, async (event, request: CreateRunDraftRequest) => {
