@@ -59,6 +59,9 @@ export interface RuntimeAdapterDescriptor {
   status: AdapterStatus;
   capabilities: Capability[];
   configurationHint?: string;
+  executablePath?: string;
+  version?: string;
+  checkedAt?: string;
 }
 
 export interface SystemInfo {
@@ -90,11 +93,40 @@ export interface RunDraft extends CreateRunDraftRequest {
   storagePath: string;
 }
 
+export type PreviewRunStatus = 'starting' | 'running' | 'completed' | 'failed' | 'cancelled';
+export type RunEventType = 'run.started' | 'runtime.stdout' | 'runtime.stderr' | 'run.completed' | 'run.failed' | 'run.cancelled';
+
+export interface RunEvent {
+  runId: string;
+  sequence: number;
+  timestamp: string;
+  type: RunEventType;
+  message: string;
+  payload?: unknown;
+}
+
+export interface PreviewRun extends CreateRunDraftRequest {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+  status: PreviewRunStatus;
+  storagePath: string;
+  exitCode?: number;
+  error?: string;
+}
+
+export type RunEventListener = (event: RunEvent) => void;
+
 export interface DesktopApi {
   getSystemInfo(): Promise<SystemInfo>;
   listPipelines(): Promise<PipelineManifest[]>;
+  installPipelinePack(): Promise<PipelineManifest | null>;
   listRuntimes(): Promise<RuntimeAdapterDescriptor[]>;
   selectProjectDirectory(): Promise<ProjectSelection | null>;
   createRunDraft(request: CreateRunDraftRequest): Promise<RunDraft>;
+  startPreviewRun(request: CreateRunDraftRequest): Promise<PreviewRun>;
+  getPreviewRun(runId: string): Promise<PreviewRun | null>;
+  cancelPreviewRun(runId: string): Promise<boolean>;
+  onRunEvent(listener: RunEventListener): () => void;
   openPath(path: string): Promise<string>;
 }
