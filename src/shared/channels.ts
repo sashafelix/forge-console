@@ -11,6 +11,10 @@ export const IPC_CHANNELS = {
   startPreviewRun: 'runs:start-preview',
   getPreviewRun: 'runs:get-preview',
   cancelPreviewRun: 'runs:cancel-preview',
+  prepareExecution: 'runs:prepare-execution',
+  approveAndStartExecution: 'runs:approve-start-execution',
+  getExecutionRun: 'runs:get-execution',
+  cancelExecution: 'runs:cancel-execution',
   runEvent: 'runs:event',
   openPath: 'shell:open-path'
 } as const;
