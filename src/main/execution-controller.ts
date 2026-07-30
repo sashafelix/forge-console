@@ -327,6 +327,8 @@ export class ExecutionController {
         updatedAt: now,
         status: 'awaiting_approval',
         storagePath,
+        repositoryRoot: worktree.repositoryRoot,
+        baseRevision: worktree.baseRevision,
         worktreePath: worktree.worktreePath,
         workingDirectory: worktree.workingDirectory,
         branchName: worktree.branchName,
@@ -343,6 +345,7 @@ export class ExecutionController {
       await atomicJsonWrite(path.join(storagePath, 'run.json'), record);
       writer.publish('approval.required', 'Execution is prepared and requires explicit operator approval.', {
         branchName: record.branchName,
+        baseRevision: record.baseRevision,
         worktreePath: record.worktreePath,
         maxTurns: record.runtimePolicy.maxTurns,
         validationCommands: record.runtimePolicy.validationCommands
@@ -447,12 +450,29 @@ export class ExecutionController {
     }
   }
 
-  cancel(runId: string): boolean {
+  async cancel(runId: string, emitToRenderer: (event: RunEvent) => void): Promise<boolean> {
     assertRunId(runId);
     const active = this.active.get(runId);
-    if (!active) return false;
-    active.cancelRequested = true;
-    active.child.kill();
+    if (active) {
+      active.cancelRequested = true;
+      active.child.kill();
+      return true;
+    }
+
+    const record = await this.get(runId);
+    if (!record || record.status !== 'awaiting_approval') return false;
+    const writer = await createEventWriter(runId, record.storagePath, emitToRenderer);
+    await discardPreparedWorktree({
+      repositoryRoot: record.repositoryRoot,
+      worktreePath: record.worktreePath,
+      workingDirectory: record.workingDirectory,
+      branchName: record.branchName,
+      baseRevision: record.baseRevision
+    });
+    record.status = 'cancelled';
+    await this.persist(record);
+    writer.publish('run.cancelled', 'Prepared execution was discarded before approval; its worktree and branch were removed.');
+    await writer.flush();
     return true;
   }
 
