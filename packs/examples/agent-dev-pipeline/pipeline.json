@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "1.0",
+  "id": "agent-dev-pipeline",
+  "name": "Agent Development Pipeline",
+  "description": "Repository-scoped software delivery through preparation, specification, test-first implementation, independent verification and convergence.",
+  "version": "2.0.0",
+  "inputSchema": {
+    "type": "object",
+    "required": ["taskId", "task"],
+    "properties": {
+      "taskId": { "type": "string", "title": "Task ID", "description": "Stable story, issue or feature identifier." },
+      "task": { "type": "string", "title": "Task description", "description": "Describe the behaviour or outcome to deliver.", "multiline": true },
+      "constraints": { "type": "string", "title": "Constraints", "description": "Scope, compatibility, security or delivery constraints.", "multiline": true },
+      "minimumProfile": { "type": "string", "title": "Minimum risk profile", "enum": ["automatic", "small", "standard", "high-risk"], "default": "automatic" }
+    }
+  },
+  "requiredCapabilities": ["repository.read", "repository.write", "command.execute", "git.worktree", "structured.output"],
+  "supportedRuntimes": ["claude-code", "github-copilot", "bmw-llm"],
+  "stages": [
+    { "id": "prepare", "name": "Prepare", "description": "Build repository intelligence and bounded context.", "order": 1, "role": "repository_analyst", "requiredCapabilities": ["repository.read", "command.execute"] },
+    { "id": "brainstorm", "name": "Brainstorm", "description": "Convert intent into observable success criteria.", "order": 2, "role": "specifier", "requiredCapabilities": ["repository.read", "structured.output"] },
+    { "id": "plan", "name": "Plan", "description": "Create the locked task graph.", "order": 3, "role": "planner", "requiredCapabilities": ["repository.read", "structured.output"] },
+    { "id": "analyze", "name": "Analyze", "description": "Detect contradictions and missing coverage.", "order": 4, "role": "consistency_analyst", "requiredCapabilities": ["repository.read", "command.execute"] },
+    { "id": "red", "name": "Red", "description": "Create failing executable evidence.", "order": 5, "role": "test_author", "requiredCapabilities": ["repository.read", "repository.write", "command.execute"] },
+    { "id": "green", "name": "Green", "description": "Implement the minimum authorised change.", "order": 6, "role": "implementer", "requiredCapabilities": ["repository.read", "repository.write", "command.execute"] },
+    { "id": "refactor", "name": "Refactor", "description": "Improve maintainability without behaviour drift.", "order": 7, "role": "refactorer", "requiredCapabilities": ["repository.read", "repository.write", "command.execute"] },
+    { "id": "verify", "name": "Verify", "description": "Independently verify criteria and evidence.", "order": 8, "role": "independent_verifier", "requiredCapabilities": ["repository.read", "command.execute"] },
+    { "id": "converge", "name": "Converge", "description": "Confirm final consistency or request bounded remediation.", "order": 9, "role": "convergence_reviewer", "requiredCapabilities": ["repository.read", "structured.output"] }
+  ]
+}

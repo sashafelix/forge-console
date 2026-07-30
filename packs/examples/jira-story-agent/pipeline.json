@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1.0",
+  "id": "jira-story-agent",
+  "name": "Jira Story Agent",
+  "description": "Retrieve initiative context, analyse requirements, clarify uncertainty, draft reviewable stories and optionally publish approved output.",
+  "version": "1.0.0",
+  "inputSchema": {
+    "type": "object",
+    "required": ["projectKey", "sourceKey", "storyGoal"],
+    "properties": {
+      "projectKey": { "type": "string", "title": "Jira project key", "description": "Target Jira project, for example HOM or VROB." },
+      "sourceKey": { "type": "string", "title": "Source epic or feature", "description": "Epic, feature or initiative that supplies context." },
+      "storyGoal": { "type": "string", "title": "Story-generation goal", "description": "Explain what stories or refinement outcome is needed.", "multiline": true },
+      "publishMode": { "type": "string", "title": "Publish mode", "enum": ["draft-only", "approval-required", "publish-after-review"], "default": "approval-required" }
+    }
+  },
+  "requiredCapabilities": ["jira.read", "structured.output"],
+  "supportedRuntimes": ["claude-code", "github-copilot", "bmw-llm"],
+  "stages": [
+    { "id": "retrieve", "name": "Retrieve", "description": "Load bounded Jira and linked context.", "order": 1, "role": "context_retriever", "requiredCapabilities": ["jira.read"] },
+    { "id": "analyze", "name": "Analyze", "description": "Identify requirements, gaps and dependencies.", "order": 2, "role": "requirements_analyst", "requiredCapabilities": ["structured.output"] },
+    { "id": "clarify", "name": "Clarify", "description": "Resolve material uncertainty with the operator.", "order": 3, "role": "clarifier", "requiredCapabilities": ["structured.output"] },
+    { "id": "draft", "name": "Draft", "description": "Create stories and acceptance criteria.", "order": 4, "role": "story_author", "requiredCapabilities": ["structured.output"] },
+    { "id": "review", "name": "Review", "description": "Independently check completeness and traceability.", "order": 5, "role": "story_reviewer", "requiredCapabilities": ["jira.read", "structured.output"] },
+    { "id": "publish", "name": "Publish", "description": "Write only operator-approved stories to Jira.", "order": 6, "role": "publisher", "requiredCapabilities": ["jira.write"] }
+  ]
+}
