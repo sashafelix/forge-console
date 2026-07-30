@@ -2,14 +2,25 @@ import { useEffect, useMemo, useState } from 'react';
 import type {
   PipelineInputProperty,
   PipelineManifest,
+  PreviewRun,
   ProjectSelection,
-  RunDraft,
+  RunEvent,
   RuntimeAdapterDescriptor,
   SystemInfo
 } from '../shared/contracts';
 
 function statusLabel(status: RuntimeAdapterDescriptor['status']): string {
   return status === 'available' ? 'Ready' : status === 'unavailable' ? 'Unavailable' : 'Configure';
+}
+
+function runStatusFromEvent(event: RunEvent): PreviewRun['status'] | null {
+  switch (event.type) {
+    case 'run.completed': return 'completed';
+    case 'run.failed': return 'failed';
+    case 'run.cancelled': return 'cancelled';
+    case 'run.started': return 'running';
+    default: return null;
+  }
 }
 
 function Field({
@@ -72,9 +83,28 @@ export function App() {
   const [pipelineId, setPipelineId] = useState('');
   const [runtimeId, setRuntimeId] = useState('');
   const [inputs, setInputs] = useState<Record<string, unknown>>({});
-  const [createdRun, setCreatedRun] = useState<RunDraft | null>(null);
+  const [previewRun, setPreviewRun] = useState<PreviewRun | null>(null);
+  const [events, setEvents] = useState<RunEvent[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [catalogBusy, setCatalogBusy] = useState(false);
+
+  async function refreshPipelines(preferredId?: string): Promise<void> {
+    const pipelineList = await window.agentPipeline.listPipelines();
+    setPipelines(pipelineList);
+    setPipelineId((current) => preferredId ?? (pipelineList.some((pipeline) => pipeline.id === current) ? current : pipelineList[0]?.id ?? ''));
+  }
+
+  async function refreshRuntimes(): Promise<void> {
+    setCatalogBusy(true);
+    try {
+      const runtimeList = await window.agentPipeline.listRuntimes();
+      setRuntimes(runtimeList);
+      setRuntimeId((current) => runtimeList.some((runtime) => runtime.id === current) ? current : runtimeList.find((runtime) => runtime.status === 'available')?.id ?? runtimeList[0]?.id ?? '');
+    } finally {
+      setCatalogBusy(false);
+    }
+  }
 
   useEffect(() => {
     Promise.all([
@@ -86,13 +116,25 @@ export function App() {
       setRuntimes(runtimeList);
       setSystem(info);
       setPipelineId(pipelineList[0]?.id ?? '');
-      setRuntimeId(runtimeList[0]?.id ?? '');
+      setRuntimeId(runtimeList.find((runtime) => runtime.status === 'available')?.id ?? runtimeList[0]?.id ?? '');
     }).catch((reason: unknown) => setError(reason instanceof Error ? reason.message : String(reason)));
   }, []);
+
+  useEffect(() => window.agentPipeline.onRunEvent((event) => {
+    setEvents((current) => [...current, event].slice(-500));
+    const status = runStatusFromEvent(event);
+    if (status) {
+      setPreviewRun((current) => current?.id === event.runId ? { ...current, status, updatedAt: event.timestamp } : current);
+    }
+  }), []);
 
   const selectedPipeline = useMemo(
     () => pipelines.find((pipeline) => pipeline.id === pipelineId) ?? null,
     [pipelineId, pipelines]
+  );
+  const selectedRuntime = useMemo(
+    () => runtimes.find((runtime) => runtime.id === runtimeId) ?? null,
+    [runtimeId, runtimes]
   );
 
   useEffect(() => {
@@ -102,27 +144,46 @@ export function App() {
       if (property.default !== undefined) defaults[name] = property.default;
     }
     setInputs(defaults);
-    setCreatedRun(null);
+    setPreviewRun(null);
+    setEvents([]);
   }, [selectedPipeline]);
 
   async function chooseProject(): Promise<void> {
     const selection = await window.agentPipeline.selectProjectDirectory();
-    if (selection) setProject(selection);
+    if (selection) {
+      setProject(selection);
+      setPreviewRun(null);
+      setEvents([]);
+    }
   }
 
-  async function createRun(): Promise<void> {
+  async function installPack(): Promise<void> {
+    setCatalogBusy(true);
+    setError('');
+    try {
+      const installed = await window.agentPipeline.installPipelinePack();
+      if (installed) await refreshPipelines(installed.id);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      setCatalogBusy(false);
+    }
+  }
+
+  async function startPreview(): Promise<void> {
     if (!project || !selectedPipeline || !runtimeId) return;
     setBusy(true);
     setError('');
+    setEvents([]);
     try {
-      const run = await window.agentPipeline.createRunDraft({
+      const run = await window.agentPipeline.startPreviewRun({
         project,
         pipelineId: selectedPipeline.id,
         pipelineVersion: selectedPipeline.version,
         runtimeId,
         inputs
       });
-      setCreatedRun(run);
+      setPreviewRun(run);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
     } finally {
@@ -130,7 +191,23 @@ export function App() {
     }
   }
 
+  async function cancelPreview(): Promise<void> {
+    if (!previewRun) return;
+    const cancelled = await window.agentPipeline.cancelPreviewRun(previewRun.id);
+    if (!cancelled) setError('The preview process is no longer active.');
+  }
+
   const required = new Set(selectedPipeline?.inputSchema.required ?? []);
+  const requiredComplete = [...required].every((name) => {
+    const value = inputs[name];
+    return value !== undefined && value !== null && String(value).trim().length > 0;
+  });
+  const runtimeSupported = Boolean(selectedPipeline && selectedRuntime && selectedPipeline.supportedRuntimes.includes(selectedRuntime.id));
+  const canPreview = Boolean(
+    project?.isGitRepository && selectedPipeline && selectedRuntime?.status === 'available' && runtimeSupported && requiredComplete && !busy
+  );
+  const visibleEvents = previewRun ? events.filter((event) => event.runId === previewRun.id) : events;
+  const runActive = previewRun?.status === 'starting' || previewRun?.status === 'running';
 
   return (
     <div className="app-shell">
@@ -138,7 +215,7 @@ export function App() {
         <div>
           <span className="eyebrow">LOCAL AGENT WORKBENCH</span>
           <h1>Agent Pipeline UI</h1>
-          <p>Choose a project, pipeline and AI runtime without coupling the desktop app to any one workflow.</p>
+          <p>Choose a project, install a pipeline pack and use any compatible agent runtime from one local desktop application.</p>
         </div>
         <div className="system-pill">
           <span className="status-dot" />
@@ -163,12 +240,12 @@ export function App() {
           </section>
 
           <section>
-            <h2>Pipeline</h2>
+            <div className="sidebar-title"><h2>Pipeline</h2><button type="button" onClick={installPack} disabled={catalogBusy}>Install</button></div>
             <div className="option-list">
               {pipelines.map((pipeline) => (
                 <button
                   className={pipeline.id === pipelineId ? 'option active' : 'option'}
-                  key={pipeline.id}
+                  key={`${pipeline.id}@${pipeline.version}`}
                   type="button"
                   onClick={() => setPipelineId(pipeline.id)}
                 >
@@ -180,7 +257,7 @@ export function App() {
           </section>
 
           <section>
-            <h2>Runtime</h2>
+            <div className="sidebar-title"><h2>Runtime</h2><button type="button" onClick={refreshRuntimes} disabled={catalogBusy}>Refresh</button></div>
             <div className="option-list">
               {runtimes.map((runtime) => (
                 <button
@@ -189,8 +266,8 @@ export function App() {
                   type="button"
                   onClick={() => setRuntimeId(runtime.id)}
                 >
-                  <span className="option-row"><strong>{runtime.name}</strong><em>{statusLabel(runtime.status)}</em></span>
-                  <small>{runtime.kind} adapter</small>
+                  <span className="option-row"><strong>{runtime.name}</strong><em className={runtime.status}>{statusLabel(runtime.status)}</em></span>
+                  <small>{runtime.version ?? `${runtime.kind} adapter`}</small>
                 </button>
               ))}
             </div>
@@ -210,7 +287,7 @@ export function App() {
               </div>
 
               <div className="stage-track" aria-label="Pipeline stages">
-                {selectedPipeline.stages.sort((a, b) => a.order - b.order).map((stage, index) => (
+                {[...selectedPipeline.stages].sort((a, b) => a.order - b.order).map((stage, index) => (
                   <div className="stage" key={stage.id}>
                     <span>{index + 1}</span>
                     <div><strong>{stage.name}</strong><small>{stage.role}</small></div>
@@ -220,8 +297,8 @@ export function App() {
 
               <div className="form-panel">
                 <div className="section-title">
-                  <div><span className="eyebrow">RUN INPUT</span><h3>Configure task</h3></div>
-                  <span>{Object.keys(selectedPipeline.inputSchema.properties).length} fields</span>
+                  <div><span className="eyebrow">PREVIEW INPUT</span><h3>Configure task</h3></div>
+                  <span>Read-only provider run</span>
                 </div>
                 <div className="form-grid">
                   {Object.entries(selectedPipeline.inputSchema.properties).map(([name, property]) => (
@@ -235,17 +312,36 @@ export function App() {
                     />
                   ))}
                 </div>
+
+                {selectedRuntime && selectedRuntime.status !== 'available' && (
+                  <div className="runtime-hint">{selectedRuntime.configurationHint ?? 'This runtime is not available.'}</div>
+                )}
+                {selectedRuntime && !runtimeSupported && (
+                  <div className="runtime-hint">This pipeline does not declare support for {selectedRuntime.name}.</div>
+                )}
+
                 <div className="actions">
                   <button className="secondary" type="button" disabled={!project} onClick={() => project && window.agentPipeline.openPath(project.path)}>Open project</button>
-                  <button className="primary" type="button" disabled={!project || !runtimeId || busy} onClick={createRun}>{busy ? 'Creating…' : 'Create local run'}</button>
+                  {runActive && <button className="danger" type="button" onClick={cancelPreview}>Cancel preview</button>}
+                  <button className="primary" type="button" disabled={!canPreview || runActive} onClick={startPreview}>{busy ? 'Starting…' : 'Run read-only preview'}</button>
                 </div>
               </div>
 
-              {createdRun && (
-                <div className="run-created">
-                  <div><span className="status-dot" /><strong>Run draft created</strong></div>
-                  <code>{createdRun.id}</code>
-                  <p>Stored locally at {createdRun.storagePath}. Runtime execution will attach to this generic run record in the next milestone.</p>
+              {(previewRun || visibleEvents.length > 0) && (
+                <div className="run-console">
+                  <div className="console-heading">
+                    <div><span className={`run-state ${previewRun?.status ?? 'starting'}`} /><strong>{previewRun?.status ?? 'starting'}</strong></div>
+                    {previewRun && <code>{previewRun.id}</code>}
+                  </div>
+                  <div className="console-output" aria-live="polite">
+                    {visibleEvents.length === 0 ? <span>Waiting for runtime output…</span> : visibleEvents.map((event) => (
+                      <div className={`console-line ${event.type}`} key={`${event.runId}-${event.sequence}`}>
+                        <time>{new Date(event.timestamp).toLocaleTimeString()}</time>
+                        <span>{event.message}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {previewRun && <div className="console-actions"><button type="button" onClick={() => window.agentPipeline.openPath(previewRun.storagePath)}>Open run folder</button></div>}
                 </div>
               )}
             </>
