@@ -1,12 +1,21 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS } from '../shared/channels';
-import type { CreateRunDraftRequest, DesktopApi, RunEvent, RunEventListener } from '../shared/contracts';
+import type {
+  CreateRunDraftRequest,
+  DesktopApi,
+  ProcessRuntimeId,
+  RunEvent,
+  RunEventListener
+} from '../shared/contracts';
 
 const api: DesktopApi = {
   getSystemInfo: () => ipcRenderer.invoke(IPC_CHANNELS.getSystemInfo),
+  getSettings: () => ipcRenderer.invoke(IPC_CHANNELS.getSettings),
   listPipelines: () => ipcRenderer.invoke(IPC_CHANNELS.listPipelines),
   installPipelinePack: () => ipcRenderer.invoke(IPC_CHANNELS.installPipelinePack),
   listRuntimes: () => ipcRenderer.invoke(IPC_CHANNELS.listRuntimes),
+  configureRuntimeExecutable: (runtimeId: ProcessRuntimeId) => ipcRenderer.invoke(IPC_CHANNELS.configureRuntimeExecutable, runtimeId),
+  clearRuntimeExecutable: (runtimeId: ProcessRuntimeId) => ipcRenderer.invoke(IPC_CHANNELS.clearRuntimeExecutable, runtimeId),
   selectProjectDirectory: () => ipcRenderer.invoke(IPC_CHANNELS.selectProjectDirectory),
   createRunDraft: (request: CreateRunDraftRequest) => ipcRenderer.invoke(IPC_CHANNELS.createRunDraft, request),
   startPreviewRun: (request: CreateRunDraftRequest) => ipcRenderer.invoke(IPC_CHANNELS.startPreviewRun, request),
