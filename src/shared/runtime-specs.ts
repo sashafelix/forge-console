@@ -7,6 +7,11 @@ export interface ProcessRuntimeSpec {
   previewArgs: string[];
 }
 
+export interface RuntimeExecutionPolicy {
+  shell: 'denied' | 'allowed';
+  network: 'denied' | 'allowed';
+}
+
 export const PROCESS_RUNTIME_SPECS: ProcessRuntimeSpec[] = [
   {
     id: 'claude-code',
@@ -40,9 +45,17 @@ export function getProcessRuntimeSpec(runtimeId: string): ProcessRuntimeSpec | u
   return PROCESS_RUNTIME_SPECS.find((spec) => spec.id === runtimeId);
 }
 
-export function buildExecutionArgs(runtimeId: ProcessRuntimeId, maxTurns: number): string[] {
+export function buildExecutionArgs(
+  runtimeId: ProcessRuntimeId,
+  maxTurns: number,
+  policy: RuntimeExecutionPolicy = { shell: 'denied', network: 'denied' }
+): string[] {
   if (!Number.isInteger(maxTurns) || maxTurns < 1 || maxTurns > 100) throw new Error('maxTurns must be from 1 to 100');
   if (runtimeId === 'claude-code') {
+    const allowedTools = ['Read', 'Write', 'Edit', 'Glob', 'Grep'];
+    const disallowedTools: string[] = [];
+    if (policy.shell === 'allowed') allowedTools.push('Bash'); else disallowedTools.push('Bash');
+    if (policy.network === 'allowed') allowedTools.push('WebFetch', 'WebSearch'); else disallowedTools.push('WebFetch', 'WebSearch');
     return [
       '-p',
       '--input-format', 'text',
@@ -50,18 +63,28 @@ export function buildExecutionArgs(runtimeId: ProcessRuntimeId, maxTurns: number
       '--verbose',
       '--max-turns', String(maxTurns),
       '--permission-mode', 'acceptEdits',
-      '--allowedTools', 'Read,Write,Edit,Glob,Grep',
-      '--disallowedTools', 'Bash,WebFetch,WebSearch'
+      '--allowedTools', allowedTools.join(','),
+      ...(disallowedTools.length ? ['--disallowedTools', disallowedTools.join(',')] : [])
     ];
   }
+  const availableTools = ['view', 'grep', 'glob', 'edit', 'create', 'apply_patch'];
+  const allowedTools = ['write'];
+  const deniedTools = ['memory'];
+  if (policy.shell === 'allowed') {
+    availableTools.push('shell');
+    allowedTools.push('shell');
+  } else {
+    deniedTools.push('shell');
+  }
+  if (policy.network !== 'allowed') deniedTools.push('url');
   return [
     '--output-format=json',
     '--no-ask-user',
     '--no-color',
     '--no-remote',
     '--no-remote-export',
-    '--available-tools=view,grep,glob,edit,create,apply_patch',
-    '--allow-tool=write',
-    '--deny-tool=shell,url,memory'
+    `--available-tools=${availableTools.join(',')}`,
+    `--allow-tool=${allowedTools.join(',')}`,
+    `--deny-tool=${deniedTools.join(',')}`
   ];
 }
