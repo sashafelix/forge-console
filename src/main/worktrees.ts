@@ -64,6 +64,24 @@ export interface PreparedWorktree {
   baseRevision: string;
 }
 
+export async function discardPreparedWorktree(worktree: PreparedWorktree): Promise<void> {
+  const git = await findExecutable(['git']);
+  if (!git) {
+    await fs.rm(worktree.worktreePath, { recursive: true, force: true });
+    return;
+  }
+  try {
+    await runCommand(git, ['worktree', 'remove', '--force', worktree.worktreePath], worktree.repositoryRoot);
+  } catch {
+    await fs.rm(worktree.worktreePath, { recursive: true, force: true });
+  }
+  try {
+    await runCommand(git, ['branch', '-D', worktree.branchName], worktree.repositoryRoot);
+  } catch {
+    // The branch may not have been created or may already have been removed.
+  }
+}
+
 export async function createIsolatedWorktree(
   project: ProjectSelection,
   runId: string,
@@ -93,9 +111,13 @@ export async function createIsolatedWorktree(
   try {
     await runCommand(git, ['worktree', 'add', '-b', branchName, worktreePath, revision], repositoryRoot);
     const resolvedWorktree = await fs.realpath(worktreePath);
-    const workingDirectory = relativeProject && relativeProject !== '.'
+    const workingCandidate = relativeProject && relativeProject !== '.'
       ? path.join(resolvedWorktree, relativeProject)
       : resolvedWorktree;
+    const workingDirectory = await fs.realpath(workingCandidate);
+    if (workingDirectory !== resolvedWorktree && !workingDirectory.startsWith(`${resolvedWorktree}${path.sep}`)) {
+      throw new Error('The selected project subdirectory escapes the isolated worktree');
+    }
     const workingDetails = await fs.stat(workingDirectory);
     if (!workingDetails.isDirectory()) throw new Error('The selected project subdirectory does not exist in the worktree');
     return {
@@ -106,7 +128,14 @@ export async function createIsolatedWorktree(
       baseRevision: revision
     };
   } catch (error) {
-    await fs.rm(worktreePath, { recursive: true, force: true });
+    const partial: PreparedWorktree = {
+      repositoryRoot,
+      worktreePath,
+      workingDirectory: worktreePath,
+      branchName,
+      baseRevision: revision
+    };
+    await discardPreparedWorktree(partial);
     throw error;
   }
 }
