@@ -49,7 +49,7 @@ function safeBranchSegment(value: string): string {
 }
 
 function taskIdentifier(inputs: Record<string, unknown>): string {
-  for (const field of ['taskId', 'storyId', 'sourceKey', 'issueKey']) {
+  for (const field of ['taskId', 'storyId', 'sourceKey', 'issueKey', 'ticket']) {
     const value = inputs[field];
     if (typeof value === 'string' && value.trim()) return value;
   }
