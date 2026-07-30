@@ -3,7 +3,7 @@ import { constants as fsConstants, promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { ProcessRuntimeId, RuntimeAdapterDescriptor } from '../shared/contracts';
-import { PROCESS_RUNTIME_SPECS, buildExecutionArgs, getProcessRuntimeSpec } from '../shared/runtime-specs';
+import { PROCESS_RUNTIME_SPECS, buildExecutionArgs, getProcessRuntimeSpec, type RuntimeExecutionPolicy } from '../shared/runtime-specs';
 import { buildSearchPath } from '../shared/search-paths';
 import { loadSettings } from './settings';
 
@@ -164,7 +164,8 @@ export async function spawnRuntimeExecution(
   runtimeId: ProcessRuntimeId,
   cwd: string,
   prompt: string,
-  maxTurns: number
+  maxTurns: number,
+  policy: RuntimeExecutionPolicy = { shell: 'denied', network: 'denied' }
 ): Promise<ChildProcessWithoutNullStreams> {
-  return spawnRuntime(runtimeId, cwd, prompt, buildExecutionArgs(runtimeId, maxTurns));
+  return spawnRuntime(runtimeId, cwd, prompt, buildExecutionArgs(runtimeId, maxTurns, policy));
 }
