@@ -26,6 +26,7 @@ const DISALLOWED_VALIDATION_EXECUTABLES = new Set([
   'python', 'python3', 'node', 'ruby', 'perl'
 ]);
 const ALLOWED_GIT_VALIDATIONS = new Set(['status', 'diff', 'log', 'show']);
+const SHELL_META_PATTERN = /[&|<>^%!()"'`$;]/;
 
 function validateExecution(value: unknown, errors: string[]): void {
   if (!isRecord(value)) {
@@ -61,16 +62,21 @@ function validateExecution(value: unknown, errors: string[]): void {
     for (const field of ['executable', 'windowsExecutable'] as const) {
       const executable = command[field];
       if (field === 'windowsExecutable' && executable === undefined) continue;
-      if (!nonEmptyString(executable) || /[\s\0]/.test(executable)) {
-        errors.push(`${prefix}.${field} must be one executable path without whitespace`);
+      if (!nonEmptyString(executable) || /[\s\0]/.test(executable) || path.isAbsolute(executable)) {
+        errors.push(`${prefix}.${field} must be one non-absolute executable path without whitespace`);
         continue;
+      }
+      if ((executable.includes('/') || executable.includes('\\') || executable.startsWith('.')) && !safeRelativePath(executable)) {
+        errors.push(`${prefix}.${field} must be a safe relative executable path`);
       }
       const base = path.basename(executable).toLowerCase();
       if (DISALLOWED_VALIDATION_EXECUTABLES.has(base)) errors.push(`${prefix}.${field} uses a disallowed shell or interpreter`);
     }
 
-    if (!Array.isArray(command.args) || command.args.length > 64 || !command.args.every((arg) => typeof arg === 'string' && arg.length <= 512 && !/[\0\r\n]/.test(arg))) {
-      errors.push(`${prefix}.args must contain at most 64 bounded strings without control characters`);
+    if (!Array.isArray(command.args) || command.args.length > 64 || !command.args.every((arg) =>
+      typeof arg === 'string' && arg.length <= 512 && !/[\0\r\n]/.test(arg) && !SHELL_META_PATTERN.test(arg)
+    )) {
+      errors.push(`${prefix}.args must contain at most 64 bounded strings without control or shell metacharacters`);
     }
     const base = nonEmptyString(command.executable) ? path.basename(command.executable).toLowerCase() : '';
     if (base === 'git' && (!Array.isArray(command.args) || !ALLOWED_GIT_VALIDATIONS.has(String(command.args[0])))) {
