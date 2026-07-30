@@ -1,5 +1,4 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { IPC_CHANNELS } from '../shared/channels';
 import type {
   CreateRunDraftRequest,
   DesktopApi,
@@ -7,6 +6,30 @@ import type {
   RunEvent,
   RunEventListener
 } from '../shared/contracts';
+
+// Sandboxed Electron preload scripts only receive a restricted require() implementation.
+// Keep runtime values in this file so the emitted preload has no local module dependency.
+// Type-only imports above are erased by TypeScript.
+const IPC_CHANNELS = {
+  getSystemInfo: 'system:get-info',
+  getSettings: 'settings:get',
+  listPipelines: 'catalog:list-pipelines',
+  installPipelinePack: 'catalog:install-pipeline-pack',
+  listRuntimes: 'catalog:list-runtimes',
+  configureRuntimeExecutable: 'settings:configure-runtime-executable',
+  clearRuntimeExecutable: 'settings:clear-runtime-executable',
+  selectProjectDirectory: 'projects:select-directory',
+  createRunDraft: 'runs:create-draft',
+  startPreviewRun: 'runs:start-preview',
+  getPreviewRun: 'runs:get-preview',
+  cancelPreviewRun: 'runs:cancel-preview',
+  prepareExecution: 'runs:prepare-execution',
+  approveAndStartExecution: 'runs:approve-start-execution',
+  getExecutionRun: 'runs:get-execution',
+  cancelExecution: 'runs:cancel-execution',
+  runEvent: 'runs:event',
+  openPath: 'shell:open-path'
+} as const;
 
 const api: DesktopApi = {
   getSystemInfo: () => ipcRenderer.invoke(IPC_CHANNELS.getSystemInfo),
