@@ -168,3 +168,66 @@ export async function spawnRuntimeExecution(
 ): Promise<ChildProcessWithoutNullStreams> {
   return spawnRuntime(runtimeId, cwd, prompt, buildExecutionArgs(runtimeId, maxTurns));
 }
+
+function buildAgentExecutionArgs(
+  runtimeId: ProcessRuntimeId,
+  maxTurns: number,
+  permissions: { allowWrite: boolean; allowShell: boolean }
+): string[] {
+  if (!Number.isInteger(maxTurns) || maxTurns < 1 || maxTurns > 100) throw new Error('maxTurns must be from 1 to 100');
+  if (runtimeId === 'claude-code') {
+    const allowedTools = ['Read', 'Glob', 'Grep'];
+    if (permissions.allowWrite) allowedTools.push('Write', 'Edit');
+    if (permissions.allowShell) allowedTools.push('Bash');
+    const deniedTools = ['WebFetch', 'WebSearch'];
+    if (!permissions.allowWrite) deniedTools.push('Write', 'Edit');
+    if (!permissions.allowShell) deniedTools.push('Bash');
+    return [
+      '-p',
+      '--input-format', 'text',
+      '--output-format', 'stream-json',
+      '--verbose',
+      '--max-turns', String(maxTurns),
+      '--permission-mode', permissions.allowWrite ? 'acceptEdits' : 'plan',
+      '--allowedTools', allowedTools.join(','),
+      '--disallowedTools', deniedTools.join(',')
+    ];
+  }
+
+  const availableTools = ['view', 'grep', 'glob'];
+  const allowedTools: string[] = [];
+  const deniedTools = ['url', 'memory'];
+  if (permissions.allowWrite) {
+    availableTools.push('edit', 'create', 'apply_patch');
+    allowedTools.push('write');
+  } else {
+    deniedTools.push('write');
+  }
+  if (permissions.allowShell) {
+    availableTools.push('shell');
+    allowedTools.push('shell');
+  } else {
+    deniedTools.push('shell');
+  }
+
+  return [
+    '--output-format=json',
+    '--no-ask-user',
+    '--no-color',
+    '--no-remote',
+    '--no-remote-export',
+    `--available-tools=${availableTools.join(',')}`,
+    ...(allowedTools.length > 0 ? [`--allow-tool=${allowedTools.join(',')}`] : []),
+    `--deny-tool=${deniedTools.join(',')}`
+  ];
+}
+
+export async function spawnAgentRuntimeExecution(
+  runtimeId: ProcessRuntimeId,
+  cwd: string,
+  prompt: string,
+  maxTurns: number,
+  permissions: { allowWrite: boolean; allowShell: boolean }
+): Promise<ChildProcessWithoutNullStreams> {
+  return spawnRuntime(runtimeId, cwd, prompt, buildAgentExecutionArgs(runtimeId, maxTurns, permissions));
+}

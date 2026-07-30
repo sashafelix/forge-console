@@ -105,6 +105,47 @@ export interface ProjectSelection {
   isGitRepository: boolean;
 }
 
+export interface AgentInputDefinition {
+  name: string;
+  title: string;
+  description: string;
+  required: boolean;
+}
+
+export interface AgentDefinition {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  sourceRoot: string;
+  sourcePath: string;
+  relativePath: string;
+  tools: string[];
+  inputs: AgentInputDefinition[];
+  writes: string[];
+  requiredEnvironment: string[];
+  requestedCapabilities: Capability[];
+  shellRequested: boolean;
+  networkRequested: boolean;
+  writeRequested: boolean;
+  maxTurns: number;
+  supportedRuntimes: ProcessRuntimeId[];
+}
+
+export interface AgentLibrarySelection {
+  source: ProjectSelection;
+  agents: AgentDefinition[];
+}
+
+export interface AgentExecutionRequest {
+  agentSourceRoot: string;
+  agentRelativePath: string;
+  agentId: string;
+  targetProject: ProjectSelection;
+  runtimeId: ProcessRuntimeId;
+  inputs: Record<string, unknown>;
+}
+
 export interface CreateRunDraftRequest {
   project: ProjectSelection;
   pipelineId: string;
@@ -191,6 +232,38 @@ export interface ExecutionRun extends CreateRunDraftRequest {
   error?: string;
 }
 
+export interface AgentExecutionRun extends AgentExecutionRequest {
+  id: string;
+  agentName: string;
+  agentVersion: string;
+  agentSourcePath: string;
+  agentDescription: string;
+  createdAt: string;
+  updatedAt: string;
+  status: ExecutionRunStatus;
+  storagePath: string;
+  repositoryRoot: string;
+  baseRevision: string;
+  worktreePath: string;
+  workingDirectory: string;
+  branchName: string;
+  approvalRequired: true;
+  approvedAt?: string;
+  runtimePolicy: {
+    fileWrites: 'worktree-only' | 'denied-to-model';
+    shell: 'allowed-to-model' | 'denied-to-model';
+    network: 'allowed-through-approved-tools' | 'denied-to-model';
+    maxTurns: number;
+    requestedTools: string[];
+    declaredWrites: string[];
+    requiredEnvironment: string[];
+    missingEnvironment: string[];
+  };
+  changedFiles: string[];
+  exitCode?: number;
+  error?: string;
+}
+
 export type RunEventListener = (event: RunEvent) => void;
 
 export interface DesktopApi {
@@ -202,6 +275,7 @@ export interface DesktopApi {
   configureRuntimeExecutable(runtimeId: ProcessRuntimeId): Promise<RuntimeAdapterDescriptor[]>;
   clearRuntimeExecutable(runtimeId: ProcessRuntimeId): Promise<RuntimeAdapterDescriptor[]>;
   selectProjectDirectory(): Promise<ProjectSelection | null>;
+  selectAgentLibrary(): Promise<AgentLibrarySelection | null>;
   createRunDraft(request: CreateRunDraftRequest): Promise<RunDraft>;
   startPreviewRun(request: CreateRunDraftRequest): Promise<PreviewRun>;
   getPreviewRun(runId: string): Promise<PreviewRun | null>;
@@ -210,6 +284,11 @@ export interface DesktopApi {
   approveAndStartExecution(runId: string): Promise<ExecutionRun>;
   getExecutionRun(runId: string): Promise<ExecutionRun | null>;
   cancelExecution(runId: string): Promise<boolean>;
+  prepareAgentExecution(request: AgentExecutionRequest): Promise<AgentExecutionRun>;
+  approveAndStartAgentExecution(runId: string): Promise<AgentExecutionRun>;
+  getAgentExecutionRun(runId: string): Promise<AgentExecutionRun | null>;
+  cancelAgentExecution(runId: string): Promise<boolean>;
+  openAgentWorkbench(): Promise<void>;
   onRunEvent(listener: RunEventListener): () => void;
   openPath(path: string): Promise<string>;
 }
