@@ -69,6 +69,16 @@ small { color: #7f8ba4; }
 .field small { line-height: 1.4; }
 .checkbox-field { display: flex; align-items: flex-start; gap: 10px; border: 1px solid #24314c; border-radius: 10px; padding: 11px; }
 .checkbox-field span, .checkbox-field strong, .checkbox-field small { display: block; }
+.runtime-configuration { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 16px; border: 1px solid #2d3b59; border-radius: 11px; background: #0a111f; padding: 12px; }
+.runtime-configuration.available { border-color: #285a4b; }
+.runtime-configuration.unavailable, .runtime-configuration.unconfigured { border-color: #5f4d2c; }
+.runtime-configuration > div:first-child { min-width: 0; }
+.runtime-configuration strong, .runtime-configuration small, .runtime-configuration span { display: block; }
+.runtime-configuration small { margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.runtime-configuration span { margin-top: 4px; color: #70809d; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+.runtime-configuration > div:last-child { display: flex; flex: 0 0 auto; gap: 7px; }
+.runtime-configuration button { border: 1px solid #314362; border-radius: 8px; background: #14203a; padding: 7px 9px; cursor: pointer; font-size: 11px; }
+.runtime-configuration button:disabled { opacity: .45; cursor: not-allowed; }
 .runtime-hint { margin-top: 14px; border: 1px solid #5f4d2c; border-radius: 10px; background: #221b0f; color: #e8c782; padding: 10px 12px; font-size: 12px; }
 .actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
 .actions button { border-radius: 10px; padding: 10px 15px; cursor: pointer; }
@@ -88,8 +98,8 @@ small { color: #7f8ba4; }
 .console-output > span { color: #75829b; }
 .console-line { display: grid; grid-template-columns: 82px minmax(0, 1fr); gap: 10px; padding: 4px 0; color: #b7c3da; line-height: 1.45; overflow-wrap: anywhere; }
 .console-line time { color: #637089; }
-.console-line.runtime.stderr, .console-line.run.failed { color: #e898a7; }
-.console-line.run.completed { color: #75dca9; }
+.console-line.runtime-stderr, .console-line.run-failed { color: #e898a7; }
+.console-line.run-completed { color: #75dca9; }
 .console-actions { display: flex; justify-content: flex-end; border-top: 1px solid #202a40; padding: 9px 12px; }
 .console-actions button { border: 0; background: transparent; color: #78a4ff; cursor: pointer; font-size: 12px; }
 .empty { display: grid; min-height: 400px; place-items: center; color: #7d89a1; }
