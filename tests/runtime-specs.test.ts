@@ -38,6 +38,22 @@ test('Copilot execution permits write tools but denies shell URL and memory', ()
   assert.ok(args.includes('--no-remote'));
 });
 
+test('approved Claude standalone agents receive shell and network tools without global bypass', () => {
+  const args = buildExecutionArgs('claude-code', 40, { shell: 'allowed', network: 'allowed' });
+  assert.ok(args.includes('Read,Write,Edit,Glob,Grep,Bash,WebFetch,WebSearch'));
+  assert.equal(args.includes('--disallowedTools'), false);
+  assert.equal(args.includes('--dangerously-skip-permissions'), false);
+});
+
+test('approved Copilot standalone agents receive shell while retaining remote and memory restrictions', () => {
+  const args = buildExecutionArgs('github-copilot', 40, { shell: 'allowed', network: 'allowed' });
+  assert.ok(args.includes('--available-tools=view,grep,glob,edit,create,apply_patch,shell'));
+  assert.ok(args.includes('--allow-tool=write,shell'));
+  assert.ok(args.includes('--deny-tool=memory'));
+  assert.ok(args.includes('--no-remote'));
+  assert.equal(args.includes('--allow-all'), false);
+});
+
 test('execution turn budgets are bounded', () => {
   assert.throws(() => buildExecutionArgs('claude-code', 0), /maxTurns/);
   assert.throws(() => buildExecutionArgs('github-copilot', 101), /maxTurns/);
