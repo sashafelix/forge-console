@@ -181,6 +181,7 @@ export interface ExecutionRun extends CreateRunDraftRequest {
     fileWrites: 'worktree-only';
     shell: 'denied-to-model';
     network: 'denied-to-model';
+    maxTurns: number;
     validationCommands: PipelineValidationCommand[];
   };
   validationResults: ValidationCommandResult[];
