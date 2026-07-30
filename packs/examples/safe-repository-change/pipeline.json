@@ -1,0 +1,81 @@
+{
+  "schemaVersion": "1.1",
+  "id": "safe-repository-change",
+  "name": "Safe Repository Change",
+  "description": "Make one bounded local repository change in an isolated Git worktree, then run controller-owned patch validation.",
+  "version": "1.0.0",
+  "inputSchema": {
+    "type": "object",
+    "required": ["taskId", "task"],
+    "properties": {
+      "taskId": {
+        "type": "string",
+        "title": "Task ID",
+        "description": "Stable identifier used for the isolated branch name."
+      },
+      "task": {
+        "type": "string",
+        "title": "Requested change",
+        "description": "Describe one bounded change that can be completed without external systems.",
+        "multiline": true
+      },
+      "constraints": {
+        "type": "string",
+        "title": "Constraints",
+        "description": "List compatibility, scope, style or testing constraints.",
+        "multiline": true
+      }
+    }
+  },
+  "requiredCapabilities": [
+    "repository.read",
+    "repository.write",
+    "git.worktree",
+    "command.execute",
+    "structured.output"
+  ],
+  "supportedRuntimes": ["claude-code", "github-copilot"],
+  "stages": [
+    {
+      "id": "understand",
+      "name": "Understand",
+      "description": "Inspect the repository and translate the request into a bounded change plan.",
+      "order": 1,
+      "role": "repository_analyst",
+      "requiredCapabilities": ["repository.read", "structured.output"]
+    },
+    {
+      "id": "change",
+      "name": "Change",
+      "description": "Edit only files required for the requested outcome inside the isolated worktree.",
+      "order": 2,
+      "role": "implementer",
+      "requiredCapabilities": ["repository.read", "repository.write"]
+    },
+    {
+      "id": "review",
+      "name": "Review",
+      "description": "Review the patch for scope, correctness and incomplete work before controller validation.",
+      "order": 3,
+      "role": "self_reviewer",
+      "requiredCapabilities": ["repository.read", "structured.output"]
+    }
+  ],
+  "execution": {
+    "mode": "runtime-prompt",
+    "isolation": "git-worktree",
+    "promptTemplate": "prompts/execute.md",
+    "maxTurns": 24,
+    "validationCommands": [
+      {
+        "id": "git-diff-check",
+        "name": "Git patch whitespace check",
+        "executable": "git",
+        "args": ["diff", "--check"],
+        "cwd": ".",
+        "timeoutSeconds": 30,
+        "required": true
+      }
+    ]
+  }
+}
