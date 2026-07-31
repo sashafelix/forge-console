@@ -38,6 +38,15 @@ test('connection secrets use password inputs and are never rendered from connect
   assert.doesNotMatch(workbench, /summary\.secret/);
 });
 
+test('Connections has cross-platform back navigation', async () => {
+  const workbench = await source('src/renderer/ConnectionsWorkbench.tsx');
+
+  assert.match(workbench, /Back to workbench/);
+  assert.match(workbench, /window\.history\.back\(\)/);
+  assert.match(workbench, /window\.close\(\)/);
+  assert.match(workbench, /\.\/index\.html/);
+});
+
 test('BMW LLM remains non-executable after configuration', async () => {
   const runtime = await source('src/main/runtime.ts');
 
