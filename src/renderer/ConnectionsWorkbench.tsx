@@ -36,6 +36,18 @@ function secretLabel(id: ConnectionId): string {
   return id === 'bmw-llm' ? 'API token' : 'Personal access token';
 }
 
+function returnToWorkbench(): void {
+  if (window.history.length > 1) {
+    window.history.back();
+    return;
+  }
+
+  window.close();
+  window.setTimeout(() => {
+    window.location.href = './index.html';
+  }, 100);
+}
+
 export function ConnectionsWorkbench() {
   const [system, setSystem] = useState<SystemInfo | null>(null);
   const [connections, setConnections] = useState<ConnectionSummary[]>([]);
@@ -143,6 +155,7 @@ export function ConnectionsWorkbench() {
     <div className="app-shell connections-shell">
       <header className="topbar">
         <div>
+          <button className="connections-back-button" type="button" onClick={returnToWorkbench}>← Back to workbench</button>
           <span className="eyebrow">LOCAL AGENT WORKBENCH</span>
           <h1>Connections</h1>
           <p>Configure service credentials once and expose them only to approved agents that explicitly declare them.</p>

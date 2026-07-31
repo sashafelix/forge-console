@@ -2,6 +2,9 @@
 .connections-shell .topbar h1 { color: #17233d; }
 .connections-shell .topbar p { color: #65738b; }
 .connections-shell .system-pill { border-color: #cbd5e3; background: #fff; color: #4b5b73; }
+.connections-back-button { margin-bottom: 14px; border: 1px solid #c8d2e3; border-radius: 9px; background: #fff; color: #2b5f9f; padding: 8px 12px; cursor: pointer; font-weight: 700; }
+.connections-back-button:hover { border-color: #7fa3cf; background: #f7faff; }
+.connections-back-button:focus-visible { outline: 3px solid rgba(79,127,190,.2); outline-offset: 2px; }
 .connections-content { color: #172033; }
 .security-note { border-color: #a9cdb9; background: #f2fbf5; color: #285f45; }
 .connection-card { border-color: #d8e0eb; background: #fff; box-shadow: 0 10px 30px rgba(43,61,89,.06); }
