@@ -12,7 +12,7 @@ function windowOptions(title: string): Electron.BrowserWindowConstructorOptions 
     minWidth: 980,
     minHeight: 680,
     title,
-    backgroundColor: '#0b1020',
+    backgroundColor: '#f4f7fb',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -26,7 +26,7 @@ function loadRenderer(window: BrowserWindow, page: 'index.html' | 'connections.h
   const developmentUrl = process.env.VITE_DEV_SERVER_URL;
   if (developmentUrl) {
     void window.loadURL(new URL(page, developmentUrl.endsWith('/') ? developmentUrl : `${developmentUrl}/`).toString());
-    window.webContents.openDevTools({ mode: 'detach' });
+    if (process.env.OPEN_DEVTOOLS === '1') window.webContents.openDevTools({ mode: 'detach' });
   } else {
     void window.loadFile(path.join(__dirname, '..', '..', 'renderer', page));
   }
@@ -37,7 +37,7 @@ function createMainWindow(): BrowserWindow {
     mainWindow.focus();
     return mainWindow;
   }
-  mainWindow = new BrowserWindow(windowOptions('Agent Pipeline UI — Repository Workbench'));
+  mainWindow = new BrowserWindow(windowOptions('Agent Pipeline UI — Quality Workbench'));
   loadRenderer(mainWindow, 'index.html');
   mainWindow.on('closed', () => { mainWindow = null; });
   return mainWindow;
@@ -76,7 +76,7 @@ function installApplicationMenu(): void {
     {
       label: 'Workspaces',
       submenu: [
-        { label: 'Repository Workbench', accelerator: 'CmdOrCtrl+1', click: () => { createMainWindow(); } },
+        { label: 'Quality Workbench', accelerator: 'CmdOrCtrl+1', click: () => { createMainWindow(); } },
         { label: 'Connections', accelerator: 'CmdOrCtrl+,', click: () => { createConnectionsWindow(); } }
       ]
     },
