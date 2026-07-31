@@ -52,6 +52,16 @@ function parseFrontmatter(source: string): Record<string, string | string[]> {
   return result;
 }
 
+function isAgentDocument(sourcePath: string, source: string): boolean {
+  const filename = path.basename(sourcePath);
+  if (/^readme\.md$/i.test(filename)) return false;
+  if (/\.agent\.md$/i.test(filename)) return true;
+  const frontmatter = parseFrontmatter(source);
+  return typeof frontmatter.name === 'string'
+    && frontmatter.name.trim().length > 0
+    && (typeof frontmatter.description === 'string' || Array.isArray(frontmatter.tools));
+}
+
 function extractInputs(source: string): AgentInputDefinition[] {
   const names = new Set<string>();
   for (const match of source.matchAll(/\$\{input:([A-Za-z][A-Za-z0-9_.-]*)\}/g)) names.add(match[1]);
@@ -135,6 +145,7 @@ export async function resolveAgentDefinition(sourceRoot: string, relativePath: s
   if (!details.isFile() || details.isSymbolicLink()) throw new Error('Agent definition must be a regular file');
   if (details.size > MAX_AGENT_FILE_BYTES) throw new Error('Agent definition is too large');
   const source = await fs.readFile(realPath, 'utf8');
+  if (!isAgentDocument(realPath, source)) throw new Error('Selected Markdown file is not a valid agent definition');
   return { definition: parseAgent(realRoot, realPath, source), source };
 }
 
@@ -153,7 +164,7 @@ async function collectAgentFiles(root: string): Promise<string[]> {
       const candidate = path.join(directory, entry.name);
       if (entry.isSymbolicLink()) continue;
       if (entry.isDirectory()) await visit(candidate);
-      else if (entry.isFile() && /(?:\.agent)?\.md$/i.test(entry.name)) files.push(candidate);
+      else if (entry.isFile() && /\.md$/i.test(entry.name) && !/^readme\.md$/i.test(entry.name)) files.push(candidate);
     }
   };
   for (const relativeDirectory of AGENT_DIRECTORIES) await visit(path.join(root, relativeDirectory));
@@ -167,7 +178,9 @@ export async function discoverAgents(sourceRoot: string): Promise<AgentDefinitio
   for (const sourcePath of files) {
     const details = await fs.lstat(sourcePath);
     if (details.size > MAX_AGENT_FILE_BYTES) continue;
-    agents.push(parseAgent(realRoot, sourcePath, await fs.readFile(sourcePath, 'utf8')));
+    const source = await fs.readFile(sourcePath, 'utf8');
+    if (!isAgentDocument(sourcePath, source)) continue;
+    agents.push(parseAgent(realRoot, sourcePath, source));
   }
   return agents.sort((left, right) => left.name.localeCompare(right.name) || left.relativePath.localeCompare(right.relativePath));
 }
