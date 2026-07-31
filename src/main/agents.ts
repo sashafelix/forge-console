@@ -75,11 +75,13 @@ function extractInputs(source: string, orchestrator: boolean): AgentInputDefinit
     description: `Value substituted for \${input:${name}} in the agent instructions.`,
     required: true
   }));
-  if (orchestrator && !names.has('task')) {
+  if (!names.has('task') && (orchestrator || names.size === 0)) {
     inputs.unshift({
       name: 'task',
-      title: 'Pipeline task',
-      description: 'Free-form instruction for the full pipeline, for example: Review NSCNL-123456.',
+      title: orchestrator ? 'Workflow task' : 'Task',
+      description: orchestrator
+        ? 'Describe the outcome needed from the complete workflow, for example: Review NSCNL-123456.'
+        : 'Describe what this specialist should do.',
       required: true
     });
   }
