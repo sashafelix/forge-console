@@ -138,6 +138,33 @@ export async function discoverRuntimeAdapters(): Promise<RuntimeAdapterDescripto
   return discovered;
 }
 
+function runtimeEnvironment(
+  runtimeId: string,
+  approvedEnvironment: Record<string, string>
+): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    ...approvedEnvironment,
+    PATH: runtimeSearchPath(),
+    NO_COLOR: '1'
+  };
+
+  if (runtimeId === 'github-copilot') {
+    const dedicatedToken = approvedEnvironment.COPILOT_GITHUB_TOKEN ?? process.env.COPILOT_GITHUB_TOKEN;
+    if (!dedicatedToken) {
+      // Copilot CLI checks generic GitHub token variables before its OAuth token in the
+      // operating-system keychain. Corporate shells commonly export a GH_TOKEN or
+      // GITHUB_TOKEN for unrelated tooling; those values can silently override a valid
+      // `copilot login` session. Prefer the keychain/GitHub CLI fallback unless a
+      // dedicated Copilot token was explicitly supplied.
+      delete env.GH_TOKEN;
+      delete env.GITHUB_TOKEN;
+    }
+  }
+
+  return env;
+}
+
 async function spawnRuntime(
   runtimeId: string,
   cwd: string,
@@ -152,7 +179,7 @@ async function spawnRuntime(
 
   const child = spawn(resolved.path, args, {
     cwd,
-    env: { ...process.env, ...environment, PATH: runtimeSearchPath(), NO_COLOR: '1' },
+    env: runtimeEnvironment(runtimeId, environment),
     shell: requiresCommandShell(resolved.path),
     windowsHide: true,
     stdio: ['pipe', 'pipe', 'pipe']

@@ -1,0 +1,25 @@
+.connections-shell { background: #f4f7fb; color: #172033; }
+.connections-shell .topbar h1 { color: #17233d; }
+.connections-shell .topbar p { color: #65738b; }
+.connections-shell .system-pill { border-color: #cbd5e3; background: #fff; color: #4b5b73; }
+.connections-content { color: #172033; }
+.security-note { border-color: #a9cdb9; background: #f2fbf5; color: #285f45; }
+.connection-card { border-color: #d8e0eb; background: #fff; box-shadow: 0 10px 30px rgba(43,61,89,.06); }
+.connection-heading h2 { color: #17233d; }
+.connection-heading p { color: #65738b; }
+.connection-status.configured { border-color: #9fc8b2; background: #eaf8ef; color: #26704c; }
+.connection-status.missing { border-color: #dfc676; background: #fff8df; color: #795d15; }
+.connections-shell .field { color: #384861; }
+.connections-shell .field input,
+.connections-shell .field select { border-color: #cbd5e3; background: #fff; color: #172033; }
+.connections-shell .field input:focus,
+.connections-shell .field select:focus { border-color: #4f7fbe; box-shadow: 0 0 0 3px rgba(79,127,190,.12); }
+.connection-test-state { border-top-color: #e1e7ef; }
+.connection-test-state .ok { color: #26704c; }
+.connection-test-state .failed { color: #a43b48; }
+.connection-actions .secondary { border-color: #c8d2e3; background: #fff; color: #24334f; }
+.connection-actions .danger { border-color: #e1a8b0; background: #fff3f4; color: #9c3442; }
+.connection-actions .primary { border-color: #235a9f; background: #2f6fbd; color: #fff; }
+.adapter-warning { border-color: #dfc676; background: #fff8df; color: #795d15; }
+.success-banner { border-color: #9fc8b2; background: #f2fbf5; color: #26704c; }
+.error-banner { border-color: #e1a8b0; background: #fff3f4; color: #9c3442; }
