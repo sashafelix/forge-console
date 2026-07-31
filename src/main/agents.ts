@@ -2,144 +2,159 @@ import { promises as fs, type Dirent } from 'node:fs';
 import path from 'node:path';
 import type { AgentDefinition, AgentInputDefinition, Capability, ProcessRuntimeId } from '../shared/contracts';
 
-const MAX_AGENT_FILES = 250;
-const MAX_AGENT_FILE_BYTES = 768 * 1024;
-const AGENT_DIRECTORIES = ['agents', path.join('.github', 'agents'), path.join('.claude', 'agents')];
-const SUPPORTED_RUNTIMES: ProcessRuntimeId[] = ['claude-code', 'github-copilot'];
+const MAX_FILES = 250;
+const MAX_BYTES = 768 * 1024;
+const DIRECTORIES = ['agents', path.join('.github', 'agents'), path.join('.claude', 'agents')];
+const MCP_FILES = [path.join('.github', 'mcp.json'), '.mcp.json', path.join('.vscode', 'mcp.json')];
+const RUNTIMES: ProcessRuntimeId[] = ['claude-code', 'github-copilot'];
 
 function humanize(value: string): string {
   return value.replace(/[._-]+/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
-function scalar(value: string): string {
-  const trimmed = value.trim();
-  if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) return trimmed.slice(1, -1);
-  return trimmed;
-}
-
-function parseInlineArray(value: string): string[] {
-  const trimmed = value.trim();
-  if (!trimmed) return [];
-  try {
-    const parsed = JSON.parse(trimmed) as unknown;
-    if (Array.isArray(parsed)) return parsed.filter((entry): entry is string => typeof entry === 'string');
-  } catch {
-    // Fall through to the permissive parser.
-  }
-  return trimmed.replace(/^\[|\]$/g, '').split(',').map((entry) => scalar(entry)).filter(Boolean);
-}
-
-function parseFrontmatter(source: string): Record<string, string | string[]> {
-  const match = source.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
-  if (!match) return {};
-  const lines = match[1].split(/\r?\n/);
+function frontmatter(source: string): Record<string, string | string[]> {
+  const block = source.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)?.[1];
+  if (!block) return {};
   const result: Record<string, string | string[]> = {};
-  for (let index = 0; index < lines.length; index += 1) {
-    const keyMatch = lines[index].match(/^([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$/);
-    if (!keyMatch) continue;
-    const [, key, rawValue] = keyMatch;
-    if (rawValue === '>' || rawValue === '|') {
-      const values: string[] = [];
-      while (index + 1 < lines.length && /^\s+/.test(lines[index + 1])) {
-        index += 1;
-        values.push(lines[index].trim());
-      }
-      result[key] = values.join(rawValue === '>' ? ' ' : '\n').trim();
-    } else {
-      result[key] = key === 'tools' ? parseInlineArray(rawValue) : scalar(rawValue);
-    }
+  for (const line of block.split(/\r?\n/)) {
+    const match = line.match(/^([A-Za-z][A-Za-z0-9_-]*):\s*(.*)$/);
+    if (!match) continue;
+    const value = match[2].trim().replace(/^['"]|['"]$/g, '');
+    result[match[1]] = match[1] === 'tools'
+      ? value.replace(/^\[|\]$/g, '').split(',').map((entry) => entry.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean)
+      : value;
   }
   return result;
 }
 
-function extractInputs(source: string): AgentInputDefinition[] {
-  const names = new Set<string>();
-  for (const match of source.matchAll(/\$\{input:([A-Za-z][A-Za-z0-9_.-]*)\}/g)) names.add(match[1]);
-  return [...names].sort().map((name) => ({ name, title: humanize(name), description: `Value substituted for \${input:${name}} in the agent instructions.`, required: true }));
+function section(source: string, heading: string): string {
+  const match = source.match(new RegExp(`^##\\s+${heading}\\s*$([\\s\\S]*?)(?=^##\\s+|$)`, 'im'));
+  return match?.[1]?.trim() ?? '';
 }
 
-function extractSectionBullets(source: string, heading: string): string[] {
-  const start = source.search(new RegExp(`^##\\s+${heading}\\s*$`, 'im'));
-  if (start < 0) return [];
-  const afterHeading = source.slice(start).replace(/^##[^\r\n]*(?:\r?\n)?/, '');
-  const nextHeading = afterHeading.search(/^##\s+/m);
-  const section = nextHeading >= 0 ? afterHeading.slice(0, nextHeading) : afterHeading;
-  return section.split(/\r?\n/).map((line) => line.match(/^\s*-\s+(.+)$/)?.[1]?.trim()).filter((value): value is string => Boolean(value));
+function bullets(source: string, heading: string): string[] {
+  return section(source, heading).split(/\r?\n/)
+    .map((line) => line.match(/^\s*-\s+(.+)$/)?.[1]?.trim())
+    .filter((value): value is string => Boolean(value));
 }
 
-function requestedCapabilities(tools: string[], source: string): Capability[] {
-  const normalized = new Set(tools.map((tool) => tool.toLowerCase()));
-  const capabilities = new Set<Capability>(['repository.read', 'structured.output', 'git.worktree']);
-  if (['edit', 'create', 'write', 'apply_patch'].some((tool) => normalized.has(tool))) capabilities.add('repository.write');
-  if (['bash', 'shell', 'terminal'].some((tool) => normalized.has(tool))) capabilities.add('command.execute');
-  if (/\bjira\b|ATC_JIRA_TOKEN/i.test(source)) capabilities.add('jira.read');
-  if (/\bconfluence\b|ATC_CONFLUENCE_TOKEN/i.test(source)) capabilities.add('confluence.read');
-  if (/\bmcp\b/i.test(source)) capabilities.add('mcp.tools');
-  return [...capabilities];
+function variables(source: string): string[] {
+  return [...new Set([...source.matchAll(/\$\{?([A-Z][A-Z0-9_]{2,})\}?/g)].map((match) => match[1]))].sort();
 }
 
-function requiredEnvironment(source: string): string[] {
-  const variables = new Set<string>();
-  for (const match of source.matchAll(/\$\{?([A-Z][A-Z0-9_]{2,})\}?/g)) variables.add(match[1]);
-  return [...variables].sort();
+async function repositoryVariables(root: string): Promise<string[]> {
+  const found = new Set<string>();
+  for (const relative of MCP_FILES) {
+    try {
+      for (const name of variables(await fs.readFile(path.join(root, relative), 'utf8'))) found.add(name);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+  }
+  return [...found].sort();
 }
 
-function inferredMaxTurns(source: string): number {
-  const declared = source.match(/(?:~|about\s+)?(\d{1,3})\s+tool calls/i)?.[1];
-  return declared ? Math.max(1, Math.min(100, Number(declared))) : 30;
+function inputs(source: string): AgentInputDefinition[] {
+  const explicit = [...new Set([...source.matchAll(/\$\{input:([A-Za-z][A-Za-z0-9_.-]*)\}/g)].map((match) => match[1]))].sort();
+  if (explicit.length > 0) {
+    return explicit.map((name) => ({
+      name,
+      title: humanize(name),
+      description: `Value substituted for \${input:${name}} in the agent instructions.`,
+      required: true
+    }));
+  }
+  const examples = bullets(source, 'Inputs').slice(0, 4);
+  return [{
+    name: 'instruction',
+    title: 'Operator instruction',
+    description: examples.length > 0 ? `Tell the workflow what to do. Examples: ${examples.join(' · ')}` : 'Tell the workflow exactly what to do.',
+    required: true
+  }];
+}
+
+function capabilities(source: string, tools: string[], writes: string[]): Capability[] {
+  const normalized = tools.map((tool) => tool.toLowerCase());
+  const result = new Set<Capability>(['repository.read', 'structured.output', 'git.worktree']);
+  if (writes.length > 0 || normalized.some((tool) => ['edit', 'create', 'write', 'apply_patch'].includes(tool))) result.add('repository.write');
+  if (normalized.some((tool) => ['bash', 'shell', 'terminal'].includes(tool))) result.add('command.execute');
+  if (/\bjira\b/i.test(source)) result.add('jira.read');
+  if (/\bconfluence\b/i.test(source)) result.add('confluence.read');
+  if (/\bmcp\b/i.test(source)) result.add('mcp.tools');
+  return [...result];
 }
 
 function safeId(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'agent';
 }
 
-function parseAgent(sourceRoot: string, sourcePath: string, source: string): AgentDefinition {
-  const frontmatter = parseFrontmatter(source);
-  const filename = path.basename(sourcePath).replace(/\.agent\.md$|\.md$/i, '');
-  const name = typeof frontmatter.name === 'string' && frontmatter.name.trim() ? frontmatter.name.trim() : filename;
-  const tools = Array.isArray(frontmatter.tools) ? [...new Set(frontmatter.tools.map((tool) => tool.trim()).filter(Boolean))] : [];
-  const capabilities = requestedCapabilities(tools, source);
+function isAgentFile(file: string, source: string): boolean {
+  const name = path.basename(file);
+  if (/^readme(?:\.agent)?\.md$/i.test(name)) return false;
+  if (/\.agent\.md$/i.test(name)) return true;
+  const meta = frontmatter(source);
+  return typeof meta.name === 'string' || Array.isArray(meta.tools) || /^#\s+Agent\s*:/im.test(source);
+}
+
+function parseAgent(root: string, file: string, source: string, repositoryEnvironment: string[]): AgentDefinition {
+  const meta = frontmatter(source);
+  const filename = path.basename(file).replace(/\.agent\.md$|\.md$/i, '');
+  const heading = source.match(/^#\s+Agent\s*:\s*(.+)$/im)?.[1]?.trim();
+  const name = typeof meta.name === 'string' && meta.name.trim() ? meta.name.trim() : heading || filename;
+  const tools = Array.isArray(meta.tools) ? [...new Set(meta.tools)] : [];
+  const writes = bullets(source, 'Writes');
+  const requestedCapabilities = capabilities(source, tools, writes);
+  const requiredEnvironment = new Set(variables(source));
+  if (/\bjira\b|\bconfluence\b|\bmcp\b/i.test(source)) repositoryEnvironment.forEach((value) => requiredEnvironment.add(value));
+  const relativePath = path.relative(root, file);
+  const purpose = section(source, 'Purpose').replace(/\s+/g, ' ').trim();
+  const declaredTurns = source.match(/(?:~|about\s+)?(\d{1,3})\s+tool calls/i)?.[1];
   return {
     id: safeId(name),
     name,
-    version: typeof frontmatter.version === 'string' && frontmatter.version.trim() ? frontmatter.version.trim() : 'unversioned',
-    description: typeof frontmatter.description === 'string' && frontmatter.description.trim() ? frontmatter.description.trim() : `Standalone agent discovered at ${path.relative(sourceRoot, sourcePath)}.`,
-    sourceRoot,
-    sourcePath,
-    relativePath: path.relative(sourceRoot, sourcePath),
+    version: typeof meta.version === 'string' && meta.version.trim() ? meta.version.trim() : 'unversioned',
+    description: typeof meta.description === 'string' && meta.description.trim() ? meta.description.trim() : purpose.slice(0, 360) || `Agent discovered at ${relativePath}.`,
+    sourceRoot: root,
+    sourcePath: file,
+    relativePath,
     tools,
-    inputs: extractInputs(source),
-    writes: extractSectionBullets(source, 'Writes'),
-    requiredEnvironment: requiredEnvironment(source),
-    requestedCapabilities: capabilities,
-    shellRequested: capabilities.includes('command.execute'),
-    networkRequested: /https?:\/\/|\bcurl\b|\bwget\b|\bjira\b|\bconfluence\b/i.test(source),
-    writeRequested: capabilities.includes('repository.write'),
-    maxTurns: inferredMaxTurns(source),
-    supportedRuntimes: SUPPORTED_RUNTIMES
+    inputs: inputs(source),
+    writes,
+    requiredEnvironment: [...requiredEnvironment].sort(),
+    requestedCapabilities,
+    shellRequested: requestedCapabilities.includes('command.execute'),
+    networkRequested: /https?:\/\/|\bcurl\b|\bwget\b|\bjira\b|\bconfluence\b|\bmcp\b/i.test(source),
+    writeRequested: requestedCapabilities.includes('repository.write'),
+    maxTurns: declaredTurns ? Math.max(1, Math.min(100, Number(declaredTurns))) : 30,
+    supportedRuntimes: RUNTIMES
   };
 }
 
-function assertRelativeAgentPath(relativePath: string): void {
+function assertRelative(relativePath: string): void {
   if (!relativePath || path.isAbsolute(relativePath)) throw new Error('Agent path must be relative to its source repository');
   const normalized = path.normalize(relativePath);
   if (normalized === '..' || normalized.startsWith(`..${path.sep}`)) throw new Error('Agent path escapes its source repository');
 }
 
 export async function resolveAgentDefinition(sourceRoot: string, relativePath: string): Promise<{ definition: AgentDefinition; source: string }> {
-  assertRelativeAgentPath(relativePath);
-  const realRoot = await fs.realpath(path.resolve(sourceRoot));
-  const realPath = await fs.realpath(path.resolve(realRoot, relativePath));
-  if (realPath !== realRoot && !realPath.startsWith(`${realRoot}${path.sep}`)) throw new Error('Agent path escapes its source repository');
-  const details = await fs.lstat(realPath);
+  assertRelative(relativePath);
+  const root = await fs.realpath(path.resolve(sourceRoot));
+  const file = await fs.realpath(path.resolve(root, relativePath));
+  if (file !== root && !file.startsWith(`${root}${path.sep}`)) throw new Error('Agent path escapes its source repository');
+  const details = await fs.lstat(file);
   if (!details.isFile() || details.isSymbolicLink()) throw new Error('Agent definition must be a regular file');
-  if (details.size > MAX_AGENT_FILE_BYTES) throw new Error('Agent definition is too large');
-  const source = await fs.readFile(realPath, 'utf8');
-  return { definition: parseAgent(realRoot, realPath, source), source };
+  if (details.size > MAX_BYTES) throw new Error('Agent definition is too large');
+  const original = await fs.readFile(file, 'utf8');
+  if (!isAgentFile(file, original)) throw new Error('Selected file is not an agent definition');
+  const definition = parseAgent(root, file, original, await repositoryVariables(root));
+  const source = definition.inputs.some((input) => input.name === 'instruction')
+    ? `${original.trim()}\n\n## Operator request\n\${input:instruction}\n`
+    : original;
+  return { definition, source };
 }
 
-async function collectAgentFiles(root: string): Promise<string[]> {
-  const files: string[] = [];
+async function collect(root: string): Promise<string[]> {
+  const result: string[] = [];
   const visit = async (directory: string): Promise<void> => {
     let entries: Dirent[];
     try {
@@ -149,25 +164,26 @@ async function collectAgentFiles(root: string): Promise<string[]> {
       throw error;
     }
     for (const entry of entries) {
-      if (files.length >= MAX_AGENT_FILES) throw new Error(`Agent library exceeds the limit of ${MAX_AGENT_FILES} agent files`);
+      if (result.length >= MAX_FILES) throw new Error(`Agent library exceeds the limit of ${MAX_FILES} files`);
       const candidate = path.join(directory, entry.name);
       if (entry.isSymbolicLink()) continue;
       if (entry.isDirectory()) await visit(candidate);
-      else if (entry.isFile() && /(?:\.agent)?\.md$/i.test(entry.name)) files.push(candidate);
+      else if (entry.isFile() && /\.md$/i.test(entry.name)) result.push(candidate);
     }
   };
-  for (const relativeDirectory of AGENT_DIRECTORIES) await visit(path.join(root, relativeDirectory));
-  return [...new Set(files)].sort();
+  for (const directory of DIRECTORIES) await visit(path.join(root, directory));
+  return [...new Set(result)].sort();
 }
 
 export async function discoverAgents(sourceRoot: string): Promise<AgentDefinition[]> {
-  const realRoot = await fs.realpath(path.resolve(sourceRoot));
-  const files = await collectAgentFiles(realRoot);
-  const agents: AgentDefinition[] = [];
-  for (const sourcePath of files) {
-    const details = await fs.lstat(sourcePath);
-    if (details.size > MAX_AGENT_FILE_BYTES) continue;
-    agents.push(parseAgent(realRoot, sourcePath, await fs.readFile(sourcePath, 'utf8')));
+  const root = await fs.realpath(path.resolve(sourceRoot));
+  const environment = await repositoryVariables(root);
+  const result: AgentDefinition[] = [];
+  for (const file of await collect(root)) {
+    const details = await fs.lstat(file);
+    if (details.size > MAX_BYTES) continue;
+    const source = await fs.readFile(file, 'utf8');
+    if (isAgentFile(file, source)) result.push(parseAgent(root, file, source, environment));
   }
-  return agents.sort((left, right) => left.name.localeCompare(right.name) || left.relativePath.localeCompare(right.relativePath));
+  return result.sort((left, right) => left.name.localeCompare(right.name) || left.relativePath.localeCompare(right.relativePath));
 }
