@@ -62,10 +62,28 @@ function isAgentDocument(sourcePath: string, source: string): boolean {
     && (typeof frontmatter.description === 'string' || Array.isArray(frontmatter.tools));
 }
 
-function extractInputs(source: string): AgentInputDefinition[] {
+function isOrchestrator(name: string, sourcePath: string, source: string): boolean {
+  return /(?:orchestrator|pipeline)/i.test(`${name} ${path.basename(sourcePath)} ${source.slice(0, 2_000)}`);
+}
+
+function extractInputs(source: string, orchestrator: boolean): AgentInputDefinition[] {
   const names = new Set<string>();
   for (const match of source.matchAll(/\$\{input:([A-Za-z][A-Za-z0-9_.-]*)\}/g)) names.add(match[1]);
-  return [...names].sort().map((name) => ({ name, title: humanize(name), description: `Value substituted for \${input:${name}} in the agent instructions.`, required: true }));
+  const inputs = [...names].sort().map((name) => ({
+    name,
+    title: humanize(name),
+    description: `Value substituted for \${input:${name}} in the agent instructions.`,
+    required: true
+  }));
+  if (orchestrator && !names.has('task')) {
+    inputs.unshift({
+      name: 'task',
+      title: 'Pipeline task',
+      description: 'Free-form instruction for the full pipeline, for example: Review NSCNL-123456.',
+      required: true
+    });
+  }
+  return inputs;
 }
 
 function extractSectionBullets(source: string, heading: string): string[] {
@@ -106,11 +124,13 @@ function safeId(value: string): string {
 function parseAgent(sourceRoot: string, sourcePath: string, source: string): AgentDefinition {
   const frontmatter = parseFrontmatter(source);
   const filename = path.basename(sourcePath).replace(/\.agent\.md$|\.md$/i, '');
-  const name = typeof frontmatter.name === 'string' && frontmatter.name.trim() ? frontmatter.name.trim() : filename;
+  const rawName = typeof frontmatter.name === 'string' && frontmatter.name.trim() ? frontmatter.name.trim() : filename;
+  const orchestrator = isOrchestrator(rawName, sourcePath, source);
+  const name = orchestrator ? `${rawName} · Full pipeline` : rawName;
   const tools = Array.isArray(frontmatter.tools) ? [...new Set(frontmatter.tools.map((tool) => tool.trim()).filter(Boolean))] : [];
   const capabilities = requestedCapabilities(tools, source);
   return {
-    id: safeId(name),
+    id: safeId(rawName),
     name,
     version: typeof frontmatter.version === 'string' && frontmatter.version.trim() ? frontmatter.version.trim() : 'unversioned',
     description: typeof frontmatter.description === 'string' && frontmatter.description.trim() ? frontmatter.description.trim() : `Standalone agent discovered at ${path.relative(sourceRoot, sourcePath)}.`,
@@ -118,7 +138,7 @@ function parseAgent(sourceRoot: string, sourcePath: string, source: string): Age
     sourcePath,
     relativePath: path.relative(sourceRoot, sourcePath),
     tools,
-    inputs: extractInputs(source),
+    inputs: extractInputs(source, orchestrator),
     writes: extractSectionBullets(source, 'Writes'),
     requiredEnvironment: requiredEnvironment(source),
     requestedCapabilities: capabilities,
@@ -144,9 +164,13 @@ export async function resolveAgentDefinition(sourceRoot: string, relativePath: s
   const details = await fs.lstat(realPath);
   if (!details.isFile() || details.isSymbolicLink()) throw new Error('Agent definition must be a regular file');
   if (details.size > MAX_AGENT_FILE_BYTES) throw new Error('Agent definition is too large');
-  const source = await fs.readFile(realPath, 'utf8');
+  let source = await fs.readFile(realPath, 'utf8');
   if (!isAgentDocument(realPath, source)) throw new Error('Selected Markdown file is not a valid agent definition');
-  return { definition: parseAgent(realRoot, realPath, source), source };
+  const definition = parseAgent(realRoot, realPath, source);
+  if (definition.inputs.some((input) => input.name === 'task') && !/\$\{input:task\}/.test(source)) {
+    source = `${source.trim()}\n\n## Operator task\n\n\${input:task}\n`;
+  }
+  return { definition, source };
 }
 
 async function collectAgentFiles(root: string): Promise<string[]> {
