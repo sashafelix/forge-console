@@ -6,14 +6,15 @@ async function source(relativePath: string): Promise<string> {
   return readFile(new URL(`../${relativePath}`, import.meta.url), 'utf8');
 }
 
-test('the default renderer mounts the repository-first workbench', async () => {
+test('the default renderer mounts the task-first quality workbench', async () => {
   const main = await source('src/renderer/main.tsx');
-  const repositoryWorkbench = await source('src/renderer/RepositoryWorkbench.tsx');
+  const taskWorkbench = await source('src/renderer/TaskWorkbench.tsx');
 
-  assert.match(main, /RepositoryWorkbench/);
-  assert.doesNotMatch(main, /<App\s*\/>/);
-  assert.match(repositoryWorkbench, /AgentWorkbench/);
-  assert.match(repositoryWorkbench, /Agents are discovered only after selecting their repository/);
+  assert.match(main, /TaskWorkbench/);
+  assert.doesNotMatch(main, /<RepositoryWorkbench\s*\/>/);
+  assert.match(taskWorkbench, /Guided workflows/);
+  assert.match(taskWorkbench, /Advanced options/);
+  assert.match(taskWorkbench, /AgentWorkbench/);
 });
 
 test('the sandboxed preload exposes connection metadata operations without a secret read API', async () => {
