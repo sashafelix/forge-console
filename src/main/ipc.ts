@@ -6,18 +6,21 @@ import { IPC_CHANNELS } from '../shared/channels';
 import type {
   AgentExecutionRequest,
   AgentLibrarySelection,
+  ConnectionId,
   CreateRunDraftRequest,
   PipelineManifest,
   ProcessRuntimeId,
   ProjectSelection,
   RunDraft,
   RunEvent,
+  SaveConnectionRequest,
   SystemInfo
 } from '../shared/contracts';
 import { isProcessRuntimeId } from '../shared/settings';
 import { AgentExecutionController } from './agent-execution-controller';
 import { discoverAgents } from './agents';
 import { listPipelineManifests, listRuntimeAdapters } from './catalog';
+import { listConnections, removeConnection, saveConnection, testConnection } from './connections';
 import { ExecutionController } from './execution-controller';
 import { installPipelinePackFromDialog, resolvePipelinePack } from './packs';
 import { PreviewRunController } from './run-controller';
@@ -47,7 +50,7 @@ async function selectProjectDirectory(): Promise<ProjectSelection | null> {
 
 async function selectAgentLibrary(): Promise<AgentLibrarySelection | null> {
   const result = await dialog.showOpenDialog({
-    title: 'Choose a repository containing standalone agent definitions',
+    title: 'Choose a repository containing agent definitions',
     properties: ['openDirectory']
   });
   if (result.canceled || result.filePaths.length === 0) return null;
@@ -136,6 +139,10 @@ export function registerIpcHandlers(openAgentWorkbench: () => void): void {
   ipcMain.handle(IPC_CHANNELS.listRuntimes, listRuntimeAdapters);
   ipcMain.handle(IPC_CHANNELS.configureRuntimeExecutable, (_event, runtimeId: ProcessRuntimeId) => configureRuntimeExecutable(runtimeId));
   ipcMain.handle(IPC_CHANNELS.clearRuntimeExecutable, (_event, runtimeId: ProcessRuntimeId) => clearRuntimeExecutable(runtimeId));
+  ipcMain.handle(IPC_CHANNELS.listConnections, listConnections);
+  ipcMain.handle(IPC_CHANNELS.saveConnection, (_event, request: SaveConnectionRequest) => saveConnection(request));
+  ipcMain.handle(IPC_CHANNELS.removeConnection, (_event, id: ConnectionId) => removeConnection(id));
+  ipcMain.handle(IPC_CHANNELS.testConnection, (_event, id: ConnectionId) => testConnection(id));
   ipcMain.handle(IPC_CHANNELS.selectProjectDirectory, selectProjectDirectory);
   ipcMain.handle(IPC_CHANNELS.selectAgentLibrary, selectAgentLibrary);
   ipcMain.handle(IPC_CHANNELS.createRunDraft, (_event, request: CreateRunDraftRequest) => createRunDraft(request));
