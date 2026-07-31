@@ -19,7 +19,17 @@ function isPipeline(agent: AgentDefinition): boolean {
 }
 
 function friendlyName(agent: AgentDefinition): string {
-  const value = agent.name.replace(/[-_]+/g, ' ').trim();
+  const identity = `${agent.id} ${agent.name} ${agent.relativePath}`.toLowerCase();
+  if (/story-orchestrator/.test(identity)) return 'Review or create Jira stories';
+  if (/defect.*(?:orchestrator|pipeline)|(?:orchestrator|pipeline).*defect/.test(identity)) return 'Clarify a defect';
+  if (/requirement.*(?:orchestrator|pipeline)|(?:orchestrator|pipeline).*requirement/.test(identity)) return 'Analyse requirements';
+  if (/test.*(?:orchestrator|pipeline)|(?:orchestrator|pipeline).*test/.test(identity)) return 'Create and review test cases';
+  if (/story-evaluator/.test(identity)) return 'Evaluate story quality';
+  if (/story-investigator/.test(identity)) return 'Investigate a Jira story';
+  if (/story-creator/.test(identity)) return 'Create Jira stories';
+  if (/defect|investigat/.test(identity)) return 'Investigate a defect';
+  if (/test/.test(identity)) return 'Create or review test cases';
+  const value = agent.name.replace(/·\s*full pipeline/i, '').replace(/[-_]+/g, ' ').trim();
   return value.replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
@@ -47,8 +57,8 @@ function statusFromEvent(event: RunEvent): AgentExecutionRun['status'] | null {
 
 function providerFailure(events: RunEvent[]): string | null {
   const text = events.map((event) => event.message).join('\n');
-  if (/Authentication token found but could not be validated|copilot_internal\/user|OAuth user login/i.test(text)) {
-    return 'GitHub Copilot is installed and has a token, but it cannot reach the BMW GitHub Enterprise authentication service from this app session. Check the corporate network, proxy or certificate setup, then retry.';
+  if (/You're not logged in to GitHub|No authentication information found|Authentication token found but could not be validated|copilot_internal\/user|OAuth user login/i.test(text)) {
+    return 'GitHub Copilot could not use its login in this desktop session. The workbench now ignores unrelated GH_TOKEN and GITHUB_TOKEN overrides and prefers the same macOS Keychain or GitHub CLI login used by your terminal. Fully restart the workbench after updating; if the message remains, run `copilot login` once and restart it again.';
   }
   return null;
 }
