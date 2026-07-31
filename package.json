@@ -1,8 +1,8 @@
 {
   "name": "agent-pipeline-ui",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "private": true,
-  "description": "Cross-platform, repository-first local agent workbench",
+  "description": "Cross-platform, task-first quality workbench for repository agents and pipelines",
   "main": "dist/electron/main/index.js",
   "scripts": {
     "clean": "node -e \"const fs=require('node:fs'); for (const p of ['dist','release']) fs.rmSync(p,{recursive:true,force:true})\"",
