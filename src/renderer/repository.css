@@ -1,0 +1,43 @@
+.repository-workbench-shell {
+  min-height: 100vh;
+  background: #08101f;
+}
+
+.repository-workbench-nav {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  min-height: 54px;
+  padding: 9px 20px;
+  border-bottom: 1px solid #1c2940;
+  background: rgba(8, 16, 31, 0.96);
+  backdrop-filter: blur(16px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.repository-workbench-nav div {
+  display: grid;
+  gap: 2px;
+}
+
+.repository-workbench-nav strong {
+  color: #eef4ff;
+}
+
+.repository-workbench-nav span {
+  color: #8997b4;
+  font-size: 12px;
+}
+
+.repository-workbench-nav button {
+  border: 1px solid #365789;
+  background: #14233e;
+  color: #dbe9ff;
+  border-radius: 9px;
+  padding: 8px 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
