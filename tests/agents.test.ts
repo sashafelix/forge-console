@@ -36,6 +36,18 @@ tools: ["view", "task"]
 Coordinate the specialist agents and produce the final review.
 `;
 
+const INPUT_FREE_SPECIALIST = `---
+name: story-evaluator
+version: '1.0.0'
+description: Evaluate the supplied story using repository context.
+tools: ["view", "grep"]
+---
+
+# Story evaluator
+
+Evaluate the requested Jira story.
+`;
+
 test('discovers agent metadata, inputs, permissions, writes and environment requirements', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'agent-library-'));
   try {
@@ -84,6 +96,23 @@ test('adds a required task input and frozen prompt placeholder for orchestrators
     assert.equal(agents[0].name, 'story-orchestrator · Full pipeline');
     assert.deepEqual(agents[0].inputs.map((input) => input.name), ['task']);
     const resolved = await resolveAgentDefinition(root, '.github/agents/story-orchestrator.agent.md');
+    assert.match(resolved.source, /\$\{input:task\}/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('gives input-free specialist agents a simple task field', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'agent-library-'));
+  try {
+    const directory = path.join(root, '.github', 'agents');
+    await mkdir(directory, { recursive: true });
+    await writeFile(path.join(directory, 'story-evaluator.agent.md'), INPUT_FREE_SPECIALIST, 'utf8');
+    const agents = await discoverAgents(root);
+    assert.deepEqual(agents[0].inputs.map((input) => input.name), ['task']);
+    assert.equal(agents[0].inputs[0].title, 'Task');
+    const resolved = await resolveAgentDefinition(root, '.github/agents/story-evaluator.agent.md');
+    assert.match(resolved.source, /## Operator task/);
     assert.match(resolved.source, /\$\{input:task\}/);
   } finally {
     await rm(root, { recursive: true, force: true });
