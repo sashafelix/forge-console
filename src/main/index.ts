@@ -3,7 +3,7 @@ import path from 'node:path';
 import { registerIpcHandlers } from './ipc';
 
 let mainWindow: BrowserWindow | null = null;
-let agentWindow: BrowserWindow | null = null;
+let connectionsWindow: BrowserWindow | null = null;
 
 function windowOptions(title: string): Electron.BrowserWindowConstructorOptions {
   return {
@@ -22,7 +22,7 @@ function windowOptions(title: string): Electron.BrowserWindowConstructorOptions 
   };
 }
 
-function loadRenderer(window: BrowserWindow, page: 'index.html' | 'agent.html'): void {
+function loadRenderer(window: BrowserWindow, page: 'index.html' | 'connections.html'): void {
   const developmentUrl = process.env.VITE_DEV_SERVER_URL;
   if (developmentUrl) {
     void window.loadURL(new URL(page, developmentUrl.endsWith('/') ? developmentUrl : `${developmentUrl}/`).toString());
@@ -37,21 +37,21 @@ function createMainWindow(): BrowserWindow {
     mainWindow.focus();
     return mainWindow;
   }
-  mainWindow = new BrowserWindow(windowOptions('Agent Pipeline UI'));
+  mainWindow = new BrowserWindow(windowOptions('Agent Pipeline UI — Repository Workbench'));
   loadRenderer(mainWindow, 'index.html');
   mainWindow.on('closed', () => { mainWindow = null; });
   return mainWindow;
 }
 
-function createAgentWindow(): BrowserWindow {
-  if (agentWindow && !agentWindow.isDestroyed()) {
-    agentWindow.focus();
-    return agentWindow;
+function createConnectionsWindow(): BrowserWindow {
+  if (connectionsWindow && !connectionsWindow.isDestroyed()) {
+    connectionsWindow.focus();
+    return connectionsWindow;
   }
-  agentWindow = new BrowserWindow(windowOptions('Agent Pipeline UI — Single Agent'));
-  loadRenderer(agentWindow, 'agent.html');
-  agentWindow.on('closed', () => { agentWindow = null; });
-  return agentWindow;
+  connectionsWindow = new BrowserWindow(windowOptions('Agent Pipeline UI — Connections'));
+  loadRenderer(connectionsWindow, 'connections.html');
+  connectionsWindow.on('closed', () => { connectionsWindow = null; });
+  return connectionsWindow;
 }
 
 function installApplicationMenu(): void {
@@ -76,8 +76,8 @@ function installApplicationMenu(): void {
     {
       label: 'Workspaces',
       submenu: [
-        { label: 'Pipeline Workbench', accelerator: 'CmdOrCtrl+1', click: () => { createMainWindow(); } },
-        { label: 'Single Agent Runner', accelerator: 'CmdOrCtrl+Shift+A', click: () => { createAgentWindow(); } }
+        { label: 'Repository Workbench', accelerator: 'CmdOrCtrl+1', click: () => { createMainWindow(); } },
+        { label: 'Connections', accelerator: 'CmdOrCtrl+,', click: () => { createConnectionsWindow(); } }
       ]
     },
     {
@@ -101,7 +101,7 @@ function installApplicationMenu(): void {
 }
 
 app.whenReady().then(() => {
-  registerIpcHandlers(() => { createAgentWindow(); });
+  registerIpcHandlers(() => { createMainWindow(); });
   installApplicationMenu();
   createMainWindow();
   app.on('activate', () => {
