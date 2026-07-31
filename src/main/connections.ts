@@ -2,12 +2,7 @@ import { app, net, safeStorage } from 'electron';
 import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import type {
-  ConnectionId,
-  ConnectionSummary,
-  ConnectionTestResult,
-  SaveConnectionRequest
-} from '../shared/contracts';
+import type { ConnectionId, ConnectionSummary, ConnectionTestResult, SaveConnectionRequest } from '../shared/contracts';
 
 interface ConnectionMetadata {
   serviceUrl: string;
@@ -29,6 +24,9 @@ interface SecretStore {
   secrets: Partial<Record<ConnectionId, string>>;
 }
 
+type ConnectionTestInput = ConnectionId | SaveConnectionRequest;
+
+const ATC_MCP_URL = 'https://atc.bmwgroup.net/mcp';
 const CONNECTION_NAMES: Record<ConnectionId, string> = {
   'jira-atc': 'Jira ATC',
   'confluence-atc': 'Confluence ATC',
@@ -165,20 +163,18 @@ export async function saveConnection(request: SaveConnectionRequest): Promise<Co
   if (!isConnectionId(request.id)) throw new Error('Unsupported connection');
   const metadata = await loadMetadata();
   const existing = mergedMetadata(metadata, request.id);
+  const isAtc = request.id !== 'bmw-llm';
   metadata.connections[request.id] = {
     ...existing,
     serviceUrl: validateUrl(request.serviceUrl, 'Service URL'),
     model: request.id === 'bmw-llm' ? request.model?.trim() ?? '' : undefined,
-    authHeader: validateHeader(request.authHeader ?? existing.authHeader),
-    authScheme: request.authScheme ?? existing.authScheme,
+    authHeader: isAtc ? DEFAULT_CONNECTIONS[request.id].authHeader : validateHeader(request.authHeader ?? existing.authHeader),
+    authScheme: isAtc ? 'raw' : request.authScheme ?? existing.authScheme,
     lastTestedAt: undefined,
     lastTestStatus: 'untested',
     lastTestMessage: undefined
   };
-
-  if (request.id === 'bmw-llm' && !metadata.connections[request.id]?.model) {
-    throw new Error('BMW LLM model is required');
-  }
+  if (request.id === 'bmw-llm' && !metadata.connections[request.id]?.model) throw new Error('BMW LLM model is required');
 
   await saveMetadata(metadata);
   if (request.secret !== undefined && request.secret.trim()) {
@@ -202,53 +198,96 @@ function authorizationValue(metadata: ConnectionMetadata, secret: string): strin
   return metadata.authScheme === 'bearer' ? `Bearer ${secret}` : secret;
 }
 
-function testUrl(id: ConnectionId, serviceUrl: string): string {
-  if (id === 'jira-atc') return `${serviceUrl}/rest/api/2/myself`;
-  if (id === 'confluence-atc') return `${serviceUrl}/rest/api/content?limit=1`;
-  return `${serviceUrl.replace(/\/v1$/, '')}/v1/models`;
+function draftMetadata(input: ConnectionTestInput, saved: ConnectionMetadata): ConnectionMetadata {
+  if (typeof input === 'string') return saved;
+  const isAtc = input.id !== 'bmw-llm';
+  return {
+    ...saved,
+    serviceUrl: validateUrl(input.serviceUrl || saved.serviceUrl, 'Service URL'),
+    model: input.id === 'bmw-llm' ? input.model?.trim() || saved.model : undefined,
+    authHeader: isAtc ? DEFAULT_CONNECTIONS[input.id].authHeader : validateHeader(input.authHeader ?? saved.authHeader),
+    authScheme: isAtc ? 'raw' : input.authScheme ?? saved.authScheme
+  };
 }
 
-export async function testConnection(id: ConnectionId): Promise<ConnectionTestResult> {
+async function testAtcMcp(id: 'jira-atc' | 'confluence-atc', metadata: ConnectionMetadata, secret: string, signal: AbortSignal): Promise<Response> {
+  const isJira = id === 'jira-atc';
+  const headers: Record<string, string> = {
+    Accept: 'application/json, text/event-stream',
+    'Content-Type': 'application/json',
+    [isJira ? 'X-Atlassian-Jira-Personal-Token' : 'X-Atlassian-Confluence-Personal-Token']: secret,
+    [isJira ? 'X-Atlassian-Jira-Url' : 'X-Atlassian-Confluence-Url']: metadata.serviceUrl
+  };
+  return net.fetch(ATC_MCP_URL, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: {
+        protocolVersion: '2025-03-26',
+        capabilities: {},
+        clientInfo: { name: 'agent-pipeline-ui', version: app.getVersion() }
+      }
+    }),
+    signal,
+    redirect: 'follow'
+  });
+}
+
+async function testBmw(metadata: ConnectionMetadata, secret: string, signal: AbortSignal): Promise<Response> {
+  const base = metadata.serviceUrl.replace(/\/v1$/, '');
+  return net.fetch(`${base}/v1/models`, {
+    method: 'GET',
+    headers: { Accept: 'application/json', [metadata.authHeader]: authorizationValue(metadata, secret) },
+    signal,
+    redirect: 'follow'
+  });
+}
+
+export async function testConnection(input: ConnectionTestInput): Promise<ConnectionTestResult> {
+  const id = typeof input === 'string' ? input : input.id;
   if (!isConnectionId(id)) throw new Error('Unsupported connection');
   const [metadataStore, secretStore] = await Promise.all([loadMetadata(), loadSecrets()]);
-  const metadata = mergedMetadata(metadataStore, id);
-  const secret = secretStore.secrets[id];
-  if (!metadata.serviceUrl.trim() || !secret?.trim()) throw new Error(`${CONNECTION_NAMES[id]} is not fully configured`);
+  const metadata = draftMetadata(input, mergedMetadata(metadataStore, id));
+  const draftSecret = typeof input === 'string' ? undefined : input.secret?.trim();
+  const secret = draftSecret || secretStore.secrets[id]?.trim();
+  if (!secret) throw new Error(`${CONNECTION_NAMES[id]} needs a token to test; type one or save one first`);
+  if (id === 'bmw-llm' && !metadata.model?.trim()) throw new Error('BMW LLM model is required');
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15_000);
   const testedAt = new Date().toISOString();
   let result: ConnectionTestResult;
   try {
-    const response = await net.fetch(testUrl(id, metadata.serviceUrl), {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        [metadata.authHeader]: authorizationValue(metadata, secret)
-      },
-      signal: controller.signal,
-      redirect: 'follow'
-    });
+    const response = id === 'bmw-llm'
+      ? await testBmw(metadata, secret, controller.signal)
+      : await testAtcMcp(id, metadata, secret, controller.signal);
+    const ok = response.ok;
+    const endpoint = id === 'bmw-llm' ? 'model endpoint' : 'ATC MCP initialize';
     result = {
       id,
-      ok: response.ok,
+      ok,
       status: response.status,
       testedAt,
-      message: response.ok ? 'Connection succeeded' : `Connection returned HTTP ${response.status}`
+      message: ok
+        ? `${endpoint} succeeded`
+        : response.status === 401 || response.status === 403
+          ? `${endpoint} rejected the credentials with HTTP ${response.status}`
+          : response.status === 429
+            ? `${endpoint} was rate-limited with HTTP 429; credentials were not verified`
+            : `${endpoint} returned HTTP ${response.status}`
     };
   } catch (error) {
-    result = {
-      id,
-      ok: false,
-      testedAt,
-      message: error instanceof Error ? error.message : String(error)
-    };
+    result = { id, ok: false, testedAt, message: error instanceof Error ? error.message : String(error) };
   } finally {
     clearTimeout(timeout);
   }
 
+  const saved = mergedMetadata(metadataStore, id);
   metadataStore.connections[id] = {
-    ...metadata,
+    ...saved,
     lastTestedAt: testedAt,
     lastTestStatus: result.ok ? 'ok' : 'failed',
     lastTestMessage: result.message
