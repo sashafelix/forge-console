@@ -79,6 +79,17 @@ export function ConnectionsWorkbench() {
     }));
   }
 
+  function requestFromDraft(id: ConnectionId, draft: ConnectionDraft): SaveConnectionRequest {
+    return {
+      id,
+      serviceUrl: draft.serviceUrl,
+      model: id === 'bmw-llm' ? draft.model : undefined,
+      authHeader: draft.authHeader,
+      authScheme: draft.authScheme,
+      secret: draft.secret || undefined
+    };
+  }
+
   async function save(id: ConnectionId): Promise<void> {
     const draft = drafts[id];
     if (!draft) return;
@@ -86,15 +97,7 @@ export function ConnectionsWorkbench() {
     setError('');
     setMessage('');
     try {
-      const request: SaveConnectionRequest = {
-        id,
-        serviceUrl: draft.serviceUrl,
-        model: id === 'bmw-llm' ? draft.model : undefined,
-        authHeader: draft.authHeader,
-        authScheme: draft.authScheme,
-        secret: draft.secret || undefined
-      };
-      applyConnections(await window.agentPipeline.saveConnection(request));
+      applyConnections(await window.agentPipeline.saveConnection(requestFromDraft(id, draft)));
       setMessage(`${byId[id]?.name ?? id} saved securely.`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
@@ -104,10 +107,13 @@ export function ConnectionsWorkbench() {
   }
 
   async function test(id: ConnectionId): Promise<void> {
+    const draft = drafts[id];
+    if (!draft) return;
     setBusyId(id);
     setError('');
     setMessage('');
     try {
+      await window.agentPipeline.saveConnection(requestFromDraft(id, draft));
       const result = await window.agentPipeline.testConnection(id);
       applyConnections(await window.agentPipeline.listConnections());
       if (result.ok) setMessage(`${byId[id]?.name ?? id}: ${result.message}.`);
@@ -150,7 +156,7 @@ export function ConnectionsWorkbench() {
       <main className="connections-content">
         <div className="security-note">
           <strong>Secure storage</strong>
-          <span>Tokens are encrypted by Electron safeStorage using the operating system credential service. Saved secrets are never returned to this screen, written into repositories, or persisted in run records.</span>
+          <span>Tokens are encrypted by Electron safeStorage using the operating system credential service. Testing current values saves them securely first; saved secrets are never returned to this screen, written into repositories, or persisted in run records.</span>
         </div>
 
         <div className="connection-grid">
@@ -159,6 +165,7 @@ export function ConnectionsWorkbench() {
             const draft = drafts[id];
             if (!summary || !draft) return null;
             const busy = busyId === id;
+            const hasTestableSecret = summary.configured || draft.secret.trim().length > 0;
             return (
               <section className="connection-card" key={id}>
                 <div className="connection-heading">
@@ -214,7 +221,7 @@ export function ConnectionsWorkbench() {
                 )}
 
                 <div className="connection-actions">
-                  <button className="secondary" type="button" disabled={busy || !summary.configured} onClick={() => test(id)}>Test connection</button>
+                  <button className="secondary" type="button" disabled={busy || !hasTestableSecret} onClick={() => test(id)}>Test current values</button>
                   <button className="secondary danger" type="button" disabled={busy || !summary.configured} onClick={() => remove(id)}>Remove</button>
                   <button className="primary" type="button" disabled={busy} onClick={() => save(id)}>{busy ? 'Working…' : 'Save securely'}</button>
                 </div>

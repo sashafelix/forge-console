@@ -176,9 +176,7 @@ export async function saveConnection(request: SaveConnectionRequest): Promise<Co
     lastTestMessage: undefined
   };
 
-  if (request.id === 'bmw-llm' && !metadata.connections[request.id]?.model) {
-    throw new Error('BMW LLM model is required');
-  }
+  if (request.id === 'bmw-llm' && !metadata.connections[request.id]?.model) throw new Error('BMW LLM model is required');
 
   await saveMetadata(metadata);
   if (request.secret !== undefined && request.secret.trim()) {
@@ -202,10 +200,27 @@ function authorizationValue(metadata: ConnectionMetadata, secret: string): strin
   return metadata.authScheme === 'bearer' ? `Bearer ${secret}` : secret;
 }
 
-function testUrl(id: ConnectionId, serviceUrl: string): string {
-  if (id === 'jira-atc') return `${serviceUrl}/rest/api/2/myself`;
-  if (id === 'confluence-atc') return `${serviceUrl}/rest/api/content?limit=1`;
-  return `${serviceUrl.replace(/\/v1$/, '')}/v1/models`;
+function atcHeaders(id: 'jira-atc' | 'confluence-atc', metadata: ConnectionMetadata, secret: string): Record<string, string> {
+  const targetHeader = id === 'jira-atc' ? 'X-Atlassian-Jira-Url' : 'X-Atlassian-Confluence-Url';
+  return {
+    Accept: 'application/json, text/event-stream',
+    'Content-Type': 'application/json',
+    [metadata.authHeader]: authorizationValue(metadata, secret),
+    [targetHeader]: metadata.serviceUrl
+  };
+}
+
+function mcpInitializeBody(): string {
+  return JSON.stringify({
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'initialize',
+    params: {
+      protocolVersion: '2025-03-26',
+      capabilities: {},
+      clientInfo: { name: 'agent-pipeline-ui', version: '0.6.1' }
+    }
+  });
 }
 
 export async function testConnection(id: ConnectionId): Promise<ConnectionTestResult> {
@@ -220,29 +235,33 @@ export async function testConnection(id: ConnectionId): Promise<ConnectionTestRe
   const testedAt = new Date().toISOString();
   let result: ConnectionTestResult;
   try {
-    const response = await net.fetch(testUrl(id, metadata.serviceUrl), {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        [metadata.authHeader]: authorizationValue(metadata, secret)
-      },
+    const isAtc = id === 'jira-atc' || id === 'confluence-atc';
+    const response = await net.fetch(isAtc ? 'https://atc.bmwgroup.net/mcp' : `${metadata.serviceUrl.replace(/\/v1$/, '')}/v1/models`, {
+      method: isAtc ? 'POST' : 'GET',
+      headers: isAtc
+        ? atcHeaders(id, metadata, secret)
+        : { Accept: 'application/json', [metadata.authHeader]: authorizationValue(metadata, secret) },
+      body: isAtc ? mcpInitializeBody() : undefined,
       signal: controller.signal,
       redirect: 'follow'
     });
+    const authenticationRejected = response.status === 401 || response.status === 403;
+    const accepted = response.ok || (isAtc && !authenticationRejected);
     result = {
       id,
-      ok: response.ok,
+      ok: accepted,
       status: response.status,
       testedAt,
-      message: response.ok ? 'Connection succeeded' : `Connection returned HTTP ${response.status}`
+      message: response.ok
+        ? 'Connection succeeded'
+        : authenticationRejected
+          ? `Authentication rejected with HTTP ${response.status}`
+          : response.status === 429
+            ? 'ATC accepted the request but rate-limited the connection test (HTTP 429)'
+            : `ATC gateway reached and credentials were not rejected (HTTP ${response.status})`
     };
   } catch (error) {
-    result = {
-      id,
-      ok: false,
-      testedAt,
-      message: error instanceof Error ? error.message : String(error)
-    };
+    result = { id, ok: false, testedAt, message: error instanceof Error ? error.message : String(error) };
   } finally {
     clearTimeout(timeout);
   }

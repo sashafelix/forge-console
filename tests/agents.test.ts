@@ -24,6 +24,18 @@ Investigate **\${input:ticket}**.
 Run curl with $ATC_JIRA_TOKEN against https://jira.example.test.
 `;
 
+const ORCHESTRATOR = `---
+name: story-orchestrator
+version: '2.0.0'
+description: Coordinate the complete Jira story review pipeline.
+tools: ["view", "task"]
+---
+
+# Story Orchestrator
+
+Coordinate the specialist agents and produce the final review.
+`;
+
 test('discovers agent metadata, inputs, permissions, writes and environment requirements', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'agent-library-'));
   try {
@@ -42,6 +54,37 @@ test('discovers agent metadata, inputs, permissions, writes and environment requ
     assert.equal(agent.networkRequested, true);
     assert.deepEqual(agent.requiredEnvironment, ['ATC_JIRA_TOKEN']);
     assert.deepEqual(agent.writes, ['`defects/${input:ticket}.md`', '`BASELINE-SCAN-REPORT.md`']);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('excludes README files and plain markdown without agent frontmatter', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'agent-library-'));
+  try {
+    const directory = path.join(root, '.github', 'agents');
+    await mkdir(directory, { recursive: true });
+    await writeFile(path.join(directory, 'README.md'), '# Agent documentation', 'utf8');
+    await writeFile(path.join(directory, 'notes.md'), '# Notes', 'utf8');
+    await writeFile(path.join(directory, 'valid.agent.md'), SAMPLE_AGENT, 'utf8');
+    const agents = await discoverAgents(root);
+    assert.deepEqual(agents.map((agent) => agent.id), ['investigate-defect']);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('adds a required task input and frozen prompt placeholder for orchestrators', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'agent-library-'));
+  try {
+    const directory = path.join(root, '.github', 'agents');
+    await mkdir(directory, { recursive: true });
+    await writeFile(path.join(directory, 'story-orchestrator.agent.md'), ORCHESTRATOR, 'utf8');
+    const agents = await discoverAgents(root);
+    assert.equal(agents[0].name, 'story-orchestrator · Full pipeline');
+    assert.deepEqual(agents[0].inputs.map((input) => input.name), ['task']);
+    const resolved = await resolveAgentDefinition(root, '.github/agents/story-orchestrator.agent.md');
+    assert.match(resolved.source, /\$\{input:task\}/);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
