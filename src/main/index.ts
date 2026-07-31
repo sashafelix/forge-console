@@ -101,7 +101,7 @@ function installApplicationMenu(): void {
 }
 
 app.whenReady().then(() => {
-  registerIpcHandlers(() => { createMainWindow(); });
+  registerIpcHandlers(() => { createConnectionsWindow(); });
   installApplicationMenu();
   createMainWindow();
   app.on('activate', () => {
