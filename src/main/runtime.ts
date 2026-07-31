@@ -5,6 +5,7 @@ import path from 'node:path';
 import type { ProcessRuntimeId, RuntimeAdapterDescriptor } from '../shared/contracts';
 import { PROCESS_RUNTIME_SPECS, buildExecutionArgs, getProcessRuntimeSpec } from '../shared/runtime-specs';
 import { buildSearchPath } from '../shared/search-paths';
+import { listConnections } from './connections';
 import { loadSettings } from './settings';
 
 const PROBE_TIMEOUT_MS = 5_000;
@@ -120,24 +121,30 @@ export async function discoverRuntimeAdapters(): Promise<RuntimeAdapterDescripto
     });
   }
 
-  const bmwEndpointDetected = Boolean(process.env.BMW_LLM_ENDPOINT?.trim());
+  const bmw = (await listConnections()).find((connection) => connection.id === 'bmw-llm');
   discovered.push({
     id: 'bmw-llm',
     name: 'BMW LLM',
     description: 'Controller-mediated HTTP adapter for the internal BMW model gateway.',
     kind: 'http',
-    status: 'unconfigured',
+    status: bmw?.configured ? 'unavailable' : 'unconfigured',
     capabilities: ['structured.output', 'mcp.tools'],
     checkedAt: new Date().toISOString(),
-    configurationHint: bmwEndpointDetected
-      ? 'An endpoint was detected, but authenticated HTTP execution is not enabled in this milestone.'
-      : 'Configure the internal endpoint and credentials in desktop settings when the HTTP adapter is enabled.'
+    configurationHint: bmw?.configured
+      ? `Configured for ${bmw.model ?? 'the selected model'}; HTTP execution is not enabled yet.`
+      : 'Configure the internal endpoint, model and credential in Connections.'
   });
 
   return discovered;
 }
 
-async function spawnRuntime(runtimeId: string, cwd: string, prompt: string, args: string[]): Promise<ChildProcessWithoutNullStreams> {
+async function spawnRuntime(
+  runtimeId: string,
+  cwd: string,
+  prompt: string,
+  args: string[],
+  environment: Record<string, string> = {}
+): Promise<ChildProcessWithoutNullStreams> {
   const spec = getProcessRuntimeSpec(runtimeId);
   if (!spec) throw new Error(`Runtime ${runtimeId} does not support local process sessions`);
   const resolved = await resolveRuntimeExecutable(spec.id);
@@ -145,7 +152,7 @@ async function spawnRuntime(runtimeId: string, cwd: string, prompt: string, args
 
   const child = spawn(resolved.path, args, {
     cwd,
-    env: { ...process.env, PATH: runtimeSearchPath(), NO_COLOR: '1' },
+    env: { ...process.env, ...environment, PATH: runtimeSearchPath(), NO_COLOR: '1' },
     shell: requiresCommandShell(resolved.path),
     windowsHide: true,
     stdio: ['pipe', 'pipe', 'pipe']
@@ -227,7 +234,8 @@ export async function spawnAgentRuntimeExecution(
   cwd: string,
   prompt: string,
   maxTurns: number,
-  permissions: { allowWrite: boolean; allowShell: boolean }
+  permissions: { allowWrite: boolean; allowShell: boolean },
+  environment: Record<string, string>
 ): Promise<ChildProcessWithoutNullStreams> {
-  return spawnRuntime(runtimeId, cwd, prompt, buildAgentExecutionArgs(runtimeId, maxTurns, permissions));
+  return spawnRuntime(runtimeId, cwd, prompt, buildAgentExecutionArgs(runtimeId, maxTurns, permissions), environment);
 }

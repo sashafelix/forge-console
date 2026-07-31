@@ -15,8 +15,9 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        pipeline: path.resolve(__dirname, 'index.html'),
-        agent: path.resolve(__dirname, 'agent.html')
+        repository: path.resolve(__dirname, 'index.html'),
+        agent: path.resolve(__dirname, 'agent.html'),
+        connections: path.resolve(__dirname, 'connections.html')
       }
     }
   }

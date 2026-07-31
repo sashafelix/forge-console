@@ -11,6 +11,7 @@ import type {
   RunEventType
 } from '../shared/contracts';
 import { resolveAgentDefinition } from './agents';
+import { resolveAgentEnvironment } from './connections';
 import { findExecutable, runtimeSearchPath, spawnAgentRuntimeExecution } from './runtime';
 import { createIsolatedWorktree, discardPreparedWorktree, type PreparedWorktree } from './worktrees';
 
@@ -175,10 +176,6 @@ function renderAgentPrompt(
   ].join('\n');
 }
 
-function missingEnvironment(required: string[]): string[] {
-  return required.filter((name) => !process.env[name]?.trim());
-}
-
 function runCommand(executable: string, args: string[], cwd: string, timeoutMs = 60_000): Promise<CommandResult> {
   return new Promise((resolve, reject) => {
     const child = spawn(executable, args, {
@@ -249,6 +246,7 @@ export class AgentExecutionController {
 
       const prompt = renderAgentPrompt(resolved.source, resolved.definition, request.inputs, worktree.workingDirectory);
       await fs.writeFile(path.join(storagePath, 'prompt.txt'), prompt, { encoding: 'utf8', mode: 0o600 });
+      const environment = await resolveAgentEnvironment(resolved.definition.requiredEnvironment);
       const now = new Date().toISOString();
       const record: AgentExecutionRun = {
         ...request,
@@ -275,7 +273,7 @@ export class AgentExecutionController {
           requestedTools: resolved.definition.tools,
           declaredWrites: resolved.definition.writes,
           requiredEnvironment: resolved.definition.requiredEnvironment,
-          missingEnvironment: missingEnvironment(resolved.definition.requiredEnvironment)
+          missingEnvironment: environment.missing
         },
         changedFiles: []
       };
@@ -306,7 +304,8 @@ export class AgentExecutionController {
     if (record.status !== 'awaiting_approval') throw new Error(`Agent execution cannot start from status ${record.status}`);
     if (!isProcessRuntimeId(record.runtimeId)) throw new Error(`Runtime ${record.runtimeId} does not support local agent execution`);
 
-    record.runtimePolicy.missingEnvironment = missingEnvironment(record.runtimePolicy.requiredEnvironment);
+    const environment = await resolveAgentEnvironment(record.runtimePolicy.requiredEnvironment);
+    record.runtimePolicy.missingEnvironment = environment.missing;
     if (record.runtimePolicy.missingEnvironment.length > 0) {
       await this.persist(record);
       throw new Error(`Required environment variables are not configured: ${record.runtimePolicy.missingEnvironment.join(', ')}`);
@@ -340,7 +339,8 @@ export class AgentExecutionController {
         {
           allowWrite: record.runtimePolicy.fileWrites === 'worktree-only',
           allowShell: record.runtimePolicy.shell === 'allowed-to-model'
-        }
+        },
+        environment.values
       );
       const active: ActiveAgentExecution = { child, record, cancelRequested: false };
       this.active.set(runId, active);

@@ -146,6 +146,39 @@ export interface AgentExecutionRequest {
   inputs: Record<string, unknown>;
 }
 
+export type ConnectionId = 'jira-atc' | 'confluence-atc' | 'bmw-llm';
+export type ConnectionTestStatus = 'untested' | 'ok' | 'failed';
+
+export interface ConnectionSummary {
+  id: ConnectionId;
+  name: string;
+  configured: boolean;
+  serviceUrl: string;
+  model?: string;
+  authHeader: string;
+  authScheme: 'bearer' | 'raw';
+  lastTestedAt?: string;
+  lastTestStatus: ConnectionTestStatus;
+  lastTestMessage?: string;
+}
+
+export interface SaveConnectionRequest {
+  id: ConnectionId;
+  serviceUrl: string;
+  model?: string;
+  authHeader?: string;
+  authScheme?: 'bearer' | 'raw';
+  secret?: string;
+}
+
+export interface ConnectionTestResult {
+  id: ConnectionId;
+  ok: boolean;
+  status?: number;
+  testedAt: string;
+  message: string;
+}
+
 export interface CreateRunDraftRequest {
   project: ProjectSelection;
   pipelineId: string;
@@ -276,6 +309,10 @@ export interface DesktopApi {
   clearRuntimeExecutable(runtimeId: ProcessRuntimeId): Promise<RuntimeAdapterDescriptor[]>;
   selectProjectDirectory(): Promise<ProjectSelection | null>;
   selectAgentLibrary(): Promise<AgentLibrarySelection | null>;
+  listConnections(): Promise<ConnectionSummary[]>;
+  saveConnection(request: SaveConnectionRequest): Promise<ConnectionSummary[]>;
+  removeConnection(connectionId: ConnectionId): Promise<ConnectionSummary[]>;
+  testConnection(connectionId: ConnectionId): Promise<ConnectionTestResult>;
   createRunDraft(request: CreateRunDraftRequest): Promise<RunDraft>;
   startPreviewRun(request: CreateRunDraftRequest): Promise<PreviewRun>;
   getPreviewRun(runId: string): Promise<PreviewRun | null>;

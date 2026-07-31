@@ -1,11 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type {
   AgentExecutionRequest,
+  ConnectionId,
   CreateRunDraftRequest,
   DesktopApi,
   ProcessRuntimeId,
   RunEvent,
-  RunEventListener
+  RunEventListener,
+  SaveConnectionRequest
 } from '../shared/contracts';
 
 // Sandboxed Electron preload scripts only receive a restricted require() implementation.
@@ -19,6 +21,10 @@ const IPC_CHANNELS = {
   listRuntimes: 'catalog:list-runtimes',
   configureRuntimeExecutable: 'settings:configure-runtime-executable',
   clearRuntimeExecutable: 'settings:clear-runtime-executable',
+  listConnections: 'connections:list',
+  saveConnection: 'connections:save',
+  removeConnection: 'connections:remove',
+  testConnection: 'connections:test',
   selectProjectDirectory: 'projects:select-directory',
   selectAgentLibrary: 'agents:select-library',
   createRunDraft: 'runs:create-draft',
@@ -48,6 +54,10 @@ const api: DesktopApi = {
   clearRuntimeExecutable: (runtimeId: ProcessRuntimeId) => ipcRenderer.invoke(IPC_CHANNELS.clearRuntimeExecutable, runtimeId),
   selectProjectDirectory: () => ipcRenderer.invoke(IPC_CHANNELS.selectProjectDirectory),
   selectAgentLibrary: () => ipcRenderer.invoke(IPC_CHANNELS.selectAgentLibrary),
+  listConnections: () => ipcRenderer.invoke(IPC_CHANNELS.listConnections),
+  saveConnection: (request: SaveConnectionRequest) => ipcRenderer.invoke(IPC_CHANNELS.saveConnection, request),
+  removeConnection: (connectionId: ConnectionId) => ipcRenderer.invoke(IPC_CHANNELS.removeConnection, connectionId),
+  testConnection: (connectionId: ConnectionId) => ipcRenderer.invoke(IPC_CHANNELS.testConnection, connectionId),
   createRunDraft: (request: CreateRunDraftRequest) => ipcRenderer.invoke(IPC_CHANNELS.createRunDraft, request),
   startPreviewRun: (request: CreateRunDraftRequest) => ipcRenderer.invoke(IPC_CHANNELS.startPreviewRun, request),
   getPreviewRun: (runId: string) => ipcRenderer.invoke(IPC_CHANNELS.getPreviewRun, runId),
