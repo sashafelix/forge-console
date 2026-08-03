@@ -63,6 +63,11 @@ function generatedAgentProfile(name: string, description: string, source: string
   return ['---', `name: ${JSON.stringify(displayName(name))}`, `description: ${JSON.stringify(description)}`, 'tools:', '  - "*"', '---', '', stripFrontmatter(source), ''].join('\n');
 }
 
+function normalizedAgentFilename(relativePath: string): string {
+  const filename = path.basename(relativePath);
+  return /\.agent\.md$/i.test(filename) ? filename : filename.replace(/\.md$/i, '.agent.md');
+}
+
 function safeRelative(relativePath: string): string {
   if (!relativePath || path.isAbsolute(relativePath)) throw new Error('Runtime workspace path must be relative');
   const normalized = path.normalize(relativePath);
@@ -153,8 +158,7 @@ export async function prepareAgentRuntimeWorkspace(sourceRoot: string, worktreeR
 
   for (const agent of await discoverAgents(realSource)) {
     const source = await fs.readFile(agent.sourcePath, 'utf8');
-    const filename = path.basename(agent.relativePath).replace(/\.md$/i, '.agent.md');
-    await inject(path.join('.github', 'agents', filename), generatedAgentProfile(agent.name, agent.description, source));
+    await inject(path.join('.github', 'agents', normalizedAgentFilename(agent.relativePath)), generatedAgentProfile(agent.name, agent.description, source));
   }
   for (const supportPath of SUPPORT_PATHS) {
     for (const relativeFile of await collectFiles(realSource, supportPath)) await inject(relativeFile, await fs.readFile(path.join(realSource, relativeFile)));
