@@ -24,7 +24,7 @@ function keyFor(agent: AgentDefinition): string {
 }
 
 function isPipeline(agent: AgentDefinition): boolean {
-  return /orchestrat|pipeline|workflow/i.test(`${agent.id} ${agent.name} ${agent.relativePath}`);
+  return /·\s*full pipeline\s*$/i.test(agent.name);
 }
 
 function friendlyName(agent: AgentDefinition): string {
@@ -64,10 +64,19 @@ function statusFromEvent(event: RunEvent): AgentExecutionRun['status'] | null {
   }
 }
 
-function providerFailure(events: RunEvent[]): string | null {
+function providerFailure(events: RunEvent[]): { title: string; message: string } | null {
   const text = events.map((event) => event.message).join('\n');
+  if (/oauth session expired|failed to authenticate|claude code.*sign-in|claude code.*login/i.test(text)) {
+    return {
+      title: 'Claude Code needs attention',
+      message: 'Its saved sign-in has expired on this computer. Open PowerShell or Git Bash, run `claude`, complete sign-in, then fully restart the workbench.'
+    };
+  }
   if (/You're not logged in to GitHub|No authentication information found|Authentication token found but could not be validated|copilot_internal\/user|OAuth user login/i.test(text)) {
-    return 'GitHub Copilot could not use its login in this desktop session. The workbench ignores unrelated GH_TOKEN and GITHUB_TOKEN overrides and prefers the same Keychain or GitHub CLI login used by your terminal. Fully restart the workbench after updating; if the message remains, run `copilot login` once and restart it again.';
+    return {
+      title: 'Copilot needs attention',
+      message: 'GitHub Copilot could not use its login in this desktop session. The workbench ignores unrelated GH_TOKEN and GITHUB_TOKEN overrides and prefers the same Keychain or GitHub CLI login used by your terminal. Fully restart the workbench after updating; if the message remains, run `copilot login` once and restart it again.'
+    };
   }
   return null;
 }
@@ -305,7 +314,7 @@ export function TaskWorkbench() {
 
       {error && <div className="task-alert error" role="alert">{error}</div>}
       {restoredRun && run && <div className="task-alert info" role="status"><strong>Previous run restored</strong><span>The workbench reconnected to {runDisplayName}. Current status: {run.status.replaceAll('_', ' ')}.</span></div>}
-      {friendlyProviderError && <div className="task-alert warning" role="alert"><strong>Copilot needs attention</strong><span>{friendlyProviderError}</span></div>}
+      {friendlyProviderError && <div className="task-alert warning" role="alert"><strong>{friendlyProviderError.title}</strong><span>{friendlyProviderError.message}</span></div>}
 
       <main className="task-main">
         <section className="task-step">
@@ -358,10 +367,10 @@ export function TaskWorkbench() {
               <details className="task-advanced-options">
                 <summary>Advanced options</summary>
                 <label><span>AI provider</span><select disabled={active} value={runtimeId} onChange={(event) => setRuntimeId(event.target.value as ProcessRuntimeId)}>{processRuntimes.map((runtime) => <option key={runtime.id} value={runtime.id} disabled={runtime.status !== 'available'}>{runtime.name}{runtime.status === 'available' ? '' : ' — unavailable'}</option>)}</select></label>
-                <small>The workbench automatically chooses an available provider. Technical permissions and isolated-worktree controls are applied in the background.</small>
+                <small>The workbench automatically chooses an available provider. Continue first performs a short provider readiness check before any worktree is created.</small>
               </details>
 
-              {!run && <div className="task-primary-row"><button className="task-primary" type="button" disabled={!canPrepare} onClick={prepare}>{busy ? 'Preparing…' : 'Continue'}</button></div>}
+              {!run && <div className="task-primary-row"><button className="task-primary" type="button" disabled={!canPrepare} onClick={prepare}>{busy ? 'Checking provider…' : 'Continue'}</button></div>}
             </div>
           </section>
         )}
