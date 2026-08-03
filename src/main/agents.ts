@@ -70,6 +70,12 @@ function isOrchestrator(name: string, sourcePath: string, source: string): boole
   return /\bPREPARE\b[\s\S]{0,300}(?:→|->)[\s\S]{0,300}\b(?:VERIFY|CONVERGE)\b/i.test(source);
 }
 
+function isInteractiveAgent(name: string, sourcePath: string, source: string): boolean {
+  const identity = `${name} ${path.basename(sourcePath)}`;
+  return /\b(?:story[-_ ]?intake|intake|interview|conversation|chat)\b/i.test(identity)
+    || /\b(?:ask_user|AskUserQuestion|ask one (?:purposeful )?question at a time|wait for (?:the )?(?:operator|user|human|product owner)|operator response|user response|human response|clarifying question|approve,? amend,? or deny|explicit approval command)\b/i.test(source);
+}
+
 function inferredOrchestratorTools(source: string, orchestrator: boolean): string[] {
   if (!orchestrator) return [];
   const inferred = new Set<string>(['Task']);
@@ -112,7 +118,7 @@ function extractSectionBullets(source: string, heading: string): string[] {
   return section.split(/\r?\n/).map((line) => line.match(/^\s*-\s+(.+)$/)?.[1]?.trim()).filter((value): value is string => Boolean(value));
 }
 
-function requestedCapabilities(tools: string[], source: string): Capability[] {
+function requestedCapabilities(tools: string[], source: string, interactive: boolean): Capability[] {
   const normalized = new Set(tools.map((tool) => tool.toLowerCase()));
   const capabilities = new Set<Capability>(['repository.read', 'structured.output', 'git.worktree']);
   if (['edit', 'create', 'write', 'apply_patch'].some((tool) => normalized.has(tool))) capabilities.add('repository.write');
@@ -120,6 +126,7 @@ function requestedCapabilities(tools: string[], source: string): Capability[] {
   if (/\bjira\b|ATC_JIRA_TOKEN/i.test(source)) capabilities.add('jira.read');
   if (/\bconfluence\b|ATC_CONFLUENCE_TOKEN/i.test(source)) capabilities.add('confluence.read');
   if (/\bmcp\b/i.test(source)) capabilities.add('mcp.tools');
+  if (interactive) capabilities.add('user.input');
   return [...capabilities];
 }
 
@@ -143,10 +150,11 @@ function parseAgent(sourceRoot: string, sourcePath: string, source: string): Age
   const filename = path.basename(sourcePath).replace(/\.agent\.md$|\.md$/i, '');
   const rawName = typeof frontmatter.name === 'string' && frontmatter.name.trim() ? frontmatter.name.trim() : filename;
   const orchestrator = isOrchestrator(rawName, sourcePath, source);
+  const interactive = isInteractiveAgent(rawName, sourcePath, source);
   const name = orchestrator ? `${rawName} · Full pipeline` : rawName;
   const declaredTools = Array.isArray(frontmatter.tools) ? frontmatter.tools.map((tool) => tool.trim()).filter(Boolean) : [];
   const tools = [...new Set([...declaredTools, ...inferredOrchestratorTools(source, orchestrator)])];
-  const capabilities = requestedCapabilities(tools, source);
+  const capabilities = requestedCapabilities(tools, source, interactive);
   return {
     id: safeId(rawName),
     name,
@@ -163,6 +171,7 @@ function parseAgent(sourceRoot: string, sourcePath: string, source: string): Age
     shellRequested: capabilities.includes('command.execute'),
     networkRequested: /https?:\/\/|\bcurl\b|\bwget\b|\bjira\b|\bconfluence\b/i.test(source),
     writeRequested: capabilities.includes('repository.write'),
+    interactive,
     maxTurns: inferredMaxTurns(source),
     supportedRuntimes: SUPPORTED_RUNTIMES
   };
