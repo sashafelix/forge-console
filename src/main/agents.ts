@@ -66,6 +66,17 @@ function isOrchestrator(name: string, sourcePath: string, source: string): boole
   return /(?:orchestrator|pipeline)/i.test(`${name} ${path.basename(sourcePath)} ${source.slice(0, 2_000)}`);
 }
 
+function inferredOrchestratorTools(source: string, orchestrator: boolean): string[] {
+  if (!orchestrator) return [];
+  const inferred = new Set<string>(['Task']);
+  if (/```(?:bash|sh|shell|powershell|cmd)\b|\b(?:python3?|npm|npx|git)\s+[A-Za-z0-9_.\/-]+/i.test(source)) inferred.add('Bash');
+  if (/\b(?:implement|refactor|create|write|edit|modify|green)\b/i.test(source)) {
+    inferred.add('Write');
+    inferred.add('Edit');
+  }
+  return [...inferred];
+}
+
 function extractInputs(source: string, orchestrator: boolean): AgentInputDefinition[] {
   const names = new Set<string>();
   for (const match of source.matchAll(/\$\{input:([A-Za-z][A-Za-z0-9_.-]*)\}/g)) names.add(match[1]);
@@ -129,7 +140,8 @@ function parseAgent(sourceRoot: string, sourcePath: string, source: string): Age
   const rawName = typeof frontmatter.name === 'string' && frontmatter.name.trim() ? frontmatter.name.trim() : filename;
   const orchestrator = isOrchestrator(rawName, sourcePath, source);
   const name = orchestrator ? `${rawName} · Full pipeline` : rawName;
-  const tools = Array.isArray(frontmatter.tools) ? [...new Set(frontmatter.tools.map((tool) => tool.trim()).filter(Boolean))] : [];
+  const declaredTools = Array.isArray(frontmatter.tools) ? frontmatter.tools.map((tool) => tool.trim()).filter(Boolean) : [];
+  const tools = [...new Set([...declaredTools, ...inferredOrchestratorTools(source, orchestrator)])];
   const capabilities = requestedCapabilities(tools, source);
   return {
     id: safeId(rawName),

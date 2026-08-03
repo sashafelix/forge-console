@@ -13,6 +13,7 @@ import type {
 import { resolveAgentDefinition } from './agents';
 import { resolveAgentEnvironment } from './connections';
 import { findExecutable, runtimeSearchPath, spawnAgentRuntimeExecution } from './runtime';
+import { RuntimeOutputTracker, type RuntimeStream } from './runtime-output';
 import { createIsolatedWorktree, discardPreparedWorktree, type PreparedWorktree } from './worktrees';
 
 const RUN_ID_PATTERN = /^[0-9a-f-]{36}$/i;
@@ -24,6 +25,7 @@ interface ActiveAgentExecution {
   child: ChildProcessWithoutNullStreams;
   record: AgentExecutionRun;
   cancelRequested: boolean;
+  output: RuntimeOutputTracker;
 }
 
 interface EventWriter {
@@ -127,6 +129,12 @@ function createLineConsumer(onLine: (line: string) => void): { push(chunk: Buffe
       buffered = '';
     }
   };
+}
+
+function publishRuntimeLine(output: RuntimeOutputTracker, writer: EventWriter, stream: RuntimeStream, line: string): void {
+  for (const item of output.consume(stream, line)) {
+    writer.publishOutput(item.stream === 'stderr' ? 'runtime.stderr' : 'runtime.stdout', item.message);
+  }
 }
 
 function renderAgentPrompt(
@@ -340,20 +348,22 @@ export class AgentExecutionController {
           allowWrite: record.runtimePolicy.fileWrites === 'worktree-only',
           allowShell: record.runtimePolicy.shell === 'allowed-to-model'
         },
+        record.runtimePolicy.requestedTools,
         environment.values
       );
-      const active: ActiveAgentExecution = { child, record, cancelRequested: false };
+      const output = new RuntimeOutputTracker(record.runtimeId);
+      const active: ActiveAgentExecution = { child, record, cancelRequested: false, output };
       this.active.set(runId, active);
-      const stdout = createLineConsumer((line) => writer.publishOutput('runtime.stdout', line));
-      const stderr = createLineConsumer((line) => writer.publishOutput('runtime.stderr', line));
+      const stdout = createLineConsumer((line) => publishRuntimeLine(output, writer, 'stdout', line));
+      const stderr = createLineConsumer((line) => publishRuntimeLine(output, writer, 'stderr', line));
       child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk));
       child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
-      child.once('error', (error) => { void this.finishFailure(active, writer, error.message); });
+      child.once('error', (error) => { void this.finishFailure(active, writer, output.failureMessage(undefined, error.message)); });
       child.once('close', (code) => {
         stdout.flush();
         stderr.flush();
         if (active.cancelRequested) void this.finishCancelled(active, writer, code ?? undefined);
-        else if (code !== 0) void this.finishFailure(active, writer, `Runtime exited with code ${code ?? 'unknown'}`, code ?? undefined);
+        else if (code !== 0) void this.finishFailure(active, writer, output.failureMessage(code ?? undefined), code ?? undefined);
         else void this.validateAndFinish(active, writer);
       });
       return { ...record };
