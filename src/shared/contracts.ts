@@ -86,9 +86,29 @@ export interface RuntimeAdapterDescriptor {
   checkedAt?: string;
 }
 
+export type NetworkProxyMode = 'inherit' | 'system' | 'manual' | 'direct';
+
+export interface NetworkSettings {
+  proxyMode: NetworkProxyMode;
+  httpProxy: string;
+  httpsProxy: string;
+  noProxy: string;
+  caCertificatePath: string;
+}
+
+export interface SaveNetworkSettingsRequest extends NetworkSettings {}
+
+export interface RuntimeConnectionTestResult {
+  runtimeId: ProcessRuntimeId;
+  ok: boolean;
+  testedAt: string;
+  message: string;
+}
+
 export interface AppSettings {
-  schemaVersion: '1.0';
+  schemaVersion: '1.1';
   runtimeExecutableOverrides: Partial<Record<ProcessRuntimeId, string>>;
+  network: NetworkSettings;
 }
 
 export interface SystemInfo {
@@ -302,6 +322,9 @@ export type RunEventListener = (event: RunEvent) => void;
 export interface DesktopApi {
   getSystemInfo(): Promise<SystemInfo>;
   getSettings(): Promise<AppSettings>;
+  saveNetworkSettings(request: SaveNetworkSettingsRequest): Promise<AppSettings>;
+  selectNetworkCaCertificate(): Promise<string | null>;
+  testRuntimeConnection(runtimeId: ProcessRuntimeId): Promise<RuntimeConnectionTestResult>;
   listPipelines(): Promise<PipelineManifest[]>;
   installPipelinePack(): Promise<PipelineManifest | null>;
   listRuntimes(): Promise<RuntimeAdapterDescriptor[]>;
