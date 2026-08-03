@@ -10,6 +10,7 @@ export interface AgentRuntimeLaunch {
   runtimeId: ProcessRuntimeId;
   cwd: string;
   agentSourceRoot: string;
+  agentRelativePath?: string;
   prompt: string;
   maxTurns: number;
   permissions: {
@@ -44,7 +45,9 @@ async function readMcpConfig(agentSourceRoot: string): Promise<McpConfig> {
       const parsed = JSON.parse(await fs.readFile(candidate, 'utf8')) as { mcpServers?: Record<string, unknown> };
       return { path: candidate, serverNames: Object.keys(parsed.mcpServers ?? {}) };
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw new Error(`Unable to read MCP configuration ${candidate}: ${error instanceof Error ? error.message : String(error)}`);
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw new Error(`Unable to read MCP configuration ${candidate}: ${error instanceof Error ? error.message : String(error)}`);
+      }
     }
   }
   return { serverNames: [] };
@@ -68,6 +71,12 @@ async function runtimeEnvironment(
       delete env.GH_TOKEN;
       delete env.GITHUB_TOKEN;
     }
+
+    // Copilot prompt mode deliberately disables repository MCP sources unless the
+    // caller opts in. The workbench only enables this after the operator selected
+    // the agent library and approved the run; the actual MCP configuration is also
+    // supplied explicitly with --additional-mcp-config.
+    env.GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP = 'true';
   }
   return env;
 }
@@ -101,37 +110,51 @@ async function claudeArgs(launch: AgentRuntimeLaunch): Promise<string[]> {
   ];
 }
 
-function agentRelativePathFromPrompt(prompt: string): string | undefined {
-  const match = prompt.match(/^- Agent source:\s*(.+)$/m);
-  return match?.[1]?.trim();
-}
-
 function stripMarkdownSuffix(filename: string): string {
   return filename.replace(/\.agent\.md$|\.md$/i, '');
 }
 
-async function resolveCopilotAgentName(launch: AgentRuntimeLaunch): Promise<string | undefined> {
-  const relativePath = agentRelativePathFromPrompt(launch.prompt);
-  if (!relativePath || path.isAbsolute(relativePath)) return undefined;
+function agentRelativePathFromPrompt(prompt: string): string | undefined {
+  return prompt.match(/^- Selected agent:\s*(.+)$/m)?.[1]?.trim();
+}
+
+function safeAgentRelativePath(relativePath: string): string {
+  if (!relativePath || path.isAbsolute(relativePath)) throw new Error('Copilot agent path must be relative to its repository');
   const normalized = path.normalize(relativePath);
-  if (normalized === '..' || normalized.startsWith(`..${path.sep}`)) return undefined;
-  const recognizedAgentPath = normalized.startsWith(`${path.join('.github', 'agents')}${path.sep}`)
-    || normalized.startsWith(`${path.join('.claude', 'agents')}${path.sep}`);
-  if (!recognizedAgentPath) return undefined;
-
-  const root = await fs.realpath(path.resolve(launch.cwd));
-  let candidate: string;
-  try {
-    candidate = await fs.realpath(path.resolve(root, normalized));
-  } catch {
-    return undefined;
+  if (normalized === '..' || normalized.startsWith(`..${path.sep}`)) throw new Error('Copilot agent path escapes its repository');
+  const githubAgents = path.join('.github', 'agents');
+  const claudeAgents = path.join('.claude', 'agents');
+  if (normalized !== githubAgents && normalized !== claudeAgents
+    && !normalized.startsWith(`${githubAgents}${path.sep}`)
+    && !normalized.startsWith(`${claudeAgents}${path.sep}`)) {
+    throw new Error('Copilot custom agents must be stored under .github/agents or .claude/agents');
   }
-  if (candidate !== root && !candidate.startsWith(`${root}${path.sep}`)) return undefined;
+  return normalized;
+}
 
-  const source = await fs.readFile(candidate, 'utf8');
-  const frontmatter = source.match(/^---\r?\n([\s\S]*?)\r?\n---/m)?.[1];
-  const declaredName = frontmatter?.match(/^name:\s*["']?([^\r\n"']+)["']?\s*$/m)?.[1]?.trim();
-  return declaredName || stripMarkdownSuffix(path.basename(candidate));
+async function resolveCopilotAgentId(launch: AgentRuntimeLaunch): Promise<string> {
+  const requestedPath = launch.agentRelativePath ?? agentRelativePathFromPrompt(launch.prompt);
+  if (!requestedPath) throw new Error('The selected Copilot agent path was not supplied to the runtime');
+  const relativePath = safeAgentRelativePath(requestedPath);
+  const worktreeRoot = await fs.realpath(path.resolve(launch.cwd));
+  let worktreeAgentPath: string;
+  try {
+    worktreeAgentPath = await fs.realpath(path.resolve(worktreeRoot, relativePath));
+  } catch {
+    throw new Error(
+      `The selected Copilot agent ${relativePath} is not present in the isolated target worktree. `
+      + 'Copilot currently requires the agent definition to exist in the target repository.'
+    );
+  }
+  if (worktreeAgentPath !== worktreeRoot && !worktreeAgentPath.startsWith(`${worktreeRoot}${path.sep}`)) {
+    throw new Error('Copilot agent path escapes the isolated target worktree');
+  }
+  const details = await fs.stat(worktreeAgentPath);
+  if (!details.isFile()) throw new Error('Selected Copilot agent definition is not a file');
+
+  // GitHub Copilot CLI defines the agent ID from the filename. The optional
+  // frontmatter `name` field is display text and must not be passed to --agent.
+  return stripMarkdownSuffix(path.basename(worktreeAgentPath));
 }
 
 function customAgentPrompt(prompt: string): string {
@@ -143,42 +166,38 @@ function secretEnvironmentNames(environment: Record<string, string>): string[] {
   return Object.keys(environment).filter((name) => /(?:TOKEN|SECRET|PASSWORD|API_KEY|AUTH)/i.test(name));
 }
 
-export async function buildCopilotArgs(launch: AgentRuntimeLaunch): Promise<string[]> {
-  const normalizedTools = new Set(launch.requestedTools.map((tool) => tool.toLowerCase()));
-  const allowedTools = new Set<string>(['view', 'grep', 'glob']);
-  const deniedTools = new Set<string>(['url', 'memory']);
+function repeatedOption(option: string, values: Iterable<string>): string[] {
+  return [...new Set(values)].flatMap((value) => [option, value]);
+}
 
-  if (launch.permissions.allowWrite) {
-    allowedTools.add('write');
-  } else {
-    deniedTools.add('write');
-  }
-  if (launch.permissions.allowShell) {
-    allowedTools.add('shell');
-  } else {
-    deniedTools.add('shell');
-  }
-  if ([...normalizedTools].some((tool) => /^(?:ask_user|ask-user|askuserquestion|askuser)$/.test(tool))) {
-    allowedTools.add('ask_user');
-  }
-  if (normalizedTools.has('task') || normalizedTools.has('agent')) allowedTools.add('task');
+export async function buildCopilotArgs(launch: AgentRuntimeLaunch): Promise<string[]> {
+  const allowedPermissions = new Set<string>(['read']);
+  const deniedPermissions = new Set<string>(['url', 'memory']);
+
+  if (launch.permissions.allowWrite) allowedPermissions.add('write');
+  else deniedPermissions.add('write');
+
+  if (launch.permissions.allowShell) allowedPermissions.add('shell');
+  else deniedPermissions.add('shell');
 
   const mcp = await readMcpConfig(launch.agentSourceRoot);
-  for (const server of mcp.serverNames) allowedTools.add(server);
-  const selectedAgent = await resolveCopilotAgentName(launch);
+  for (const server of mcp.serverNames) allowedPermissions.add(server);
+
+  const selectedAgent = await resolveCopilotAgentId(launch);
   const secrets = secretEnvironmentNames(launch.environment);
 
   return [
     '-p', customAgentPrompt(launch.prompt),
     '--output-format=json',
+    '--no-banner',
     '--no-color',
     '--no-remote',
     '--no-remote-export',
-    ...(selectedAgent ? [`--agent=${selectedAgent}`] : []),
+    `--agent=${selectedAgent}`,
     ...(path.resolve(launch.agentSourceRoot) !== path.resolve(launch.cwd) ? ['--add-dir', launch.agentSourceRoot] : []),
     ...(mcp.path ? [`--additional-mcp-config=@${mcp.path}`, '--allow-all-mcp-server-instructions'] : []),
-    `--allow-tool=${[...allowedTools].join(',')}`,
-    `--deny-tool=${[...deniedTools].join(',')}`,
+    ...repeatedOption('--allow-tool', allowedPermissions),
+    ...repeatedOption('--deny-tool', deniedPermissions),
     ...(secrets.length > 0 ? [`--secret-env-vars=${secrets.join(',')}`] : []),
     ...(launch.sessionId ? [`--resume=${launch.sessionId}`] : [])
   ];
