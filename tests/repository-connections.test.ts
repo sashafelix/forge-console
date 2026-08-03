@@ -22,7 +22,8 @@ test('the task workbench preserves and recovers active runs', async () => {
   const taskWorkbench = await source('src/renderer/TaskWorkbench.tsx');
   const preload = await source('src/main/preload.ts');
   const contracts = await source('src/shared/contracts.ts');
-  const history = await source('src/main/agent-run-history.ts');
+  const controller = await source('src/main/agent-execution-controller.ts');
+  const ipc = await source('src/main/ipc.ts');
 
   assert.match(taskWorkbench, /ACTIVE_RUN_STORAGE_KEY/);
   assert.match(taskWorkbench, /getLatestAgentExecutionRun/);
@@ -35,8 +36,11 @@ test('the task workbench preserves and recovers active runs', async () => {
     assert.match(preload, new RegExp(`${method}:`));
     assert.match(contracts, new RegExp(`${method}\\(`));
   }
-  assert.match(history, /ACTIVE_STATUSES/);
-  assert.match(history, /events\.jsonl/);
+  assert.match(controller, /async getLatest\(\)/);
+  assert.match(controller, /async getEvents\(runId: string\)/);
+  assert.match(controller, /events\.jsonl/);
+  assert.match(ipc, /agentRuns\.getLatest\(\)/);
+  assert.match(ipc, /agentRuns\.getEvents\(runId\)/);
 });
 
 test('the sandboxed preload exposes connection metadata operations without a secret read API', async () => {
