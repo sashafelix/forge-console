@@ -2,6 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { ProcessRuntimeId } from '../shared/contracts';
+import { manageAgentProcess } from './agent-processes';
 import { applyConfiguredNetworkEnvironment } from './network-settings';
 import { discoverRuntimeAdapters, requiresCommandShell, runtimeSearchPath } from './runtime';
 
@@ -136,13 +137,13 @@ export async function spawnAgentRuntime(launch: AgentRuntimeLaunch): Promise<Chi
   }
   const executable = await resolveExecutable(launch.runtimeId);
   const args = launch.runtimeId === 'claude-code' ? await claudeArgs(launch) : copilotArgs(launch);
-  const child = spawn(executable, args, {
+  const child = manageAgentProcess(spawn(executable, args, {
     cwd: launch.cwd,
     env: await runtimeEnvironment(launch.runtimeId, launch.environment),
     shell: requiresCommandShell(executable),
     windowsHide: true,
     stdio: ['pipe', 'pipe', 'pipe']
-  });
+  }));
   child.stdin.end(launch.prompt, 'utf8');
   return child;
 }
