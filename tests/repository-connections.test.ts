@@ -15,6 +15,28 @@ test('the default renderer mounts the task-first quality workbench', async () =>
   assert.match(taskWorkbench, /Guided workflows/);
   assert.match(taskWorkbench, /Advanced options/);
   assert.match(taskWorkbench, /AgentWorkbench/);
+  assert.match(taskWorkbench, /Back to guided workbench/);
+});
+
+test('the task workbench preserves and recovers active runs', async () => {
+  const taskWorkbench = await source('src/renderer/TaskWorkbench.tsx');
+  const preload = await source('src/main/preload.ts');
+  const contracts = await source('src/shared/contracts.ts');
+  const history = await source('src/main/agent-run-history.ts');
+
+  assert.match(taskWorkbench, /ACTIVE_RUN_STORAGE_KEY/);
+  assert.match(taskWorkbench, /getLatestAgentExecutionRun/);
+  assert.match(taskWorkbench, /getAgentExecutionEvents/);
+  assert.match(taskWorkbench, /Previous run restored/);
+  assert.match(taskWorkbench, /openAgentWorkbench/);
+  assert.doesNotMatch(taskWorkbench, /window\.location\.href = '\.\/connections\.html'/);
+
+  for (const method of ['getLatestAgentExecutionRun', 'getAgentExecutionEvents']) {
+    assert.match(preload, new RegExp(`${method}:`));
+    assert.match(contracts, new RegExp(`${method}\\(`));
+  }
+  assert.match(history, /ACTIVE_STATUSES/);
+  assert.match(history, /events\.jsonl/);
 });
 
 test('the sandboxed preload exposes connection metadata operations without a secret read API', async () => {
