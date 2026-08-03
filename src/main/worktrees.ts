@@ -13,11 +13,21 @@ interface CommandResult {
   exitCode: number;
 }
 
-function runCommand(executable: string, args: string[], cwd: string, timeoutMs = GIT_TIMEOUT_MS): Promise<CommandResult> {
+interface CommandOptions {
+  environment?: NodeJS.ProcessEnv;
+  timeoutMs?: number;
+}
+
+function runCommand(executable: string, args: string[], cwd: string, options: CommandOptions = {}): Promise<CommandResult> {
   return new Promise((resolve, reject) => {
     const child = spawn(executable, args, {
       cwd,
-      env: { ...process.env, PATH: runtimeSearchPath(), NO_COLOR: '1' },
+      env: {
+        ...process.env,
+        PATH: runtimeSearchPath(),
+        NO_COLOR: '1',
+        ...(options.environment ?? {})
+      },
       shell: false,
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe']
@@ -26,7 +36,7 @@ function runCommand(executable: string, args: string[], cwd: string, timeoutMs =
     let stderr = '';
     child.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString('utf8'); });
     child.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString('utf8'); });
-    const timer = setTimeout(() => child.kill(), timeoutMs);
+    const timer = setTimeout(() => child.kill(), options.timeoutMs ?? GIT_TIMEOUT_MS);
     child.once('error', (error) => {
       clearTimeout(timer);
       reject(error);
@@ -54,6 +64,55 @@ function taskIdentifier(inputs: Record<string, unknown>): string {
     if (typeof value === 'string' && value.trim()) return value;
   }
   return 'task';
+}
+
+function snapshotIdentity(runId: string): NodeJS.ProcessEnv {
+  return {
+    GIT_AUTHOR_NAME: 'Agent Pipeline UI',
+    GIT_AUTHOR_EMAIL: 'agent-pipeline-ui@localhost',
+    GIT_COMMITTER_NAME: 'Agent Pipeline UI',
+    GIT_COMMITTER_EMAIL: 'agent-pipeline-ui@localhost',
+    GIT_AUTHOR_DATE: new Date().toISOString(),
+    GIT_COMMITTER_DATE: new Date().toISOString(),
+    AGENT_PIPELINE_RUN_ID: runId
+  };
+}
+
+async function createRepositorySnapshot(
+  git: string,
+  repositoryRoot: string,
+  headRevision: string,
+  runId: string
+): Promise<string> {
+  const snapshotRoot = path.join(app.getPath('userData'), 'snapshots');
+  await fs.mkdir(snapshotRoot, { recursive: true });
+  const indexPath = path.join(snapshotRoot, `${runId}.index`);
+  const environment: NodeJS.ProcessEnv = {
+    ...snapshotIdentity(runId),
+    GIT_INDEX_FILE: indexPath
+  };
+
+  try {
+    // Build an index from HEAD, then overlay the exact current working-copy state.
+    // This includes tracked modifications and non-ignored untracked files, while
+    // leaving the user's real index, branch, refs and working tree untouched.
+    await runCommand(git, ['read-tree', headRevision], repositoryRoot, { environment });
+    await runCommand(git, ['add', '-A', '--', '.'], repositoryRoot, { environment });
+    const tree = (await runCommand(git, ['write-tree'], repositoryRoot, { environment })).stdout.trim();
+    if (!/^[0-9a-f]{40,64}$/i.test(tree)) throw new Error('Git snapshot tree did not resolve correctly');
+
+    const snapshot = (await runCommand(
+      git,
+      ['commit-tree', tree, '-p', headRevision, '-m', `Agent Pipeline UI snapshot ${runId}`],
+      repositoryRoot,
+      { environment }
+    )).stdout.trim();
+    if (!/^[0-9a-f]{40,64}$/i.test(snapshot)) throw new Error('Git snapshot commit did not resolve correctly');
+    return snapshot;
+  } finally {
+    await fs.rm(indexPath, { force: true });
+    await fs.rm(`${indexPath}.lock`, { force: true });
+  }
 }
 
 export interface PreparedWorktree {
@@ -99,8 +158,9 @@ export async function createIsolatedWorktree(
     throw new Error('Selected project path is outside the resolved Git repository root');
   }
 
-  const revision = (await runCommand(git, ['rev-parse', 'HEAD'], repositoryRoot)).stdout.trim();
-  if (!/^[0-9a-f]{40,64}$/i.test(revision)) throw new Error('Git HEAD did not resolve to a commit');
+  const headRevision = (await runCommand(git, ['rev-parse', 'HEAD'], repositoryRoot)).stdout.trim();
+  if (!/^[0-9a-f]{40,64}$/i.test(headRevision)) throw new Error('Git HEAD did not resolve to a commit');
+  const revision = await createRepositorySnapshot(git, repositoryRoot, headRevision, runId);
 
   const worktreeRoot = path.join(app.getPath('userData'), 'worktrees');
   await fs.mkdir(worktreeRoot, { recursive: true });
