@@ -80,3 +80,16 @@ test('Advanced loads a complete light-theme override after legacy styles', async
   }
   assert.match(light, /color-scheme:\s*light/);
 });
+
+test('provider checks and active runs show accessible animated activity feedback', async () => {
+  const workbench = await source('src/renderer/TaskWorkbench.tsx');
+  const navigation = await source('src/renderer/state-navigation.css');
+
+  assert.match(workbench, /Getting things ready/);
+  assert.match(workbench, /task-busy-spinner/);
+  assert.match(workbench, /task-working-dots/);
+  assert.match(workbench, /aria-live="polite"/);
+  assert.match(navigation, /@keyframes task-spin/);
+  assert.match(navigation, /@keyframes task-status-pulse/);
+  assert.match(navigation, /prefers-reduced-motion:\s*reduce/);
+});
