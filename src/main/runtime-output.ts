@@ -34,8 +34,10 @@ function textValue(value: unknown): string | undefined {
 
 function sanitize(message: string): string {
   return message
+    .replace(/(\bAuthorization\s*[:=]\s*Bearer\s+)[A-Za-z0-9._~+\/-]{8,}/gi, '$1[REDACTED]')
     .replace(/\bBearer\s+[A-Za-z0-9._~+\/-]{8,}/gi, 'Bearer [REDACTED]')
-    .replace(/((?:authorization|api[_ -]?key|access[_ -]?token|personal[_ -]?token|password|secret)\s*[:=]\s*)[^\s,;]+/gi, '$1[REDACTED]')
+    .replace(/(\bAuthorization\s*[:=]\s*)(?!Bearer\b)[^\s,;]+/gi, '$1[REDACTED]')
+    .replace(/((?:api[_ -]?key|access[_ -]?token|personal[_ -]?token|password|secret)\s*[:=]\s*)[^\s,;]+/gi, '$1[REDACTED]')
     .replace(/(X-Atlassian-[A-Za-z-]*Token\s*[:=]\s*)[^\s,;]+/gi, '$1[REDACTED]')
     .trim()
     .slice(0, MAX_MESSAGE_CHARS);
