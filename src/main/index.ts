@@ -1,11 +1,19 @@
 import { app, BrowserWindow, Menu, type MenuItemConstructorOptions } from 'electron';
 import path from 'node:path';
+import { terminateAllAgentProcesses } from './agent-processes';
 import { registerAgentRunHistoryIpcHandlers } from './agent-run-history-ipc';
 import { recoverInterruptedAgentRuns } from './interrupted-run-recovery';
 import { registerIpcHandlers } from './ipc';
 
 let mainWindow: BrowserWindow | null = null;
 let connectionsWindow: BrowserWindow | null = null;
+let providerShutdownStarted = false;
+
+function stopProviderProcesses(): void {
+  if (providerShutdownStarted) return;
+  providerShutdownStarted = true;
+  terminateAllAgentProcesses(true);
+}
 
 function windowOptions(title: string): Electron.BrowserWindowConstructorOptions {
   return {
@@ -113,6 +121,15 @@ app.whenReady().then(async () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
   });
 });
+
+app.on('before-quit', stopProviderProcesses);
+
+for (const [signal, exitCode] of [['SIGINT', 130], ['SIGTERM', 143]] as const) {
+  process.once(signal, () => {
+    stopProviderProcesses();
+    process.exit(exitCode);
+  });
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
