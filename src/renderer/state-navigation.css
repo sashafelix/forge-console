@@ -1,0 +1,54 @@
+.advanced-workbench-shell {
+  min-height: 100vh;
+  background: #f4f7fb;
+}
+
+.advanced-workbench-nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #d7e0ec;
+  background: rgba(255, 255, 255, .96);
+  padding: 12px 28px;
+  box-shadow: 0 4px 16px rgba(43, 61, 89, .06);
+}
+
+.advanced-workbench-nav button {
+  border: 1px solid #b9c8dc;
+  border-radius: 10px;
+  background: #fff;
+  color: #234f86;
+  padding: 9px 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.advanced-workbench-nav button:hover {
+  border-color: #4f7fbe;
+  background: #f3f7fc;
+}
+
+.advanced-workbench-nav span {
+  color: #66758c;
+  font-size: 13px;
+  text-transform: capitalize;
+}
+
+.task-alert.info {
+  border-color: #a9c4e4;
+  background: #f2f7fd;
+  color: #285887;
+}
+
+.task-alert.info strong,
+.task-alert.info span {
+  display: block;
+}
+
+.task-alert.info span {
+  margin-top: 3px;
+}
