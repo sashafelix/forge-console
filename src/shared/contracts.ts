@@ -9,7 +9,8 @@ export type Capability =
   | 'github.read'
   | 'github.write'
   | 'mcp.tools'
-  | 'structured.output';
+  | 'structured.output'
+  | 'user.input';
 
 export interface PipelineInputProperty {
   type: 'string' | 'number' | 'boolean';
@@ -148,6 +149,7 @@ export interface AgentDefinition {
   shellRequested: boolean;
   networkRequested: boolean;
   writeRequested: boolean;
+  interactive: boolean;
   maxTurns: number;
   supportedRuntimes: ProcessRuntimeId[];
 }
@@ -215,7 +217,33 @@ export interface RunDraft extends CreateRunDraftRequest {
 }
 
 export type PreviewRunStatus = 'starting' | 'running' | 'completed' | 'failed' | 'cancelled';
-export type ExecutionRunStatus = 'preparing' | 'awaiting_approval' | 'running' | 'validating' | 'completed' | 'failed' | 'cancelled';
+export type ExecutionRunStatus =
+  | 'preparing'
+  | 'awaiting_approval'
+  | 'running'
+  | 'waiting_for_input'
+  | 'validating'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
+
+export interface AgentQuestion {
+  id: string;
+  question: string;
+  reason?: string;
+  choices: string[];
+  allowFreeText: boolean;
+  requestedAt: string;
+}
+
+export interface AgentConversationMessage {
+  id: string;
+  role: 'assistant' | 'user' | 'system';
+  content: string;
+  timestamp: string;
+  questionId?: string;
+}
+
 export type RunEventType =
   | 'run.started'
   | 'runtime.stdout'
@@ -223,6 +251,9 @@ export type RunEventType =
   | 'worktree.created'
   | 'approval.required'
   | 'execution.started'
+  | 'execution.resumed'
+  | 'interaction.requested'
+  | 'interaction.replied'
   | 'validation.started'
   | 'validation.stdout'
   | 'validation.stderr'
@@ -302,10 +333,16 @@ export interface AgentExecutionRun extends AgentExecutionRequest {
   branchName: string;
   approvalRequired: true;
   approvedAt?: string;
+  providerSessionId?: string;
+  pendingQuestion?: AgentQuestion;
+  conversation: AgentConversationMessage[];
+  interactionCount: number;
+  resultSummary?: string;
   runtimePolicy: {
     fileWrites: 'worktree-only' | 'denied-to-model';
     shell: 'allowed-to-model' | 'denied-to-model';
     network: 'allowed-through-approved-tools' | 'denied-to-model';
+    interactive: boolean;
     maxTurns: number;
     requestedTools: string[];
     declaredWrites: string[];
@@ -315,6 +352,12 @@ export interface AgentExecutionRun extends AgentExecutionRequest {
   changedFiles: string[];
   exitCode?: number;
   error?: string;
+}
+
+export interface ReplyToAgentExecutionRequest {
+  runId: string;
+  reply: string;
+  questionId?: string;
 }
 
 export type RunEventListener = (event: RunEvent) => void;
@@ -346,6 +389,7 @@ export interface DesktopApi {
   cancelExecution(runId: string): Promise<boolean>;
   prepareAgentExecution(request: AgentExecutionRequest): Promise<AgentExecutionRun>;
   approveAndStartAgentExecution(runId: string): Promise<AgentExecutionRun>;
+  replyToAgentExecution(request: ReplyToAgentExecutionRequest): Promise<AgentExecutionRun>;
   getAgentExecutionRun(runId: string): Promise<AgentExecutionRun | null>;
   getLatestAgentExecutionRun(): Promise<AgentExecutionRun | null>;
   getAgentExecutionEvents(runId: string): Promise<RunEvent[]>;
