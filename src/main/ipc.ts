@@ -23,6 +23,7 @@ import { listPipelineManifests, listRuntimeAdapters } from './catalog';
 import { listConnections, removeConnection, saveConnection, testConnection } from './connections';
 import { ExecutionController } from './execution-controller';
 import { installPipelinePackFromDialog, resolvePipelinePack } from './packs';
+import { preflightRuntimeSession } from './runtime';
 import { PreviewRunController } from './run-controller';
 import { clearRuntimeExecutableOverride, loadSettings, setRuntimeExecutableOverride } from './settings';
 
@@ -170,6 +171,7 @@ export function registerIpcHandlers(openAgentWorkbench: () => void): void {
   ipcMain.handle(IPC_CHANNELS.cancelExecution, (event, runId: string) => executionRuns.cancel(runId, rendererEmitter(event)));
   ipcMain.handle(IPC_CHANNELS.prepareAgentExecution, async (event, request: AgentExecutionRequest) => {
     await ensureRuntimeAvailable(request.runtimeId);
+    await preflightRuntimeSession(request.runtimeId, request.targetProject.path);
     return agentRuns.prepare(request, rendererEmitter(event));
   });
   ipcMain.handle(IPC_CHANNELS.approveAndStartAgentExecution, async (event, runId: string) => {
