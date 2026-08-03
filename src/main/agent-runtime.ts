@@ -3,6 +3,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { ProcessRuntimeId } from '../shared/contracts';
 import { manageAgentProcess } from './agent-processes';
+import { createCopilotAgentOverlay } from './copilot-agent-overlay';
 import { applyConfiguredNetworkEnvironment } from './network-settings';
 import { discoverRuntimeAdapters, requiresCommandShell, runtimeSearchPath } from './runtime';
 
@@ -80,7 +81,6 @@ async function runtimeEnvironment(
       delete env.GH_TOKEN;
       delete env.GITHUB_TOKEN;
     }
-
     env.GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP = 'true';
   }
   return env;
@@ -146,10 +146,7 @@ async function resolveCopilotAgentId(launch: AgentRuntimeLaunch): Promise<string
   try {
     worktreeAgentPath = await fs.realpath(path.resolve(worktreeRoot, relativePath));
   } catch {
-    throw new Error(
-      `The selected Copilot agent ${relativePath} is not present in the isolated target worktree. `
-      + 'Commit or save the agent in the selected repository, then create a new run.'
-    );
+    throw new Error(`The selected Copilot agent ${relativePath} could not be staged into the isolated target worktree.`);
   }
   if (worktreeAgentPath !== worktreeRoot && !worktreeAgentPath.startsWith(`${worktreeRoot}${path.sep}`)) {
     throw new Error('Copilot agent path escapes the isolated target worktree');
@@ -186,7 +183,10 @@ function collectHelpCapabilities(executable: string, environment: NodeJS.Process
     child.stdout.on('data', collect);
     child.stderr.on('data', collect);
     const timeout = setTimeout(() => child.kill(), COPILOT_HELP_TIMEOUT_MS);
+    let finished = false;
     const finish = () => {
+      if (finished) return;
+      finished = true;
       clearTimeout(timeout);
       const options = new Set(output.match(/--[a-z0-9][a-z0-9-]*/gi) ?? []);
       resolve({ options, helpText: output });
@@ -222,10 +222,8 @@ export async function buildCopilotArgs(
 
   const allowedPermissions = new Set<string>(['read']);
   const deniedPermissions = new Set<string>(['url', 'memory']);
-
   if (launch.permissions.allowWrite) allowedPermissions.add('write');
   else deniedPermissions.add('write');
-
   if (launch.permissions.allowShell) allowedPermissions.add('shell');
   else deniedPermissions.add('shell');
 
@@ -238,7 +236,6 @@ export async function buildCopilotArgs(
 
   if (supports(capabilities, '--prompt')) args.push('--prompt', customAgentPrompt(launch.prompt));
   else args.push('-p', customAgentPrompt(launch.prompt));
-
   if (supports(capabilities, '--output-format')) args.push('--output-format=json');
   optionalFlag(args, capabilities, '--no-banner');
   optionalFlag(args, capabilities, '--no-color');
@@ -249,21 +246,15 @@ export async function buildCopilotArgs(
   if (path.resolve(launch.agentSourceRoot) !== path.resolve(launch.cwd) && supports(capabilities, '--add-dir')) {
     args.push('--add-dir', launch.agentSourceRoot);
   }
-
   if (mcp.path) {
     requireOption(capabilities, '--additional-mcp-config', 'load the selected repository MCP configuration');
     args.push(`--additional-mcp-config=@${mcp.path}`);
     optionalFlag(args, capabilities, '--allow-all-mcp-server-instructions');
   }
 
-  // The public and older enterprise CLIs both accept one comma-separated value.
-  // Repeated `--allow-tool value` pairs are rejected by some corporate builds.
   args.push(`--allow-tool=${[...allowedPermissions].join(',')}`);
   args.push(`--deny-tool=${[...deniedPermissions].join(',')}`);
-
-  if (secrets.length > 0 && supports(capabilities, '--secret-env-vars')) {
-    args.push(`--secret-env-vars=${secrets.join(',')}`);
-  }
+  if (secrets.length > 0 && supports(capabilities, '--secret-env-vars')) args.push(`--secret-env-vars=${secrets.join(',')}`);
   if (launch.sessionId) {
     requireOption(capabilities, '--resume', 'resume an interactive workflow conversation');
     args.push(`--resume=${launch.sessionId}`);
@@ -277,17 +268,38 @@ export async function spawnAgentRuntime(launch: AgentRuntimeLaunch): Promise<Chi
   }
   const executable = await resolveExecutable(launch.runtimeId);
   const environment = await runtimeEnvironment(launch.runtimeId, launch.environment);
-  const args = launch.runtimeId === 'claude-code'
-    ? await claudeArgs(launch)
-    : await buildCopilotArgs(launch, await collectHelpCapabilities(executable, environment));
-  const child = manageAgentProcess(spawn(executable, args, {
-    cwd: launch.cwd,
-    env: environment,
-    shell: requiresCommandShell(executable),
-    windowsHide: true,
-    stdio: ['pipe', 'pipe', 'pipe']
-  }));
-  if (launch.runtimeId === 'claude-code') child.stdin.end(launch.prompt, 'utf8');
-  else child.stdin.end();
-  return child;
+  const overlay = launch.runtimeId === 'github-copilot'
+    ? await createCopilotAgentOverlay(launch.agentSourceRoot, launch.cwd)
+    : undefined;
+
+  try {
+    const args = launch.runtimeId === 'claude-code'
+      ? await claudeArgs(launch)
+      : await buildCopilotArgs(launch, await collectHelpCapabilities(executable, environment));
+    const child = manageAgentProcess(spawn(executable, args, {
+      cwd: launch.cwd,
+      env: environment,
+      shell: requiresCommandShell(executable),
+      windowsHide: true,
+      stdio: ['pipe', 'pipe', 'pipe']
+    }));
+
+    // Registered before controller listeners, so validation observes the restored
+    // worktree rather than temporary local agent definitions.
+    let cleaned = false;
+    const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
+      overlay?.cleanup();
+    };
+    child.once('close', cleanup);
+    child.once('error', cleanup);
+
+    if (launch.runtimeId === 'claude-code') child.stdin.end(launch.prompt, 'utf8');
+    else child.stdin.end();
+    return child;
+  } catch (error) {
+    overlay?.cleanup();
+    throw error;
+  }
 }
