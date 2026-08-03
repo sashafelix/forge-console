@@ -63,7 +63,11 @@ function isAgentDocument(sourcePath: string, source: string): boolean {
 }
 
 function isOrchestrator(name: string, sourcePath: string, source: string): boolean {
-  return /(?:orchestrator|pipeline)/i.test(`${name} ${path.basename(sourcePath)} ${source.slice(0, 2_000)}`);
+  const identity = `${name} ${path.basename(sourcePath)}`;
+  if (/\borchestrat(?:or|e|ion)\b/i.test(identity)) return true;
+  if (/^#{1,3}\s+.*\b(?:orchestrator|full pipeline)\b/im.test(source)) return true;
+  if (/\b(?:stage execution|stage transitions|for each stage|invoke only the declared owner|bounded remediation and closure)\b/i.test(source)) return true;
+  return /\bPREPARE\b[\s\S]{0,300}(?:→|->)[\s\S]{0,300}\b(?:VERIFY|CONVERGE)\b/i.test(source);
 }
 
 function inferredOrchestratorTools(source: string, orchestrator: boolean): string[] {
