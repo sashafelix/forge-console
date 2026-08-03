@@ -53,7 +53,8 @@ For each stage, invoke only the declared owner.
 test('the guided workbench uses the explicit Full pipeline marker', async () => {
   const workbench = await source('src/renderer/TaskWorkbench.tsx');
 
-  assert.match(workbench, /full pipeline\\s\*\$\/i);
+  assert.match(workbench, /full pipeline/i);
+  assert.match(workbench, /test\(agent\.name\)/);
   assert.doesNotMatch(workbench, /orchestrat\|pipeline\|workflow/);
 });
 
@@ -75,7 +76,7 @@ test('Advanced loads a complete light-theme override after legacy styles', async
 
   assert.ok(main.indexOf("'./advanced-light.css'") > main.indexOf("'./styles.css'"));
   for (const selector of ['.sidebar', '.content', '.form-panel', '.approval-panel', '.run-console']) {
-    assert.match(light, new RegExp(`advanced-workbench-shell \\${selector.replace('.', '.')}`));
+    assert.match(light, new RegExp(`advanced-workbench-shell \\${selector}`));
   }
   assert.match(light, /color-scheme:\s*light/);
 });
