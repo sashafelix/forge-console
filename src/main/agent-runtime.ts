@@ -1,16 +1,17 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { ProcessRuntimeId } from '../shared/contracts';
 import { manageAgentProcess } from './agent-processes';
+import { runtimeWorkspaceDetails } from './agent-runtime-workspace';
 import { applyConfiguredNetworkEnvironment } from './network-settings';
 import { discoverRuntimeAdapters, requiresCommandShell, runtimeSearchPath } from './runtime';
 
 export interface AgentRuntimeLaunch {
   runtimeId: ProcessRuntimeId;
   cwd: string;
+  storagePath: string;
   agentSourceRoot: string;
-  agentRelativePath?: string;
+  agentRelativePath: string;
   prompt: string;
   maxTurns: number;
   permissions: {
@@ -22,10 +23,14 @@ export interface AgentRuntimeLaunch {
   sessionId?: string;
 }
 
-interface McpConfig {
-  path?: string;
-  serverNames: string[];
+interface CopilotCapabilities {
+  flags: Set<string>;
+  helpText: string;
 }
+
+const COPILOT_HELP_TIMEOUT_MS = 8_000;
+const MAX_HELP_OUTPUT = 512 * 1024;
+const copilotCapabilityCache = new Map<string, CopilotCapabilities>();
 
 async function resolveExecutable(runtimeId: ProcessRuntimeId): Promise<string> {
   const runtime = (await discoverRuntimeAdapters()).find((candidate) => candidate.id === runtimeId);
@@ -33,24 +38,6 @@ async function resolveExecutable(runtimeId: ProcessRuntimeId): Promise<string> {
     throw new Error(runtime?.configurationHint ?? `Runtime executable for ${runtimeId} is unavailable`);
   }
   return runtime.executablePath;
-}
-
-async function readMcpConfig(agentSourceRoot: string): Promise<McpConfig> {
-  const candidates = [
-    path.join(agentSourceRoot, '.github', 'mcp.json'),
-    path.join(agentSourceRoot, '.mcp.json')
-  ];
-  for (const candidate of candidates) {
-    try {
-      const parsed = JSON.parse(await fs.readFile(candidate, 'utf8')) as { mcpServers?: Record<string, unknown> };
-      return { path: candidate, serverNames: Object.keys(parsed.mcpServers ?? {}) };
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-        throw new Error(`Unable to read MCP configuration ${candidate}: ${error instanceof Error ? error.message : String(error)}`);
-      }
-    }
-  }
-  return { serverNames: [] };
 }
 
 async function runtimeEnvironment(
@@ -71,11 +58,6 @@ async function runtimeEnvironment(
       delete env.GH_TOKEN;
       delete env.GITHUB_TOKEN;
     }
-
-    // Copilot prompt mode deliberately disables repository MCP sources unless the
-    // caller opts in. The workbench only enables this after the operator selected
-    // the agent library and approved the run; the actual MCP configuration is also
-    // supplied explicitly with --additional-mcp-config.
     env.GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP = 'true';
   }
   return env;
@@ -87,9 +69,6 @@ async function claudeArgs(launch: AgentRuntimeLaunch): Promise<string[]> {
   if (launch.permissions.allowWrite) allowedTools.push('Write', 'Edit');
   if (launch.permissions.allowShell) allowedTools.push('Bash');
   if (normalizedTools.has('task') || normalizedTools.has('agent')) allowedTools.push('Task');
-
-  const mcp = await readMcpConfig(launch.agentSourceRoot);
-  for (const server of mcp.serverNames) allowedTools.push(`mcp__${server}__*`);
 
   const deniedTools = ['WebFetch', 'WebSearch'];
   if (!launch.permissions.allowWrite) deniedTools.push('Write', 'Edit');
@@ -105,56 +84,8 @@ async function claudeArgs(launch: AgentRuntimeLaunch): Promise<string[]> {
     '--allowedTools', [...new Set(allowedTools)].join(','),
     '--disallowedTools', deniedTools.join(','),
     ...(path.resolve(launch.agentSourceRoot) !== path.resolve(launch.cwd) ? ['--add-dir', launch.agentSourceRoot] : []),
-    ...(mcp.path ? ['--mcp-config', mcp.path] : []),
     ...(launch.sessionId ? ['--resume', launch.sessionId] : [])
   ];
-}
-
-function stripMarkdownSuffix(filename: string): string {
-  return filename.replace(/\.agent\.md$|\.md$/i, '');
-}
-
-function agentRelativePathFromPrompt(prompt: string): string | undefined {
-  return prompt.match(/^- Selected agent:\s*(.+)$/m)?.[1]?.trim();
-}
-
-function safeAgentRelativePath(relativePath: string): string {
-  if (!relativePath || path.isAbsolute(relativePath)) throw new Error('Copilot agent path must be relative to its repository');
-  const normalized = path.normalize(relativePath);
-  if (normalized === '..' || normalized.startsWith(`..${path.sep}`)) throw new Error('Copilot agent path escapes its repository');
-  const githubAgents = path.join('.github', 'agents');
-  const claudeAgents = path.join('.claude', 'agents');
-  if (normalized !== githubAgents && normalized !== claudeAgents
-    && !normalized.startsWith(`${githubAgents}${path.sep}`)
-    && !normalized.startsWith(`${claudeAgents}${path.sep}`)) {
-    throw new Error('Copilot custom agents must be stored under .github/agents or .claude/agents');
-  }
-  return normalized;
-}
-
-async function resolveCopilotAgentId(launch: AgentRuntimeLaunch): Promise<string> {
-  const requestedPath = launch.agentRelativePath ?? agentRelativePathFromPrompt(launch.prompt);
-  if (!requestedPath) throw new Error('The selected Copilot agent path was not supplied to the runtime');
-  const relativePath = safeAgentRelativePath(requestedPath);
-  const worktreeRoot = await fs.realpath(path.resolve(launch.cwd));
-  let worktreeAgentPath: string;
-  try {
-    worktreeAgentPath = await fs.realpath(path.resolve(worktreeRoot, relativePath));
-  } catch {
-    throw new Error(
-      `The selected Copilot agent ${relativePath} is not present in the isolated target worktree. `
-      + 'Copilot currently requires the agent definition to exist in the target repository.'
-    );
-  }
-  if (worktreeAgentPath !== worktreeRoot && !worktreeAgentPath.startsWith(`${worktreeRoot}${path.sep}`)) {
-    throw new Error('Copilot agent path escapes the isolated target worktree');
-  }
-  const details = await fs.stat(worktreeAgentPath);
-  if (!details.isFile()) throw new Error('Selected Copilot agent definition is not a file');
-
-  // GitHub Copilot CLI defines the agent ID from the filename. The optional
-  // frontmatter `name` field is display text and must not be passed to --agent.
-  return stripMarkdownSuffix(path.basename(worktreeAgentPath));
 }
 
 function customAgentPrompt(prompt: string): string {
@@ -166,41 +97,110 @@ function secretEnvironmentNames(environment: Record<string, string>): string[] {
   return Object.keys(environment).filter((name) => /(?:TOKEN|SECRET|PASSWORD|API_KEY|AUTH)/i.test(name));
 }
 
-function repeatedOption(option: string, values: Iterable<string>): string[] {
-  return [...new Set(values)].flatMap((value) => [option, value]);
+function collectHelp(executable: string): Promise<CopilotCapabilities> {
+  const cached = copilotCapabilityCache.get(executable);
+  if (cached) return Promise.resolve(cached);
+
+  return new Promise((resolve, reject) => {
+    const child = spawn(executable, ['--help'], {
+      env: { ...process.env, PATH: runtimeSearchPath(), NO_COLOR: '1' },
+      shell: requiresCommandShell(executable),
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    let output = '';
+    const append = (chunk: Buffer) => {
+      if (output.length < MAX_HELP_OUTPUT) output += chunk.toString('utf8');
+    };
+    child.stdout.on('data', append);
+    child.stderr.on('data', append);
+    const timeout = setTimeout(() => child.kill(), COPILOT_HELP_TIMEOUT_MS);
+    child.once('error', (error) => {
+      clearTimeout(timeout);
+      reject(new Error(`Unable to inspect the installed GitHub Copilot CLI: ${error.message}`));
+    });
+    child.once('close', (code) => {
+      clearTimeout(timeout);
+      if (code !== 0 || !output.trim()) {
+        reject(new Error('The installed GitHub Copilot CLI did not return usable --help output'));
+        return;
+      }
+      const flags = new Set<string>();
+      for (const match of output.matchAll(/(^|[\s,])(--[a-z0-9][a-z0-9-]*)\b/gim)) flags.add(match[2]);
+      const capabilities = { flags, helpText: output };
+      copilotCapabilityCache.set(executable, capabilities);
+      resolve(capabilities);
+    });
+  });
 }
 
-export async function buildCopilotArgs(launch: AgentRuntimeLaunch): Promise<string[]> {
+function requireFlag(capabilities: CopilotCapabilities, flag: string): void {
+  if (!capabilities.flags.has(flag)) {
+    throw new Error(`The installed GitHub Copilot CLI does not support ${flag}. Update Copilot CLI or choose Claude Code for this run.`);
+  }
+}
+
+function optionalFlag(capabilities: CopilotCapabilities, flag: string, value?: string): string[] {
+  if (!capabilities.flags.has(flag)) return [];
+  return [value === undefined ? flag : `${flag}=${value}`];
+}
+
+export async function buildCopilotArgs(
+  launch: AgentRuntimeLaunch,
+  executable?: string
+): Promise<string[]> {
+  const resolvedExecutable = executable ?? await resolveExecutable('github-copilot');
+  const capabilities = await collectHelp(resolvedExecutable);
+  requireFlag(capabilities, '--agent');
+  requireFlag(capabilities, '--allow-tool');
+
+  const workspace = await runtimeWorkspaceDetails(launch.storagePath);
+  if (!workspace) throw new Error('The staged agent runtime workspace is missing');
+
   const allowedPermissions = new Set<string>(['read']);
   const deniedPermissions = new Set<string>(['url', 'memory']);
-
   if (launch.permissions.allowWrite) allowedPermissions.add('write');
   else deniedPermissions.add('write');
-
   if (launch.permissions.allowShell) allowedPermissions.add('shell');
   else deniedPermissions.add('shell');
 
-  const mcp = await readMcpConfig(launch.agentSourceRoot);
-  for (const server of mcp.serverNames) allowedPermissions.add(server);
+  const mcpServers = new Set<string>();
+  if (workspace.mcpConfigPath) {
+    const config = JSON.parse(await import('node:fs/promises').then(({ readFile }) => readFile(workspace.mcpConfigPath!, 'utf8'))) as { mcpServers?: Record<string, unknown> };
+    for (const server of Object.keys(config.mcpServers ?? {})) {
+      allowedPermissions.add(server);
+      mcpServers.add(server);
+    }
+  }
 
-  const selectedAgent = await resolveCopilotAgentId(launch);
-  const secrets = secretEnvironmentNames(launch.environment);
-
-  return [
+  const args = [
     '-p', customAgentPrompt(launch.prompt),
-    '--output-format=json',
-    '--no-banner',
-    '--no-color',
-    '--no-remote',
-    '--no-remote-export',
-    `--agent=${selectedAgent}`,
-    ...(path.resolve(launch.agentSourceRoot) !== path.resolve(launch.cwd) ? ['--add-dir', launch.agentSourceRoot] : []),
-    ...(mcp.path ? [`--additional-mcp-config=@${mcp.path}`, '--allow-all-mcp-server-instructions'] : []),
-    ...repeatedOption('--allow-tool', allowedPermissions),
-    ...repeatedOption('--deny-tool', deniedPermissions),
-    ...(secrets.length > 0 ? [`--secret-env-vars=${secrets.join(',')}`] : []),
-    ...(launch.sessionId ? [`--resume=${launch.sessionId}`] : [])
+    ...optionalFlag(capabilities, '--output-format', 'json'),
+    ...optionalFlag(capabilities, '--no-banner'),
+    ...optionalFlag(capabilities, '--no-color'),
+    `--agent=${workspace.agentId}`,
+    `--allow-tool=${[...allowedPermissions].join(',')}`
   ];
+
+  if (capabilities.flags.has('--deny-tool') && deniedPermissions.size > 0) {
+    args.push(`--deny-tool=${[...deniedPermissions].join(',')}`);
+  }
+  if (path.resolve(launch.agentSourceRoot) !== path.resolve(launch.cwd) && capabilities.flags.has('--add-dir')) {
+    args.push(`--add-dir=${launch.agentSourceRoot}`);
+  }
+  if (workspace.mcpConfigPath && capabilities.flags.has('--additional-mcp-config')) {
+    args.push(`--additional-mcp-config=@${workspace.mcpConfigPath}`);
+  }
+  const secrets = secretEnvironmentNames(launch.environment);
+  if (secrets.length > 0 && capabilities.flags.has('--secret-env-vars')) {
+    args.push(`--secret-env-vars=${secrets.join(',')}`);
+  }
+  if (launch.sessionId) {
+    requireFlag(capabilities, '--resume');
+    args.push(`--resume=${launch.sessionId}`);
+  }
+
+  return args;
 }
 
 export async function spawnAgentRuntime(launch: AgentRuntimeLaunch): Promise<ChildProcessWithoutNullStreams> {
@@ -208,7 +208,9 @@ export async function spawnAgentRuntime(launch: AgentRuntimeLaunch): Promise<Chi
     throw new Error('maxTurns must be from 1 to 100');
   }
   const executable = await resolveExecutable(launch.runtimeId);
-  const args = launch.runtimeId === 'claude-code' ? await claudeArgs(launch) : await buildCopilotArgs(launch);
+  const args = launch.runtimeId === 'claude-code'
+    ? await claudeArgs(launch)
+    : await buildCopilotArgs(launch, executable);
   const child = manageAgentProcess(spawn(executable, args, {
     cwd: launch.cwd,
     env: await runtimeEnvironment(launch.runtimeId, launch.environment),
@@ -219,4 +221,8 @@ export async function spawnAgentRuntime(launch: AgentRuntimeLaunch): Promise<Chi
   if (launch.runtimeId === 'claude-code') child.stdin.end(launch.prompt, 'utf8');
   else child.stdin.end();
   return child;
+}
+
+export function clearCopilotCapabilityCache(): void {
+  copilotCapabilityCache.clear();
 }
