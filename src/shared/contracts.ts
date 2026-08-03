@@ -324,6 +324,8 @@ export interface DesktopApi {
   prepareAgentExecution(request: AgentExecutionRequest): Promise<AgentExecutionRun>;
   approveAndStartAgentExecution(runId: string): Promise<AgentExecutionRun>;
   getAgentExecutionRun(runId: string): Promise<AgentExecutionRun | null>;
+  getLatestAgentExecutionRun(): Promise<AgentExecutionRun | null>;
+  getAgentExecutionEvents(runId: string): Promise<RunEvent[]>;
   cancelAgentExecution(runId: string): Promise<boolean>;
   openAgentWorkbench(): Promise<void>;
   onRunEvent(listener: RunEventListener): () => void;
