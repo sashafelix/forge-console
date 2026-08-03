@@ -129,7 +129,7 @@ export async function applyConfiguredNetworkEnvironment(
   } else if (network.proxyMode === 'system') {
     clearProxyEnvironment(env);
     await session.defaultSession.setProxy({ mode: 'system' });
-    const resolved = parseResolvedSystemProxy(await session.defaultSession.resolveProxy(providerProbeUrl(runtimeId)));
+    const resolved = parseResolvedSystemProxy(await session.defaultSession.resolveProxy(providerProbeUrl(runtimeId).toString()));
     if (resolved.proxy) {
       env.HTTP_PROXY = resolved.proxy;
       env.http_proxy = resolved.proxy;
