@@ -37,15 +37,10 @@ function secretLabel(id: ConnectionId): string {
 }
 
 function returnToWorkbench(): void {
-  if (window.history.length > 1) {
-    window.history.back();
-    return;
-  }
-
   window.close();
   window.setTimeout(() => {
     window.location.href = './index.html';
-  }, 100);
+  }, 150);
 }
 
 export function ConnectionsWorkbench() {
