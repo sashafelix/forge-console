@@ -206,13 +206,16 @@ export async function spawnRuntimeExecution(
 function buildAgentExecutionArgs(
   runtimeId: ProcessRuntimeId,
   maxTurns: number,
-  permissions: { allowWrite: boolean; allowShell: boolean }
+  permissions: { allowWrite: boolean; allowShell: boolean },
+  requestedTools: string[]
 ): string[] {
   if (!Number.isInteger(maxTurns) || maxTurns < 1 || maxTurns > 100) throw new Error('maxTurns must be from 1 to 100');
+  const normalizedTools = new Set(requestedTools.map((tool) => tool.toLowerCase()));
   if (runtimeId === 'claude-code') {
     const allowedTools = ['Read', 'Glob', 'Grep'];
     if (permissions.allowWrite) allowedTools.push('Write', 'Edit');
     if (permissions.allowShell) allowedTools.push('Bash');
+    if (normalizedTools.has('task') || normalizedTools.has('agent')) allowedTools.push('Task');
     const deniedTools = ['WebFetch', 'WebSearch'];
     if (!permissions.allowWrite) deniedTools.push('Write', 'Edit');
     if (!permissions.allowShell) deniedTools.push('Bash');
@@ -223,7 +226,7 @@ function buildAgentExecutionArgs(
       '--verbose',
       '--max-turns', String(maxTurns),
       '--permission-mode', permissions.allowWrite ? 'acceptEdits' : 'plan',
-      '--allowedTools', allowedTools.join(','),
+      '--allowedTools', [...new Set(allowedTools)].join(','),
       '--disallowedTools', deniedTools.join(',')
     ];
   }
@@ -262,7 +265,8 @@ export async function spawnAgentRuntimeExecution(
   prompt: string,
   maxTurns: number,
   permissions: { allowWrite: boolean; allowShell: boolean },
+  requestedTools: string[],
   environment: Record<string, string>
 ): Promise<ChildProcessWithoutNullStreams> {
-  return spawnRuntime(runtimeId, cwd, prompt, buildAgentExecutionArgs(runtimeId, maxTurns, permissions), environment);
+  return spawnRuntime(runtimeId, cwd, prompt, buildAgentExecutionArgs(runtimeId, maxTurns, permissions, requestedTools), environment);
 }
