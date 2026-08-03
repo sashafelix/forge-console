@@ -22,6 +22,7 @@ const MAX_MESSAGE_CHARS = 2_000;
 const MAX_RAW_LINE_CHARS = 65_536;
 const MAX_TRACKED_MESSAGES = 40;
 const MAX_JSON_DEPTH = 10;
+const MAX_UNKNOWN_EVENTS = 20;
 const INPUT_BLOCK = /```agent-input\s*([\s\S]*?)```/i;
 const RESULT_BLOCK = /```agent-result\s*([\s\S]*?)```/i;
 const INPUT_XML = /<agent-input>([\s\S]*?)<\/agent-input>/i;
@@ -181,7 +182,7 @@ function sessionIdFrom(value: unknown, depth = 0): string | undefined {
   if (depth > MAX_JSON_DEPTH) return undefined;
   if (isRecord(value)) {
     for (const [key, candidate] of Object.entries(value)) {
-      if (/^(?:session[_-]?id|conversation[_-]?id|task[_-]?id)$/i.test(key)
+      if (/^(?:session[_-]?id|conversation[_-]?id)$/i.test(key)
         && typeof candidate === 'string' && candidate.trim().length >= 8) {
         return candidate.trim();
       }
@@ -290,6 +291,12 @@ function looksLikeQuestion(value: string): boolean {
     || /^(?:what|which|who|where|when|why|how|do|does|did|is|are|can|could|would|should|please choose|please confirm)\b/i.test(trimmed);
 }
 
+function completedAssistantEvent(eventType: string, value: JsonRecord): boolean {
+  if (/delta|chunk|partial|start|thinking|reasoning/i.test(eventType)) return false;
+  if (/assistant.*message|message.*assistant|response.*complete|turn.*(?:complete|end)|result|final|completion|done|session.*end/i.test(eventType)) return true;
+  return !eventType && roleFrom(value)?.toLowerCase() === 'assistant';
+}
+
 export class RuntimeOutputTracker {
   private readonly errors: string[] = [];
   private readonly recent: string[] = [];
@@ -298,6 +305,7 @@ export class RuntimeOutputTracker {
   private interaction?: RuntimeInteractionRequest;
   private completionSummary?: string;
   private lastAssistantResponse?: string;
+  private unknownEventCount = 0;
 
   constructor(private readonly runtimeId: ProcessRuntimeId) {}
 
@@ -320,7 +328,12 @@ export class RuntimeOutputTracker {
     const inlineResult = resultFromText(trimmed);
     if (inlineResult) this.completionSummary = inlineResult;
     const cleaned = withoutContracts(trimmed);
-    if (stream === 'stdout' && cleaned) this.lastAssistantResponse = cleaned;
+    if (stream === 'stdout' && cleaned) {
+      this.lastAssistantResponse = cleaned;
+      if (this.runtimeId === 'github-copilot' && looksLikeQuestion(cleaned)) {
+        this.interaction = { question: cleaned, choices: [], allowFreeText: true };
+      }
+    }
     const item = notice(stream, cleaned, stream === 'stderr');
     if (!item) return [];
     this.track(item);
@@ -453,6 +466,9 @@ export class RuntimeOutputTracker {
     if (raw) {
       this.captureAssistantText(raw);
       const cleaned = withoutContracts(raw);
+      if (!this.interaction && cleaned && completedAssistantEvent(type, value) && looksLikeQuestion(cleaned)) {
+        this.interaction = { question: cleaned, choices: [], allowFreeText: true };
+      }
       if (cleaned) {
         const item = notice(stream, cleaned, false, /result|final|complete|end/i.test(type));
         if (item) notices.push(item);
@@ -463,6 +479,14 @@ export class RuntimeOutputTracker {
     if (type && /warning|blocked|permission|mcp/i.test(type)) {
       const detail = deepString(value, ['message', 'detail', 'reason', 'status']);
       const item = notice(stream, detail ? `${humanize(type)}: ${detail}` : humanize(type), /error|blocked|denied/i.test(type));
+      if (item) notices.push(item);
+      return this.trackAll(notices);
+    }
+
+    if (this.unknownEventCount < MAX_UNKNOWN_EVENTS) {
+      this.unknownEventCount += 1;
+      const rawEvent = redactRuntimeLine(JSON.stringify(value));
+      const item = notice(stream, `Unparsed Copilot event${type ? ` (${type})` : ''}: ${rawEvent}`);
       if (item) notices.push(item);
     }
     return this.trackAll(notices);
