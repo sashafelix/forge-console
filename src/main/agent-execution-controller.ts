@@ -4,27 +4,33 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type {
+  AgentConversationMessage,
   AgentExecutionRequest,
   AgentExecutionRun,
+  AgentQuestion,
   ProcessRuntimeId,
+  ReplyToAgentExecutionRequest,
   RunEvent,
   RunEventType
 } from '../shared/contracts';
+import { spawnAgentRuntime } from './agent-runtime';
 import { resolveAgentDefinition } from './agents';
 import { resolveAgentEnvironment } from './connections';
-import { findExecutable, runtimeSearchPath, spawnAgentRuntimeExecution } from './runtime';
-import { RuntimeOutputTracker, type RuntimeStream } from './runtime-output';
+import { findExecutable, runtimeSearchPath } from './runtime';
+import { RuntimeOutputTracker, type RuntimeInteractionRequest, type RuntimeStream } from './runtime-output';
 import { createIsolatedWorktree, discardPreparedWorktree, type PreparedWorktree } from './worktrees';
 
 const RUN_ID_PATTERN = /^[0-9a-f-]{36}$/i;
 const MAX_EVENT_LINE_CHARS = 16_384;
 const MAX_OUTPUT_EVENTS = 5_000;
 const MAX_CHANGED_FILES = 500;
+const MAX_INTERACTIONS = 50;
 
 interface ActiveAgentExecution {
   child: ChildProcessWithoutNullStreams;
   record: AgentExecutionRun;
   cancelRequested: boolean;
+  interactionCaptured: boolean;
   output: RuntimeOutputTracker;
 }
 
@@ -50,6 +56,23 @@ function assertRunId(runId: string): void {
 
 function isProcessRuntimeId(value: string): value is ProcessRuntimeId {
   return value === 'claude-code' || value === 'github-copilot';
+}
+
+function conversationMessage(role: AgentConversationMessage['role'], content: string, questionId?: string): AgentConversationMessage {
+  return { id: randomUUID(), role, content: content.trim(), timestamp: new Date().toISOString(), questionId };
+}
+
+function normalizeRecord(record: AgentExecutionRun): AgentExecutionRun {
+  return {
+    ...record,
+    conversation: Array.isArray(record.conversation) ? record.conversation : [],
+    interactionCount: Number.isInteger(record.interactionCount) ? record.interactionCount : 0,
+    changedFiles: Array.isArray(record.changedFiles) ? record.changedFiles : [],
+    runtimePolicy: {
+      ...record.runtimePolicy,
+      interactive: record.runtimePolicy?.interactive === true
+    }
+  };
 }
 
 async function atomicJsonWrite(target: string, value: unknown): Promise<void> {
@@ -137,6 +160,28 @@ function publishRuntimeLine(output: RuntimeOutputTracker, writer: EventWriter, s
   }
 }
 
+function interactionContract(interactive: boolean): string[] {
+  return [
+    'Desktop conversation contract:',
+    '- This run is controlled by a workbench that can pause, show a question to the operator, and resume the same provider session.',
+    '- Never invent a human decision, approval, business fact, or missing requirement.',
+    '- When a human answer or approval is required, stop before taking the guarded action.',
+    '- Prefer the runtime ask-user tool when available. Otherwise end the turn with exactly one fenced block in this form:',
+    '```agent-input',
+    '{"question":"One clear question","reason":"Why this is needed","choices":[],"allowFreeText":true}',
+    '```',
+    '- Ask one purposeful question at a time. Do not put multiple unrelated questions into one message.',
+    '- After the operator replies, continue from the same state and do not repeat already answered questions.',
+    '- When the requested workflow is genuinely complete, end with exactly one fenced block in this form:',
+    '```agent-result',
+    '{"summary":"What was completed and where the result is stored","artifacts":["relative/path"],"nextSteps":[]}',
+    '```',
+    interactive
+      ? '- This agent is explicitly interactive. Reaching a question or approval boundary means WAITING FOR INPUT, not completion.'
+      : '- Ask only when the task cannot be completed safely without a human answer.'
+  ];
+}
+
 function renderAgentPrompt(
   source: string,
   definition: Awaited<ReturnType<typeof resolveAgentDefinition>>['definition'],
@@ -165,7 +210,7 @@ function renderAgentPrompt(
       ? '- Shell access: explicitly approved for this trusted agent definition. Use it only for the stated task.'
       : '- Shell access: unavailable; do not attempt to invoke commands.',
     definition.networkRequested
-      ? '- Network access may occur only through the approved agent tools and only for services required by the task.'
+      ? '- Network access may occur only through approved MCP/service tools required by the task.'
       : '- Network access is not requested; do not access external services.'
   ];
 
@@ -173,14 +218,27 @@ function renderAgentPrompt(
     rendered.trim(),
     '',
     'Desktop execution context:',
-    `- Agent source: ${definition.relativePath}`,
+    `- Agent source repository: ${definition.sourceRoot}`,
+    `- Selected agent: ${definition.relativePath}`,
     `- Target repository worktree: ${workingDirectory}`,
-    '- The agent source repository contains instructions only. Investigate the target repository in the current working directory.',
+    '- Read AGENTS.md, CLAUDE.md, .github/copilot-instructions.md, invoked agent definitions, skills, and policy files from the agent source repository when they exist.',
+    '- If the runtime cannot invoke a named sub-agent natively, open the corresponding definition under .github/agents, agents, or .claude/agents and execute that stage contract directly in this same session. Do not silently skip the stage.',
+    '- Use the repository MCP configuration for Jira, Confluence, and other declared services. A missing required service is a blocking error, not permission to fabricate data.',
     ...permissions,
-    '- Do not access files outside the isolated worktree except through explicitly approved service calls.',
+    '- Do not access files outside the isolated worktree or agent source repository except through explicitly approved service calls.',
     '- Do not modify Git metadata, create commits, push, merge, publish, deploy, or access production systems.',
     '- Never print credentials, tokens, authorization headers, or secret environment-variable values.',
-    '- Finish with a concise summary of evidence, files created or changed, unresolved questions, and recommended next steps.'
+    ...interactionContract(definition.interactive)
+  ].join('\n');
+}
+
+function resumePrompt(question: AgentQuestion, reply: string): string {
+  return [
+    'The operator answered the pending workbench question.',
+    `Question: ${question.question}`,
+    `Answer: ${reply}`,
+    '',
+    'Treat this answer as authoritative only for the question shown above. Continue the existing workflow from the exact paused state. Follow the desktop conversation contract: ask the next single question if more human input is required, otherwise complete the work and emit agent-result.'
   ].join('\n');
 }
 
@@ -221,6 +279,17 @@ function parseChangedFiles(porcelain: string): string[] {
   return [...changed].sort();
 }
 
+function questionFrom(interaction: RuntimeInteractionRequest): AgentQuestion {
+  return {
+    id: randomUUID(),
+    question: interaction.question,
+    reason: interaction.reason,
+    choices: interaction.choices,
+    allowFreeText: interaction.allowFreeText,
+    requestedAt: new Date().toISOString()
+  };
+}
+
 export class AgentExecutionController {
   private readonly active = new Map<string, ActiveAgentExecution>();
 
@@ -238,14 +307,14 @@ export class AgentExecutionController {
     const storagePath = path.join(runRoot(), id);
     await fs.mkdir(storagePath, { recursive: true });
     const writer = await createEventWriter(id, storagePath, emitToRenderer);
-    writer.publish('run.started', `Preparing standalone agent ${resolved.definition.name}`);
+    writer.publish('run.started', `Preparing ${resolved.definition.name}`);
 
     let worktree: PreparedWorktree | undefined;
     let committed = false;
     try {
       renderAgentPrompt(resolved.source, resolved.definition, request.inputs, '<isolated-worktree>');
       worktree = await createIsolatedWorktree(request.targetProject, id, request.inputs);
-      writer.publish('worktree.created', `Created target-code worktree ${worktree.branchName}`, {
+      writer.publish('worktree.created', `Created safe target-code worktree ${worktree.branchName}`, {
         worktreePath: worktree.worktreePath,
         workingDirectory: worktree.workingDirectory,
         branchName: worktree.branchName,
@@ -256,6 +325,7 @@ export class AgentExecutionController {
       await fs.writeFile(path.join(storagePath, 'prompt.txt'), prompt, { encoding: 'utf8', mode: 0o600 });
       const environment = await resolveAgentEnvironment(resolved.definition.requiredEnvironment);
       const now = new Date().toISOString();
+      const initialTask = String(request.inputs.task ?? Object.values(request.inputs).find((value) => String(value ?? '').trim()) ?? resolved.definition.description);
       const record: AgentExecutionRun = {
         ...request,
         id,
@@ -273,10 +343,13 @@ export class AgentExecutionController {
         workingDirectory: worktree.workingDirectory,
         branchName: worktree.branchName,
         approvalRequired: true,
+        conversation: [conversationMessage('user', initialTask)],
+        interactionCount: 0,
         runtimePolicy: {
           fileWrites: resolved.definition.writeRequested ? 'worktree-only' : 'denied-to-model',
           shell: resolved.definition.shellRequested ? 'allowed-to-model' : 'denied-to-model',
           network: resolved.definition.networkRequested ? 'allowed-through-approved-tools' : 'denied-to-model',
+          interactive: resolved.definition.interactive,
           maxTurns: resolved.definition.maxTurns,
           requestedTools: resolved.definition.tools,
           declaredWrites: resolved.definition.writes,
@@ -286,7 +359,7 @@ export class AgentExecutionController {
         changedFiles: []
       };
       await atomicJsonWrite(path.join(storagePath, 'run.json'), record);
-      writer.publish('approval.required', 'Standalone agent is prepared and requires explicit operator approval.', {
+      writer.publish('approval.required', 'The task is prepared and requires explicit operator approval.', {
         agentName: record.agentName,
         targetRepository: record.repositoryRoot,
         worktreePath: record.worktreePath,
@@ -306,17 +379,135 @@ export class AgentExecutionController {
 
   async start(runId: string, emitToRenderer: (event: RunEvent) => void): Promise<AgentExecutionRun> {
     assertRunId(runId);
+    const record = await this.getRequired(runId);
+    if (record.status !== 'awaiting_approval') throw new Error(`Agent execution cannot start from status ${record.status}`);
+    const prompt = await fs.readFile(path.join(record.storagePath, 'prompt.txt'), 'utf8');
+    record.approvedAt = new Date().toISOString();
+    return this.runTurn(record, prompt, undefined, 'execution.started', 'Approved task started', emitToRenderer);
+  }
+
+  async reply(request: ReplyToAgentExecutionRequest, emitToRenderer: (event: RunEvent) => void): Promise<AgentExecutionRun> {
+    assertRunId(request.runId);
+    const reply = request.reply.trim();
+    if (!reply) throw new Error('A reply is required');
+    const record = await this.getRequired(request.runId);
+    if (record.status !== 'waiting_for_input' || !record.pendingQuestion) {
+      throw new Error(`Agent execution is not waiting for input; current status is ${record.status}`);
+    }
+    if (request.questionId && request.questionId !== record.pendingQuestion.id) throw new Error('The pending question changed; refresh the run before replying');
+    if (!record.pendingQuestion.allowFreeText && record.pendingQuestion.choices.length > 0 && !record.pendingQuestion.choices.includes(reply)) {
+      throw new Error('Choose one of the available answers');
+    }
+    if (record.interactionCount >= MAX_INTERACTIONS) throw new Error(`Interaction limit of ${MAX_INTERACTIONS} reached`);
+
+    const question = record.pendingQuestion;
+    record.conversation.push(conversationMessage('user', reply, question.id));
+    record.pendingQuestion = undefined;
+    record.interactionCount += 1;
+    const writer = await createEventWriter(record.id, record.storagePath, emitToRenderer);
+    writer.publish('interaction.replied', 'Your answer was sent to the workflow.', { questionId: question.id });
+    await writer.flush();
+
+    let prompt = resumePrompt(question, reply);
+    if (!record.providerSessionId) {
+      const original = await fs.readFile(path.join(record.storagePath, 'prompt.txt'), 'utf8');
+      prompt = `${original}\n\nPrevious workbench conversation:\n${record.conversation.map((message) => `${message.role.toUpperCase()}: ${message.content}`).join('\n')}\n\n${prompt}`;
+    }
+    return this.runTurn(record, prompt, record.providerSessionId, 'execution.resumed', 'Workflow resumed with your answer', emitToRenderer);
+  }
+
+  async get(runId: string): Promise<AgentExecutionRun | null> {
+    assertRunId(runId);
+    const active = this.active.get(runId);
+    if (active) return normalizeRecord({ ...active.record });
+    try {
+      return normalizeRecord(JSON.parse(await fs.readFile(path.join(runRoot(), runId, 'run.json'), 'utf8')) as AgentExecutionRun);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+      throw error;
+    }
+  }
+
+  async getLatest(): Promise<AgentExecutionRun | null> {
+    let directories: string[];
+    try {
+      directories = await fs.readdir(runRoot());
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+      throw error;
+    }
+    const records = (await Promise.all(directories.filter((entry) => RUN_ID_PATTERN.test(entry)).map(async (entry) => {
+      try {
+        return normalizeRecord(JSON.parse(await fs.readFile(path.join(runRoot(), entry, 'run.json'), 'utf8')) as AgentExecutionRun);
+      } catch {
+        return null;
+      }
+    }))).filter((record): record is AgentExecutionRun => Boolean(record));
+    return records.sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))[0] ?? null;
+  }
+
+  async getEvents(runId: string): Promise<RunEvent[]> {
+    assertRunId(runId);
+    try {
+      return (await fs.readFile(path.join(runRoot(), runId, 'events.jsonl'), 'utf8'))
+        .split(/\r?\n/)
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as RunEvent)
+        .sort((left, right) => left.sequence - right.sequence);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+      throw error;
+    }
+  }
+
+  async cancel(runId: string, emitToRenderer: (event: RunEvent) => void): Promise<boolean> {
+    assertRunId(runId);
+    const active = this.active.get(runId);
+    if (active) {
+      active.cancelRequested = true;
+      active.child.kill();
+      return true;
+    }
+
+    const record = await this.get(runId);
+    if (!record || !['awaiting_approval', 'waiting_for_input'].includes(record.status)) return false;
+    const writer = await createEventWriter(runId, record.storagePath, emitToRenderer);
+    await discardPreparedWorktree({
+      repositoryRoot: record.repositoryRoot,
+      worktreePath: record.worktreePath,
+      workingDirectory: record.workingDirectory,
+      branchName: record.branchName,
+      baseRevision: record.baseRevision
+    });
+    record.status = 'cancelled';
+    record.pendingQuestion = undefined;
+    await this.persist(record);
+    writer.publish('run.cancelled', 'The task and its isolated worktree were discarded.');
+    await writer.flush();
+    return true;
+  }
+
+  private async getRequired(runId: string): Promise<AgentExecutionRun> {
     if (this.active.has(runId)) throw new Error('Agent execution is already active');
     const record = await this.get(runId);
     if (!record) throw new Error('Agent execution was not found');
-    if (record.status !== 'awaiting_approval') throw new Error(`Agent execution cannot start from status ${record.status}`);
     if (!isProcessRuntimeId(record.runtimeId)) throw new Error(`Runtime ${record.runtimeId} does not support local agent execution`);
+    return record;
+  }
 
+  private async runTurn(
+    record: AgentExecutionRun,
+    prompt: string,
+    sessionId: string | undefined,
+    eventType: 'execution.started' | 'execution.resumed',
+    eventMessage: string,
+    emitToRenderer: (event: RunEvent) => void
+  ): Promise<AgentExecutionRun> {
     const environment = await resolveAgentEnvironment(record.runtimePolicy.requiredEnvironment);
     record.runtimePolicy.missingEnvironment = environment.missing;
-    if (record.runtimePolicy.missingEnvironment.length > 0) {
+    if (environment.missing.length > 0) {
       await this.persist(record);
-      throw new Error(`Required environment variables are not configured: ${record.runtimePolicy.missingEnvironment.join(', ')}`);
+      throw new Error(`Required environment variables are not configured: ${environment.missing.join(', ')}`);
     }
 
     record.worktreePath = await fs.realpath(record.worktreePath);
@@ -325,37 +516,47 @@ export class AgentExecutionController {
       throw new Error('Agent working directory escapes the isolated worktree');
     }
 
-    const prompt = await fs.readFile(path.join(record.storagePath, 'prompt.txt'), 'utf8');
-    const writer = await createEventWriter(runId, record.storagePath, emitToRenderer);
-    record.approvedAt = new Date().toISOString();
-    record.updatedAt = record.approvedAt;
+    const writer = await createEventWriter(record.id, record.storagePath, emitToRenderer);
     record.status = 'running';
+    record.error = undefined;
+    record.exitCode = undefined;
     await this.persist(record);
-    writer.publish('execution.started', `Approved standalone agent started with ${record.runtimeId}`, {
+    writer.publish(eventType, eventMessage, {
       agentName: record.agentName,
       worktreePath: record.worktreePath,
+      providerSessionId: sessionId ? '[PRESENT]' : undefined,
       shell: record.runtimePolicy.shell,
       network: record.runtimePolicy.network
     });
 
     try {
-      const child = await spawnAgentRuntimeExecution(
-        record.runtimeId,
-        record.workingDirectory,
+      const child = await spawnAgentRuntime({
+        runtimeId: record.runtimeId,
+        cwd: record.workingDirectory,
+        agentSourceRoot: record.agentSourceRoot,
         prompt,
-        record.runtimePolicy.maxTurns,
-        {
+        maxTurns: record.runtimePolicy.maxTurns,
+        permissions: {
           allowWrite: record.runtimePolicy.fileWrites === 'worktree-only',
           allowShell: record.runtimePolicy.shell === 'allowed-to-model'
         },
-        record.runtimePolicy.requestedTools,
-        environment.values
-      );
+        requestedTools: record.runtimePolicy.requestedTools,
+        environment: environment.values,
+        sessionId
+      });
       const output = new RuntimeOutputTracker(record.runtimeId);
-      const active: ActiveAgentExecution = { child, record, cancelRequested: false, output };
-      this.active.set(runId, active);
-      const stdout = createLineConsumer((line) => publishRuntimeLine(output, writer, 'stdout', line));
-      const stderr = createLineConsumer((line) => publishRuntimeLine(output, writer, 'stderr', line));
+      const active: ActiveAgentExecution = { child, record, cancelRequested: false, interactionCaptured: false, output };
+      this.active.set(record.id, active);
+
+      const consume = (stream: RuntimeStream, line: string) => {
+        publishRuntimeLine(output, writer, stream, line);
+        if (output.pendingInteraction() && !active.interactionCaptured) {
+          active.interactionCaptured = true;
+          windowlessKill(child);
+        }
+      };
+      const stdout = createLineConsumer((line) => consume('stdout', line));
+      const stderr = createLineConsumer((line) => consume('stderr', line));
       child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk));
       child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
       child.once('error', (error) => { void this.finishFailure(active, writer, output.failureMessage(undefined, error.message)); });
@@ -363,6 +564,7 @@ export class AgentExecutionController {
         stdout.flush();
         stderr.flush();
         if (active.cancelRequested) void this.finishCancelled(active, writer, code ?? undefined);
+        else if (output.pendingInteraction()) void this.finishWaiting(active, writer, output.pendingInteraction()!);
         else if (code !== 0) void this.finishFailure(active, writer, output.failureMessage(code ?? undefined), code ?? undefined);
         else void this.validateAndFinish(active, writer);
       });
@@ -378,51 +580,34 @@ export class AgentExecutionController {
     }
   }
 
-  async get(runId: string): Promise<AgentExecutionRun | null> {
-    assertRunId(runId);
-    const active = this.active.get(runId);
-    if (active) return { ...active.record };
-    try {
-      return JSON.parse(await fs.readFile(path.join(runRoot(), runId, 'run.json'), 'utf8')) as AgentExecutionRun;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
-      throw error;
-    }
-  }
-
-  async cancel(runId: string, emitToRenderer: (event: RunEvent) => void): Promise<boolean> {
-    assertRunId(runId);
-    const active = this.active.get(runId);
-    if (active) {
-      active.cancelRequested = true;
-      active.child.kill();
-      return true;
-    }
-
-    const record = await this.get(runId);
-    if (!record || record.status !== 'awaiting_approval') return false;
-    const writer = await createEventWriter(runId, record.storagePath, emitToRenderer);
-    await discardPreparedWorktree({
-      repositoryRoot: record.repositoryRoot,
-      worktreePath: record.worktreePath,
-      workingDirectory: record.workingDirectory,
-      branchName: record.branchName,
-      baseRevision: record.baseRevision
-    });
-    record.status = 'cancelled';
-    await this.persist(record);
-    writer.publish('run.cancelled', 'Prepared standalone-agent worktree and branch were discarded before approval.');
-    await writer.flush();
-    return true;
-  }
-
   private async persist(record: AgentExecutionRun): Promise<void> {
     record.updatedAt = new Date().toISOString();
     await atomicJsonWrite(path.join(record.storagePath, 'run.json'), record);
   }
 
+  private async finishWaiting(active: ActiveAgentExecution, writer: EventWriter, interaction: RuntimeInteractionRequest): Promise<void> {
+    if (!this.active.has(active.record.id)) return;
+    const question = questionFrom(interaction);
+    active.record.providerSessionId = active.output.sessionId() ?? active.record.providerSessionId;
+    active.record.pendingQuestion = question;
+    active.record.status = 'waiting_for_input';
+    active.record.resultSummary = undefined;
+    active.record.conversation.push(conversationMessage('assistant', question.question, question.id));
+    await this.persist(active.record);
+    writer.publish('interaction.requested', question.question, {
+      questionId: question.id,
+      reason: question.reason,
+      choices: question.choices,
+      allowFreeText: question.allowFreeText,
+      resumableSession: Boolean(active.record.providerSessionId)
+    });
+    await writer.flush();
+    this.active.delete(active.record.id);
+  }
+
   private async finishFailure(active: ActiveAgentExecution, writer: EventWriter, message: string, exitCode?: number): Promise<void> {
     if (!this.active.has(active.record.id)) return;
+    active.record.providerSessionId = active.output.sessionId() ?? active.record.providerSessionId;
     active.record.status = 'failed';
     active.record.error = message;
     active.record.exitCode = exitCode;
@@ -436,24 +621,27 @@ export class AgentExecutionController {
     if (!this.active.has(active.record.id)) return;
     active.record.status = 'cancelled';
     active.record.exitCode = exitCode;
+    active.record.pendingQuestion = undefined;
     await this.persist(active.record);
-    writer.publish('run.cancelled', 'Standalone agent was cancelled by the operator.', { exitCode });
+    writer.publish('run.cancelled', 'The task was cancelled by the operator.', { exitCode });
     await writer.flush();
     this.active.delete(active.record.id);
   }
 
   private async validateAndFinish(active: ActiveAgentExecution, writer: EventWriter): Promise<void> {
+    active.record.providerSessionId = active.output.sessionId() ?? active.record.providerSessionId;
+    active.record.resultSummary = active.output.resultSummary();
     active.record.status = 'validating';
     active.record.exitCode = 0;
     await this.persist(active.record);
-    writer.publish('validation.started', 'Validating the target worktree and collecting changed files.');
+    writer.publish('validation.started', 'Validating the target worktree and collecting results.');
 
     try {
       const git = await findExecutable(['git']);
       if (!git) throw new Error('Git executable was not found for post-agent validation');
       const head = await runCommand(git, ['rev-parse', 'HEAD'], active.record.worktreePath);
       if (head.exitCode !== 0 || head.stdout.trim() !== active.record.baseRevision) {
-        throw new Error('The agent changed Git history or created a commit; standalone-agent runs must remain uncommitted');
+        throw new Error('The agent changed Git history or created a commit; workbench runs must remain uncommitted');
       }
       const diffCheck = await runCommand(git, ['diff', '--check'], active.record.worktreePath);
       writer.publishOutput('validation.stdout', diffCheck.stdout.trim() || 'git diff --check passed');
@@ -464,13 +652,20 @@ export class AgentExecutionController {
       if (active.record.runtimePolicy.fileWrites === 'denied-to-model' && active.record.changedFiles.length > 0) {
         throw new Error('The agent changed files even though its definition did not request write access');
       }
+      if (active.record.runtimePolicy.declaredWrites.length > 0 && active.record.changedFiles.length === 0) {
+        throw new Error(`The provider exited successfully but the workflow produced none of its declared artefacts. Expected outputs include: ${active.record.runtimePolicy.declaredWrites.slice(0, 4).join(', ')}`);
+      }
+      if (active.record.changedFiles.length === 0 && !active.output.hasMeaningfulOutput()) {
+        throw new Error('The provider exited successfully without producing a result, asking a question, or changing any files');
+      }
 
       active.record.status = 'completed';
+      if (active.record.resultSummary) active.record.conversation.push(conversationMessage('assistant', active.record.resultSummary));
       await this.persist(active.record);
       writer.publish('validation.completed', `Collected ${active.record.changedFiles.length} changed file(s).`, {
         changedFiles: active.record.changedFiles
       });
-      writer.publish('run.completed', 'Standalone agent completed. Review the isolated worktree before committing or publishing.', {
+      writer.publish('run.completed', active.record.resultSummary ?? 'The workflow completed. Review the isolated results before committing or publishing.', {
         agentName: active.record.agentName,
         worktreePath: active.record.worktreePath,
         branchName: active.record.branchName,
@@ -486,4 +681,10 @@ export class AgentExecutionController {
       await this.finishFailure(active, writer, error instanceof Error ? error.message : String(error));
     }
   }
+}
+
+function windowlessKill(child: ChildProcessWithoutNullStreams): void {
+  setTimeout(() => {
+    if (!child.killed) child.kill();
+  }, 25);
 }
