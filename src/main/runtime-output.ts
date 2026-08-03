@@ -19,33 +19,17 @@ export interface RuntimeInteractionRequest {
 type JsonRecord = Record<string, unknown>;
 
 const MAX_MESSAGE_CHARS = 2_000;
+const MAX_RAW_LINE_CHARS = 65_536;
 const MAX_TRACKED_MESSAGES = 40;
+const MAX_JSON_DEPTH = 10;
 const INPUT_BLOCK = /```agent-input\s*([\s\S]*?)```/i;
 const RESULT_BLOCK = /```agent-result\s*([\s\S]*?)```/i;
 const INPUT_XML = /<agent-input>([\s\S]*?)<\/agent-input>/i;
 const RESULT_XML = /<agent-result>([\s\S]*?)<\/agent-result>/i;
+const SENSITIVE_KEY = /(?:authorization|cookie|password|secret|token|api[_-]?key|credential)/i;
 
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function textValue(value: unknown): string | undefined {
-  if (typeof value === 'string' && value.trim()) return value.trim();
-  if (Array.isArray(value)) {
-    const values = value.map(textValue).filter((entry): entry is string => Boolean(entry));
-    return values.length > 0 ? values.join('\n') : undefined;
-  }
-  if (!isRecord(value)) return undefined;
-  for (const key of ['text', 'message', 'error', 'detail', 'reason', 'result', 'content', 'summary', 'question']) {
-    const text = textValue(value[key]);
-    if (text) return text;
-  }
-  return undefined;
-}
-
-function stringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.map((entry) => textValue(entry)).filter((entry): entry is string => Boolean(entry));
 }
 
 function sanitize(message: string): string {
@@ -59,23 +43,96 @@ function sanitize(message: string): string {
     .slice(0, MAX_MESSAGE_CHARS);
 }
 
+function redactValue(value: unknown, key = '', depth = 0): unknown {
+  if (SENSITIVE_KEY.test(key)) return '[REDACTED]';
+  if (depth > MAX_JSON_DEPTH) return '[TRUNCATED]';
+  if (typeof value === 'string') return sanitize(value);
+  if (Array.isArray(value)) return value.slice(0, 100).map((entry) => redactValue(entry, '', depth + 1));
+  if (!isRecord(value)) return value;
+  return Object.fromEntries(
+    Object.entries(value).slice(0, 200).map(([entryKey, entryValue]) => [entryKey, redactValue(entryValue, entryKey, depth + 1)])
+  );
+}
+
+export function redactRuntimeLine(line: string): string {
+  const trimmed = line.trim();
+  if (!trimmed) return '';
+  try {
+    return JSON.stringify(redactValue(JSON.parse(trimmed) as unknown)).slice(0, MAX_RAW_LINE_CHARS);
+  } catch {
+    return sanitize(trimmed).slice(0, MAX_RAW_LINE_CHARS);
+  }
+}
+
+function directString(record: JsonRecord, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+    if (Array.isArray(value)) {
+      const joined = value.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0).join('\n').trim();
+      if (joined) return joined;
+    }
+  }
+  return undefined;
+}
+
+function deepString(value: unknown, keys: string[], depth = 0): string | undefined {
+  if (depth > MAX_JSON_DEPTH) return undefined;
+  if (isRecord(value)) {
+    const direct = directString(value, keys);
+    if (direct) return direct;
+    const preferredContainers = ['data', 'payload', 'message', 'response', 'result', 'output', 'content', 'event', 'details'];
+    for (const key of preferredContainers) {
+      if (key in value) {
+        const nested = deepString(value[key], keys, depth + 1);
+        if (nested) return nested;
+      }
+    }
+    for (const nestedValue of Object.values(value)) {
+      const nested = deepString(nestedValue, keys, depth + 1);
+      if (nested) return nested;
+    }
+  } else if (Array.isArray(value)) {
+    for (const entry of value) {
+      const nested = deepString(entry, keys, depth + 1);
+      if (nested) return nested;
+    }
+  }
+  return undefined;
+}
+
+function textValue(value: unknown): string | undefined {
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (Array.isArray(value)) {
+    const values = value.map(textValue).filter((entry): entry is string => Boolean(entry));
+    return values.length > 0 ? values.join('\n') : undefined;
+  }
+  if (!isRecord(value)) return undefined;
+  return deepString(value, ['text', 'content', 'message', 'response', 'output', 'result', 'summary', 'question', 'delta', 'reason', 'detail']);
+}
+
+function stringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((entry) => textValue(entry)).filter((entry): entry is string => Boolean(entry));
+}
+
 function humanize(value: string): string {
-  return value.replace(/^error[_-]?/i, '').replace(/[_-]+/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase()).trim();
+  return value.replace(/^error[_-]?/i, '').replace(/[._-]+/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase()).trim();
 }
 
 function toolDetail(input: unknown): string {
   if (!isRecord(input)) return '';
-  const candidate = input.command ?? input.file_path ?? input.path ?? input.pattern ?? input.query ?? input.description ?? input.prompt;
+  const candidate = input.command ?? input.file_path ?? input.filePath ?? input.path ?? input.pattern ?? input.query ?? input.description ?? input.prompt ?? input.arguments;
   const text = textValue(candidate);
   if (!text) return '';
   return `: ${text.replace(/\s+/g, ' ').trim().slice(0, 280)}`;
 }
 
 function toolLabel(name: string): string {
-  if (/^(Task|Agent)$/i.test(name)) return 'Delegating workflow step';
-  if (/^Bash$/i.test(name)) return 'Running command';
-  if (/^(Read|Glob|Grep)$/i.test(name)) return 'Inspecting repository';
-  if (/^(Write|Edit)$/i.test(name)) return 'Updating isolated worktree';
+  if (/^(Task|Agent|task|write_agent)$/i.test(name)) return 'Delegating workflow step';
+  if (/^(Bash|shell|bash|powershell)$/i.test(name)) return 'Running command';
+  if (/^(Read|view|Glob|glob|Grep|grep|rg)$/i.test(name)) return 'Inspecting repository';
+  if (/^(Write|Edit|write|edit|create|apply_patch)$/i.test(name)) return 'Updating isolated worktree';
   return `Using ${name}`;
 }
 
@@ -96,11 +153,11 @@ function parseJsonBlock(source: string, pattern: RegExp): JsonRecord | null {
 }
 
 function interactionFromRecord(record: JsonRecord): RuntimeInteractionRequest | null {
-  const question = textValue(record.question ?? record.prompt ?? record.message);
+  const question = textValue(record.question ?? record.prompt ?? record.message ?? record.content);
   if (!question) return null;
   return {
     question,
-    reason: textValue(record.reason ?? record.context),
+    reason: textValue(record.reason ?? record.context ?? record.description),
     choices: stringArray(record.choices ?? record.options),
     allowFreeText: record.allowFreeText !== false && record.allow_free_text !== false
   };
@@ -120,16 +177,60 @@ function withoutContracts(source: string): string {
   return source.replace(INPUT_BLOCK, '').replace(RESULT_BLOCK, '').replace(INPUT_XML, '').replace(RESULT_XML, '').trim();
 }
 
-function sessionIdFrom(value: JsonRecord): string | undefined {
-  for (const key of ['session_id', 'sessionId', 'sessionID', 'session']) {
-    const candidate = value[key];
-    if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
-    if (isRecord(candidate)) {
-      const nested = sessionIdFrom(candidate);
+function sessionIdFrom(value: unknown, depth = 0): string | undefined {
+  if (depth > MAX_JSON_DEPTH) return undefined;
+  if (isRecord(value)) {
+    for (const [key, candidate] of Object.entries(value)) {
+      if (/^(?:session[_-]?id|conversation[_-]?id|task[_-]?id)$/i.test(key)
+        && typeof candidate === 'string' && candidate.trim().length >= 8) {
+        return candidate.trim();
+      }
+    }
+    for (const candidate of Object.values(value)) {
+      const nested = sessionIdFrom(candidate, depth + 1);
+      if (nested) return nested;
+    }
+  } else if (Array.isArray(value)) {
+    for (const candidate of value) {
+      const nested = sessionIdFrom(candidate, depth + 1);
       if (nested) return nested;
     }
   }
   return undefined;
+}
+
+function eventTypeFrom(value: JsonRecord): string {
+  return directString(value, ['type', 'eventType', 'event_type', 'event', 'kind'])
+    ?? (isRecord(value.data) ? directString(value.data, ['type', 'eventType', 'event_type', 'event', 'kind']) : undefined)
+    ?? '';
+}
+
+interface ToolCall {
+  name: string;
+  input?: unknown;
+}
+
+function toolCallFrom(value: unknown, depth = 0): ToolCall | null {
+  if (depth > MAX_JSON_DEPTH) return null;
+  if (isRecord(value)) {
+    const name = directString(value, ['tool', 'tool_name', 'toolName']);
+    if (name) return { name, input: value.input ?? value.arguments ?? value.args ?? value.parameters };
+
+    const type = directString(value, ['type', 'eventType', 'event_type', 'event', 'kind']) ?? '';
+    const named = directString(value, ['name']);
+    if (named && /tool|function/i.test(type)) return { name: named, input: value.input ?? value.arguments ?? value.args ?? value.parameters };
+
+    for (const candidate of Object.values(value)) {
+      const nested = toolCallFrom(candidate, depth + 1);
+      if (nested) return nested;
+    }
+  } else if (Array.isArray(value)) {
+    for (const candidate of value) {
+      const nested = toolCallFrom(candidate, depth + 1);
+      if (nested) return nested;
+    }
+  }
+  return null;
 }
 
 function nativeQuestionFromTool(name: string, input: unknown): RuntimeInteractionRequest | null {
@@ -138,17 +239,55 @@ function nativeQuestionFromTool(name: string, input: unknown): RuntimeInteractio
   const questions = Array.isArray(input.questions) ? input.questions : [input];
   const first = questions.find(isRecord);
   if (!first) return null;
-  const question = textValue(first.question ?? first.prompt ?? first.message);
+  const question = textValue(first.question ?? first.prompt ?? first.message ?? first.content);
   if (!question) return null;
   const options = Array.isArray(first.options)
     ? first.options.map((option) => isRecord(option) ? textValue(option.label ?? option.value) : textValue(option)).filter((entry): entry is string => Boolean(entry))
     : stringArray(first.choices);
   return {
     question,
-    reason: textValue(first.reason ?? first.description),
+    reason: textValue(first.reason ?? first.description ?? first.context),
     choices: options,
     allowFreeText: first.allowFreeText !== false && first.allow_free_text !== false
   };
+}
+
+function roleFrom(value: unknown, depth = 0): string | undefined {
+  if (depth > MAX_JSON_DEPTH) return undefined;
+  if (isRecord(value)) {
+    const role = directString(value, ['role', 'author']);
+    if (role) return role;
+    for (const candidate of Object.values(value)) {
+      const nested = roleFrom(candidate, depth + 1);
+      if (nested) return nested;
+    }
+  } else if (Array.isArray(value)) {
+    for (const candidate of value) {
+      const nested = roleFrom(candidate, depth + 1);
+      if (nested) return nested;
+    }
+  }
+  return undefined;
+}
+
+function assistantTextFrom(value: JsonRecord, eventType: string): string | undefined {
+  const role = roleFrom(value)?.toLowerCase();
+  const assistantLike = role === 'assistant' || /assistant|response|result|completion|message/i.test(eventType);
+  if (!assistantLike) return undefined;
+  return deepString(value, ['text', 'content', 'message', 'response', 'output', 'result', 'summary', 'delta']);
+}
+
+function explicitErrorFrom(value: JsonRecord, eventType: string): string | undefined {
+  const failed = value.success === false || value.ok === false || /error|failed|failure/i.test(eventType);
+  if (!failed) return undefined;
+  return deepString(value, ['error', 'errorMessage', 'error_message', 'message', 'detail', 'reason']);
+}
+
+function looksLikeQuestion(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  return /\?\s*$/.test(trimmed)
+    || /^(?:what|which|who|where|when|why|how|do|does|did|is|are|can|could|would|should|please choose|please confirm)\b/i.test(trimmed);
 }
 
 export class RuntimeOutputTracker {
@@ -158,6 +297,7 @@ export class RuntimeOutputTracker {
   private currentSessionId?: string;
   private interaction?: RuntimeInteractionRequest;
   private completionSummary?: string;
+  private lastAssistantResponse?: string;
 
   constructor(private readonly runtimeId: ProcessRuntimeId) {}
 
@@ -180,6 +320,7 @@ export class RuntimeOutputTracker {
     const inlineResult = resultFromText(trimmed);
     if (inlineResult) this.completionSummary = inlineResult;
     const cleaned = withoutContracts(trimmed);
+    if (stream === 'stdout' && cleaned) this.lastAssistantResponse = cleaned;
     const item = notice(stream, cleaned, stream === 'stderr');
     if (!item) return [];
     this.track(item);
@@ -198,12 +339,22 @@ export class RuntimeOutputTracker {
     return this.completionSummary;
   }
 
+  assistantResponse(): string | undefined {
+    return this.lastAssistantResponse;
+  }
+
+  inferredInteractiveQuestion(): RuntimeInteractionRequest | undefined {
+    const response = this.lastAssistantResponse?.trim();
+    if (!response || !looksLikeQuestion(response)) return undefined;
+    return { question: response, choices: [], allowFreeText: true };
+  }
+
   hasMeaningfulOutput(): boolean {
     return Boolean(this.completionSummary);
   }
 
   failureMessage(exitCode?: number, fallback?: string): string {
-    const detail = this.errors.at(-1) ?? this.finalMessage ?? this.recent.at(-1) ?? (fallback ? sanitize(fallback) : undefined);
+    const detail = this.errors.at(-1) ?? this.finalMessage ?? this.lastAssistantResponse ?? this.recent.at(-1) ?? (fallback ? sanitize(fallback) : undefined);
     const provider = this.runtimeId === 'claude-code' ? 'Claude Code' : 'GitHub Copilot';
     const code = exitCode === undefined ? '' : ` (exit code ${exitCode})`;
     return detail ? `${provider} failed${code}: ${detail}` : `${provider} failed${code} without returning an error message.`;
@@ -214,12 +365,12 @@ export class RuntimeOutputTracker {
     if (sessionId) this.currentSessionId = sessionId;
     return this.runtimeId === 'claude-code'
       ? this.consumeClaude(stream, value)
-      : this.consumeGeneric(stream, value);
+      : this.consumeCopilot(stream, value);
   }
 
   private consumeClaude(stream: RuntimeStream, value: JsonRecord): RuntimeOutputNotice[] {
     const notices: RuntimeOutputNotice[] = [];
-    const type = typeof value.type === 'string' ? value.type : '';
+    const type = eventTypeFrom(value);
     const subtype = typeof value.subtype === 'string' ? value.subtype : '';
 
     if (type === 'system' && subtype === 'init') {
@@ -233,24 +384,13 @@ export class RuntimeOutputTracker {
         if (!isRecord(block)) continue;
         if (block.type === 'text') {
           const raw = textValue(block.text) ?? '';
-          const interaction = interactionFromText(raw);
-          if (interaction) this.interaction = interaction;
-          const result = resultFromText(raw);
-          if (result) this.completionSummary = result;
+          this.captureAssistantText(raw);
           const cleaned = withoutContracts(raw);
           const item = notice(stream, cleaned);
           if (item) notices.push(item);
         } else if (block.type === 'tool_use') {
           const name = typeof block.name === 'string' ? block.name : 'tool';
-          const question = nativeQuestionFromTool(name, block.input);
-          if (question) {
-            this.interaction = question;
-            const item = notice(stream, `Waiting for your answer: ${question.question}`);
-            if (item) notices.push(item);
-          } else {
-            const item = notice(stream, `${toolLabel(name)}${toolDetail(block.input)}`);
-            if (item) notices.push(item);
-          }
+          this.captureToolInteraction(name, block.input, stream, notices);
         }
       }
       return this.trackAll(notices);
@@ -268,12 +408,7 @@ export class RuntimeOutputTracker {
     if (type === 'result') {
       const isError = value.is_error === true || /^error/i.test(subtype);
       const raw = textValue(value.result) ?? textValue(value.errors) ?? textValue(value.error);
-      if (raw) {
-        const interaction = interactionFromText(raw);
-        if (interaction) this.interaction = interaction;
-        const result = resultFromText(raw);
-        if (result) this.completionSummary = result;
-      }
+      if (raw) this.captureAssistantText(raw);
       if (isError) {
         const reason = subtype ? humanize(subtype) : 'Execution failed';
         const detail = raw ? withoutContracts(raw) : '';
@@ -290,7 +425,7 @@ export class RuntimeOutputTracker {
       return this.trackAll(notices);
     }
 
-    const explicitError = textValue(value.error) ?? (value.is_error === true ? textValue(value.message) : undefined);
+    const explicitError = explicitErrorFrom(value, type);
     if (explicitError) {
       const item = notice('stderr', explicitError, true);
       if (item) notices.push(item);
@@ -298,43 +433,60 @@ export class RuntimeOutputTracker {
     return this.trackAll(notices);
   }
 
-  private consumeGeneric(stream: RuntimeStream, value: JsonRecord): RuntimeOutputNotice[] {
+  private consumeCopilot(stream: RuntimeStream, value: JsonRecord): RuntimeOutputNotice[] {
     const notices: RuntimeOutputNotice[] = [];
-    const type = typeof value.type === 'string' ? value.type : '';
-    const explicitError = textValue(value.error) ?? (value.success === false ? textValue(value.message) : undefined);
+    const type = eventTypeFrom(value);
+    const explicitError = explicitErrorFrom(value, type);
     if (explicitError) {
-      const item = notice('stderr', explicitError, true, /result|final/i.test(type));
+      const item = notice('stderr', explicitError, true, /result|final|complete|end/i.test(type));
       if (item) notices.push(item);
       return this.trackAll(notices);
     }
 
-    const tool = typeof value.tool === 'string' ? value.tool : typeof value.tool_name === 'string' ? value.tool_name : undefined;
+    const tool = toolCallFrom(value);
     if (tool) {
-      const question = nativeQuestionFromTool(tool, value.input ?? value.arguments);
-      if (question) {
-        this.interaction = question;
-        const item = notice(stream, `Waiting for your answer: ${question.question}`);
-        if (item) notices.push(item);
-      } else {
-        const item = notice(stream, `${toolLabel(tool)}${toolDetail(value.input ?? value.arguments)}`);
+      this.captureToolInteraction(tool.name, tool.input, stream, notices);
+      return this.trackAll(notices);
+    }
+
+    const raw = assistantTextFrom(value, type);
+    if (raw) {
+      this.captureAssistantText(raw);
+      const cleaned = withoutContracts(raw);
+      if (cleaned) {
+        const item = notice(stream, cleaned, false, /result|final|complete|end/i.test(type));
         if (item) notices.push(item);
       }
       return this.trackAll(notices);
     }
 
-    const raw = textValue(value.result) ?? textValue(value.message) ?? textValue(value.content);
-    if (raw) {
-      const interaction = interactionFromText(raw);
-      if (interaction) this.interaction = interaction;
-      const result = resultFromText(raw);
-      if (result) this.completionSummary = result;
-      const cleaned = withoutContracts(raw);
-      if (cleaned) {
-        const item = notice(stream, cleaned, false, /result|final/i.test(type));
-        if (item) notices.push(item);
-      }
+    if (type && /warning|blocked|permission|mcp/i.test(type)) {
+      const detail = deepString(value, ['message', 'detail', 'reason', 'status']);
+      const item = notice(stream, detail ? `${humanize(type)}: ${detail}` : humanize(type), /error|blocked|denied/i.test(type));
+      if (item) notices.push(item);
     }
     return this.trackAll(notices);
+  }
+
+  private captureAssistantText(raw: string): void {
+    const interaction = interactionFromText(raw);
+    if (interaction) this.interaction = interaction;
+    const result = resultFromText(raw);
+    if (result) this.completionSummary = result;
+    const cleaned = withoutContracts(raw);
+    if (cleaned) this.lastAssistantResponse = cleaned;
+  }
+
+  private captureToolInteraction(name: string, input: unknown, stream: RuntimeStream, notices: RuntimeOutputNotice[]): void {
+    const question = nativeQuestionFromTool(name, input);
+    if (question) {
+      this.interaction = question;
+      const item = notice(stream, `Waiting for your answer: ${question.question}`);
+      if (item) notices.push(item);
+    } else {
+      const item = notice(stream, `${toolLabel(name)}${toolDetail(input)}`);
+      if (item) notices.push(item);
+    }
   }
 
   private trackAll(notices: RuntimeOutputNotice[]): RuntimeOutputNotice[] {
