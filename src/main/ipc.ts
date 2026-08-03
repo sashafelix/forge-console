@@ -14,6 +14,7 @@ import type {
   RunDraft,
   RunEvent,
   SaveConnectionRequest,
+  SaveNetworkSettingsRequest,
   SystemInfo
 } from '../shared/contracts';
 import { isProcessRuntimeId } from '../shared/settings';
@@ -22,10 +23,11 @@ import { discoverAgents } from './agents';
 import { listPipelineManifests, listRuntimeAdapters } from './catalog';
 import { listConnections, removeConnection, saveConnection, testConnection } from './connections';
 import { ExecutionController } from './execution-controller';
+import { applyElectronNetworkSettings } from './network-settings';
 import { installPipelinePackFromDialog, resolvePipelinePack } from './packs';
-import { preflightRuntimeSession } from './runtime';
+import { clearRuntimePreflightCache, preflightRuntimeSession, testRuntimeConnection } from './runtime';
 import { PreviewRunController } from './run-controller';
-import { clearRuntimeExecutableOverride, loadSettings, setRuntimeExecutableOverride } from './settings';
+import { clearRuntimeExecutableOverride, loadSettings, setNetworkSettings, setRuntimeExecutableOverride } from './settings';
 
 const previewRuns = new PreviewRunController();
 const executionRuns = new ExecutionController();
@@ -61,6 +63,22 @@ async function selectAgentLibrary(): Promise<AgentLibrarySelection | null> {
     throw new Error('No agents were found under agents/, .github/agents/, or .claude/agents/.');
   }
   return { source, agents };
+}
+
+async function selectNetworkCaCertificate(): Promise<string | null> {
+  const result = await dialog.showOpenDialog({
+    title: 'Choose a corporate CA certificate bundle',
+    properties: ['openFile'],
+    filters: [
+      { name: 'Certificate files', extensions: ['pem', 'crt', 'cer'] },
+      { name: 'All files', extensions: ['*'] }
+    ]
+  });
+  if (result.canceled || result.filePaths.length === 0) return null;
+  const selectedPath = await fs.realpath(path.resolve(result.filePaths[0]));
+  const details = await fs.stat(selectedPath);
+  if (!details.isFile()) throw new Error('Selected CA certificate is not a file');
+  return selectedPath;
 }
 
 async function configureRuntimeExecutable(runtimeId: ProcessRuntimeId) {
@@ -135,6 +153,18 @@ export function registerIpcHandlers(openAgentWorkbench: () => void): void {
     nodeVersion: process.versions.node
   }));
   ipcMain.handle(IPC_CHANNELS.getSettings, loadSettings);
+  ipcMain.handle(IPC_CHANNELS.saveNetworkSettings, async (_event, request: SaveNetworkSettingsRequest) => {
+    const settings = await setNetworkSettings(request);
+    clearRuntimePreflightCache();
+    await applyElectronNetworkSettings();
+    return settings;
+  });
+  ipcMain.handle(IPC_CHANNELS.selectNetworkCaCertificate, selectNetworkCaCertificate);
+  ipcMain.handle(IPC_CHANNELS.testRuntimeConnection, async (_event, runtimeId: ProcessRuntimeId) => {
+    if (!isProcessRuntimeId(runtimeId)) throw new Error(`Unsupported process runtime: ${String(runtimeId)}`);
+    await ensureRuntimeAvailable(runtimeId);
+    return testRuntimeConnection(runtimeId, app.getPath('userData'));
+  });
   ipcMain.handle(IPC_CHANNELS.listPipelines, listPipelineManifests);
   ipcMain.handle(IPC_CHANNELS.installPipelinePack, installPipelinePackFromDialog);
   ipcMain.handle(IPC_CHANNELS.listRuntimes, listRuntimeAdapters);

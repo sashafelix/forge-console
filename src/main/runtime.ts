@@ -2,10 +2,11 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { constants as fsConstants, promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { ProcessRuntimeId, RuntimeAdapterDescriptor } from '../shared/contracts';
+import type { ProcessRuntimeId, RuntimeAdapterDescriptor, RuntimeConnectionTestResult } from '../shared/contracts';
 import { PROCESS_RUNTIME_SPECS, buildExecutionArgs, getProcessRuntimeSpec } from '../shared/runtime-specs';
 import { buildSearchPath } from '../shared/search-paths';
 import { listConnections } from './connections';
+import { applyConfiguredNetworkEnvironment } from './network-settings';
 import { RuntimeOutputTracker, type RuntimeStream } from './runtime-output';
 import { loadSettings } from './settings';
 
@@ -142,16 +143,17 @@ export async function discoverRuntimeAdapters(): Promise<RuntimeAdapterDescripto
   return discovered;
 }
 
-function runtimeEnvironment(
-  runtimeId: string,
+async function runtimeEnvironment(
+  runtimeId: ProcessRuntimeId,
   approvedEnvironment: Record<string, string>
-): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = {
+): Promise<NodeJS.ProcessEnv> {
+  let env: NodeJS.ProcessEnv = {
     ...process.env,
     ...approvedEnvironment,
     PATH: runtimeSearchPath(),
     NO_COLOR: '1'
   };
+  env = await applyConfiguredNetworkEnvironment(env, runtimeId);
 
   if (runtimeId === 'github-copilot') {
     const dedicatedToken = approvedEnvironment.COPILOT_GITHUB_TOKEN ?? process.env.COPILOT_GITHUB_TOKEN;
@@ -183,7 +185,7 @@ async function spawnRuntime(
 
   const child = spawn(resolved.path, args, {
     cwd,
-    env: runtimeEnvironment(runtimeId, environment),
+    env: await runtimeEnvironment(spec.id, environment),
     shell: requiresCommandShell(resolved.path),
     windowsHide: true,
     stdio: ['pipe', 'pipe', 'pipe']
@@ -233,20 +235,24 @@ function lineConsumer(onLine: (line: string) => void): { push(chunk: Buffer): vo
 
 function preflightGuidance(runtimeId: ProcessRuntimeId, message: string): string {
   if (runtimeId === 'claude-code' && /oauth session expired|authenticate|authentication|not logged in|unauthori[sz]ed|login|sign.?in|401/i.test(message)) {
-    return 'Claude Code is installed, but its sign-in is not usable on this computer. Open PowerShell or Git Bash, run `claude`, complete the sign-in flow, then fully restart the workbench and try again.';
+    return 'Claude Code is installed, but its sign-in is not usable on this computer. Open a terminal, run `claude`, complete the sign-in flow, then fully restart the workbench and try again.';
   }
   if (runtimeId === 'github-copilot' && /authenticate|authentication|not logged in|oauth|copilot_internal\/user|unauthori[sz]ed|login|sign.?in|401/i.test(message)) {
     return 'GitHub Copilot is installed, but its login is not usable in this desktop session. Open a terminal, run `copilot login`, complete sign-in, then fully restart the workbench and try again.';
   }
   if (/network|fetch failed|enotfound|econnrefused|certificate|unable to verify|self.signed|proxy|timed out/i.test(message)) {
-    return `${runtimeId === 'claude-code' ? 'Claude Code' : 'GitHub Copilot'} could not reach its service from the desktop process. Check the active VPN, proxy and corporate CA settings, then restart the workbench.`;
+    return `${runtimeId === 'claude-code' ? 'Claude Code' : 'GitHub Copilot'} could not reach its service from the desktop process. Review Network & Proxy in Connections, then check the active VPN, proxy and corporate CA settings.`;
   }
   return message;
 }
 
-export async function preflightRuntimeSession(runtimeId: ProcessRuntimeId, cwd: string): Promise<void> {
+export function clearRuntimePreflightCache(): void {
+  successfulPreflights.clear();
+}
+
+export async function preflightRuntimeSession(runtimeId: ProcessRuntimeId, cwd: string, force = false): Promise<void> {
   const checkedAt = successfulPreflights.get(runtimeId);
-  if (checkedAt && Date.now() - checkedAt < PREFLIGHT_CACHE_MS) return;
+  if (!force && checkedAt && Date.now() - checkedAt < PREFLIGHT_CACHE_MS) return;
 
   const child = await spawnRuntime(
     runtimeId,
@@ -279,11 +285,31 @@ export async function preflightRuntimeSession(runtimeId: ProcessRuntimeId, cwd: 
     });
     const timeout = setTimeout(() => {
       child.kill();
-      finish(new Error(`${runtimeId === 'claude-code' ? 'Claude Code' : 'GitHub Copilot'} readiness check timed out. Check the active VPN, proxy and provider login, then try again.`));
+      finish(new Error(`${runtimeId === 'claude-code' ? 'Claude Code' : 'GitHub Copilot'} readiness check timed out. Open Connections → Network & Proxy and verify the selected proxy mode, VPN and provider login.`));
     }, PREFLIGHT_TIMEOUT_MS);
   });
 
   successfulPreflights.set(runtimeId, Date.now());
+}
+
+export async function testRuntimeConnection(runtimeId: ProcessRuntimeId, cwd: string): Promise<RuntimeConnectionTestResult> {
+  const testedAt = new Date().toISOString();
+  try {
+    await preflightRuntimeSession(runtimeId, cwd, true);
+    return {
+      runtimeId,
+      ok: true,
+      testedAt,
+      message: `${runtimeId === 'claude-code' ? 'Claude Code' : 'GitHub Copilot'} authenticated and reached its provider successfully.`
+    };
+  } catch (error) {
+    return {
+      runtimeId,
+      ok: false,
+      testedAt,
+      message: error instanceof Error ? error.message : String(error)
+    };
+  }
 }
 
 export async function spawnRuntimePreview(runtimeId: string, cwd: string, prompt: string): Promise<ChildProcessWithoutNullStreams> {

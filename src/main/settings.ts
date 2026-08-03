@@ -2,7 +2,7 @@ import { app } from 'electron';
 import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import type { AppSettings, ProcessRuntimeId } from '../shared/contracts';
+import type { AppSettings, ProcessRuntimeId, SaveNetworkSettingsRequest } from '../shared/contracts';
 import { defaultSettings, validateSettings } from '../shared/settings';
 
 function settingsPath(): string {
@@ -45,4 +45,18 @@ export async function clearRuntimeExecutableOverride(runtimeId: ProcessRuntimeId
   delete settings.runtimeExecutableOverrides[runtimeId];
   await saveSettings(settings);
   return settings;
+}
+
+export async function setNetworkSettings(request: SaveNetworkSettingsRequest): Promise<AppSettings> {
+  if (request.caCertificatePath.trim()) {
+    const certificatePath = await fs.realpath(path.resolve(request.caCertificatePath.trim()));
+    const details = await fs.stat(certificatePath);
+    if (!details.isFile()) throw new Error('CA certificate path must point to a file');
+    request = { ...request, caCertificatePath: certificatePath };
+  }
+
+  const settings = await loadSettings();
+  settings.network = { ...request };
+  await saveSettings(settings);
+  return loadSettings();
 }

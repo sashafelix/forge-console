@@ -7,7 +7,8 @@ import type {
   ProcessRuntimeId,
   RunEvent,
   RunEventListener,
-  SaveConnectionRequest
+  SaveConnectionRequest,
+  SaveNetworkSettingsRequest
 } from '../shared/contracts';
 
 // Sandboxed Electron preload scripts only receive a restricted require() implementation.
@@ -16,6 +17,9 @@ import type {
 const IPC_CHANNELS = {
   getSystemInfo: 'system:get-info',
   getSettings: 'settings:get',
+  saveNetworkSettings: 'settings:save-network',
+  selectNetworkCaCertificate: 'settings:select-network-ca-certificate',
+  testRuntimeConnection: 'settings:test-runtime-connection',
   listPipelines: 'catalog:list-pipelines',
   installPipelinePack: 'catalog:install-pipeline-pack',
   listRuntimes: 'catalog:list-runtimes',
@@ -49,6 +53,9 @@ const IPC_CHANNELS = {
 const api: DesktopApi = {
   getSystemInfo: () => ipcRenderer.invoke(IPC_CHANNELS.getSystemInfo),
   getSettings: () => ipcRenderer.invoke(IPC_CHANNELS.getSettings),
+  saveNetworkSettings: (request: SaveNetworkSettingsRequest) => ipcRenderer.invoke(IPC_CHANNELS.saveNetworkSettings, request),
+  selectNetworkCaCertificate: () => ipcRenderer.invoke(IPC_CHANNELS.selectNetworkCaCertificate),
+  testRuntimeConnection: (runtimeId: ProcessRuntimeId) => ipcRenderer.invoke(IPC_CHANNELS.testRuntimeConnection, runtimeId),
   listPipelines: () => ipcRenderer.invoke(IPC_CHANNELS.listPipelines),
   installPipelinePack: () => ipcRenderer.invoke(IPC_CHANNELS.installPipelinePack),
   listRuntimes: () => ipcRenderer.invoke(IPC_CHANNELS.listRuntimes),

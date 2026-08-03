@@ -8,6 +8,7 @@ import type {
   ConnectionTestResult,
   SaveConnectionRequest
 } from '../shared/contracts';
+import { applyElectronNetworkSettings } from './network-settings';
 
 interface ConnectionMetadata {
   serviceUrl: string;
@@ -218,7 +219,7 @@ function mcpInitializeBody(): string {
     params: {
       protocolVersion: '2025-03-26',
       capabilities: {},
-      clientInfo: { name: 'agent-pipeline-ui', version: '0.6.1' }
+      clientInfo: { name: 'agent-pipeline-ui', version: app.getVersion() }
     }
   });
 }
@@ -230,6 +231,7 @@ export async function testConnection(id: ConnectionId): Promise<ConnectionTestRe
   const secret = secretStore.secrets[id];
   if (!metadata.serviceUrl.trim() || !secret?.trim()) throw new Error(`${CONNECTION_NAMES[id]} is not fully configured`);
 
+  await applyElectronNetworkSettings();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15_000);
   const testedAt = new Date().toISOString();

@@ -47,6 +47,10 @@
   gap: 15px;
 }
 
+.network-card {
+  margin-bottom: 18px;
+}
+
 .connection-heading {
   display: flex;
   justify-content: space-between;
@@ -84,10 +88,97 @@
   color: #ffc75a;
 }
 
-.connection-auth-grid {
+.connection-auth-grid,
+.network-proxy-grid {
   display: grid;
   grid-template-columns: 1.3fr 1fr;
   gap: 12px;
+}
+
+.network-mode-field small,
+.network-ca-row small {
+  line-height: 1.45;
+}
+
+.network-ca-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.network-ca-row > button {
+  margin-bottom: 1px;
+  border-radius: 10px;
+  padding: 10px 13px;
+  cursor: pointer;
+}
+
+.provider-test-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  border-top: 1px solid #1d2940;
+  padding-top: 15px;
+}
+
+.provider-test {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid #22314f;
+  border-radius: 12px;
+  background: #0d172a;
+  padding: 13px;
+}
+
+.provider-test > div {
+  min-width: 0;
+}
+
+.provider-test strong,
+.provider-test span,
+.provider-test small {
+  display: block;
+}
+
+.provider-test span {
+  margin-top: 4px;
+  color: #8e9ab3;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.provider-test span.ok {
+  color: #69e6a5;
+}
+
+.provider-test span.failed {
+  color: #ff8d9b;
+}
+
+.provider-test small {
+  margin-top: 4px;
+}
+
+.provider-test button {
+  flex: 0 0 auto;
+  border-radius: 9px;
+  padding: 8px 11px;
+  cursor: pointer;
+}
+
+.network-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.network-actions button {
+  border-radius: 10px;
+  padding: 10px 15px;
+  cursor: pointer;
 }
 
 .connection-test-state {
@@ -138,13 +229,26 @@ button.danger {
   color: #ff96a4;
 }
 
+@media (max-width: 900px) {
+  .provider-test-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 700px) {
-  .connection-auth-grid {
+  .connection-auth-grid,
+  .network-proxy-grid,
+  .network-ca-row {
     grid-template-columns: 1fr;
   }
 
   .connection-heading,
-  .security-note {
+  .security-note,
+  .provider-test {
     flex-direction: column;
+  }
+
+  .provider-test {
+    align-items: stretch;
   }
 }
