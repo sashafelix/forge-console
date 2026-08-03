@@ -1,0 +1,303 @@
+.advanced-workbench-shell {
+  color-scheme: light;
+  color: #172033;
+}
+
+.advanced-workbench-shell .app-shell {
+  min-height: calc(100vh - 58px);
+  background: transparent;
+  color: #172033;
+  padding: 28px;
+}
+
+.advanced-workbench-shell .topbar h1,
+.advanced-workbench-shell .topbar h2,
+.advanced-workbench-shell .pipeline-heading h2,
+.advanced-workbench-shell .form-panel h3,
+.advanced-workbench-shell .approval-panel h3,
+.advanced-workbench-shell .execution-summary h3 {
+  color: #17233d;
+}
+
+.advanced-workbench-shell p,
+.advanced-workbench-shell small {
+  color: #69778e;
+}
+
+.advanced-workbench-shell .eyebrow {
+  color: #2f67b5;
+}
+
+.advanced-workbench-shell .system-pill,
+.advanced-workbench-shell .version-chip,
+.advanced-workbench-shell .git-badge,
+.advanced-workbench-shell .mode-chip {
+  border-color: #cbd6e5;
+  background: #f7f9fc;
+  color: #506078;
+}
+
+.advanced-workbench-shell .mode-chip.execute {
+  border-color: #9cb9df;
+  background: #eff5fd;
+  color: #2f67b5;
+}
+
+.advanced-workbench-shell .error-banner {
+  border-color: #e2a7ad;
+  background: #fff1f2;
+  color: #8a2634;
+}
+
+.advanced-workbench-shell .sidebar,
+.advanced-workbench-shell .content {
+  border-color: #d7e0eb;
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(43, 61, 89, .07);
+}
+
+.advanced-workbench-shell .sidebar section + section {
+  border-top-color: #e3e8f0;
+}
+
+.advanced-workbench-shell .sidebar h2 {
+  color: #55657d;
+}
+
+.advanced-workbench-shell .sidebar-title button,
+.advanced-workbench-shell .console-actions button {
+  color: #2f67b5;
+}
+
+.advanced-workbench-shell .project-button,
+.advanced-workbench-shell .option {
+  border-color: #d6deea;
+  background: #f9fbfd;
+  color: #23314a;
+}
+
+.advanced-workbench-shell .project-button:hover,
+.advanced-workbench-shell .option:hover {
+  border-color: #8ba9d2;
+  background: #f3f7fc;
+}
+
+.advanced-workbench-shell .project-icon {
+  background: #e4edfb;
+  color: #2f67b5;
+}
+
+.advanced-workbench-shell .option.active {
+  border-color: #4f7fbe;
+  background: #eef5ff;
+  box-shadow: inset 3px 0 #4f7fbe;
+}
+
+.advanced-workbench-shell .option-row em.available,
+.advanced-workbench-shell .git-badge.ok {
+  color: #267552;
+}
+
+.advanced-workbench-shell .option-row em.unavailable {
+  color: #a63e50;
+}
+
+.advanced-workbench-shell .option-row em.unconfigured,
+.advanced-workbench-shell .git-badge.warn {
+  color: #8b691c;
+}
+
+.advanced-workbench-shell .stage,
+.advanced-workbench-shell .agent-context-grid > div,
+.advanced-workbench-shell .agent-permission-preview > div,
+.advanced-workbench-shell .policy-grid > div {
+  border-color: #dbe3ee;
+  background: #f8fafc;
+}
+
+.advanced-workbench-shell .stage > span {
+  background: #e4edfb;
+  color: #2f67b5;
+}
+
+.advanced-workbench-shell .form-panel {
+  border-color: #d8e0eb;
+  background: #fbfcfe;
+}
+
+.advanced-workbench-shell .section-title > span,
+.advanced-workbench-shell .agent-context-grid span,
+.advanced-workbench-shell .agent-permission-preview strong,
+.advanced-workbench-shell .policy-grid strong {
+  color: #718099;
+}
+
+.advanced-workbench-shell .agent-context-grid strong,
+.advanced-workbench-shell .agent-permission-preview span,
+.advanced-workbench-shell .policy-grid span {
+  color: #263650;
+}
+
+.advanced-workbench-shell .field,
+.advanced-workbench-shell .approval-check {
+  color: #384861;
+}
+
+.advanced-workbench-shell .field input,
+.advanced-workbench-shell .field textarea,
+.advanced-workbench-shell .field select {
+  border-color: #cbd5e3;
+  background: #fff;
+  color: #172033;
+}
+
+.advanced-workbench-shell .field input:focus,
+.advanced-workbench-shell .field textarea:focus,
+.advanced-workbench-shell .field select:focus {
+  border-color: #4f7fbe;
+  box-shadow: 0 0 0 3px rgba(79, 127, 190, .12);
+}
+
+.advanced-workbench-shell .checkbox-field {
+  border-color: #d6deea;
+  background: #fff;
+}
+
+.advanced-workbench-shell .runtime-configuration {
+  border-color: #d6deea;
+  background: #fff;
+  color: #263650;
+}
+
+.advanced-workbench-shell .runtime-configuration.available {
+  border-color: #9fc8b2;
+  background: #f7fffa;
+}
+
+.advanced-workbench-shell .runtime-configuration.unavailable,
+.advanced-workbench-shell .runtime-configuration.unconfigured {
+  border-color: #e4c777;
+  background: #fff9e8;
+}
+
+.advanced-workbench-shell .runtime-configuration button,
+.advanced-workbench-shell .secondary,
+.advanced-workbench-shell .approval-actions .secondary {
+  border-color: #c8d2e3;
+  background: #fff;
+  color: #24334f;
+}
+
+.advanced-workbench-shell .primary {
+  border-color: #235a9f;
+  background: #2f6fbd;
+  color: #fff;
+}
+
+.advanced-workbench-shell .danger {
+  border-color: #dda2ab;
+  background: #fff1f2;
+  color: #9d3344;
+}
+
+.advanced-workbench-shell .runtime-hint,
+.advanced-workbench-shell .trust-warning {
+  border-color: #e4c777;
+  background: #fff9e8;
+  color: #775b13;
+}
+
+.advanced-workbench-shell .approval-panel {
+  border-color: #9cb9df;
+  background: linear-gradient(145deg, #f8fbff, #eef5fd);
+}
+
+.advanced-workbench-shell .approval-status {
+  border-color: #e4c777;
+  background: #fff9e8;
+  color: #775b13;
+}
+
+.advanced-workbench-shell .execution-details > div {
+  border-color: #d8e0eb;
+  background: rgba(255, 255, 255, .75);
+}
+
+.advanced-workbench-shell .execution-details dt {
+  color: #718099;
+}
+
+.advanced-workbench-shell .execution-details dd {
+  color: #263650;
+}
+
+.advanced-workbench-shell .environment-list > div {
+  border-top-color: #dde4ee;
+}
+
+.advanced-workbench-shell .environment-list .present {
+  color: #267552;
+}
+
+.advanced-workbench-shell .environment-list .missing {
+  color: #8b691c;
+}
+
+.advanced-workbench-shell .execution-summary {
+  border-color: #d8e0eb;
+  background: #fff;
+}
+
+.advanced-workbench-shell .run-console {
+  border-color: #d4deeb;
+  background: #fff;
+}
+
+.advanced-workbench-shell .console-heading {
+  border-bottom-color: #dce4ee;
+  background: #f4f7fb;
+  color: #263650;
+}
+
+.advanced-workbench-shell .console-heading code,
+.advanced-workbench-shell .console-line time,
+.advanced-workbench-shell .console-output > span {
+  color: #7b899d;
+}
+
+.advanced-workbench-shell .console-output {
+  background: #fbfcfe;
+  color: #34445d;
+}
+
+.advanced-workbench-shell .console-line {
+  color: #34445d;
+}
+
+.advanced-workbench-shell .console-line.runtime-stderr,
+.advanced-workbench-shell .console-line.run-failed {
+  color: #a63e50;
+}
+
+.advanced-workbench-shell .console-line.run-completed {
+  color: #267552;
+}
+
+.advanced-workbench-shell .console-actions {
+  border-top-color: #dce4ee;
+  background: #f8fafc;
+}
+
+.advanced-workbench-shell .empty {
+  color: #718099;
+}
+
+@media (max-width: 1100px) {
+  .advanced-workbench-shell .app-shell {
+    padding: 20px;
+  }
+
+  .advanced-workbench-shell .workspace {
+    grid-template-columns: 250px minmax(0, 1fr);
+  }
+}
