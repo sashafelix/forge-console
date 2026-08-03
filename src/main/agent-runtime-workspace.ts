@@ -1,3 +1,4 @@
+import { copyFileSync, existsSync, lstatSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { promises as fs, type Dirent } from 'node:fs';
 import path from 'node:path';
 import { discoverAgents } from './agents';
@@ -59,17 +60,7 @@ function displayName(value: string): string {
 }
 
 function generatedAgentProfile(name: string, description: string, source: string): string {
-  return [
-    '---',
-    `name: ${JSON.stringify(displayName(name))}`,
-    `description: ${JSON.stringify(description)}`,
-    'tools:',
-    '  - "*"',
-    '---',
-    '',
-    stripFrontmatter(source),
-    ''
-  ].join('\n');
+  return ['---', `name: ${JSON.stringify(displayName(name))}`, `description: ${JSON.stringify(description)}`, 'tools:', '  - "*"', '---', '', stripFrontmatter(source), ''].join('\n');
 }
 
 function safeRelative(relativePath: string): string {
@@ -124,25 +115,14 @@ async function collectFiles(root: string, relativePath: string): Promise<string[
   return files;
 }
 
-export async function prepareAgentRuntimeWorkspace(
-  sourceRoot: string,
-  worktreeRoot: string,
-  storagePath: string,
-  selectedAgentRelativePath: string
-): Promise<PreparedAgentRuntimeWorkspace> {
+export async function prepareAgentRuntimeWorkspace(sourceRoot: string, worktreeRoot: string, storagePath: string, selectedAgentRelativePath: string): Promise<PreparedAgentRuntimeWorkspace> {
   const realSource = await fs.realpath(path.resolve(sourceRoot));
   const realWorktree = await fs.realpath(path.resolve(worktreeRoot));
   const backupRoot = path.join(storagePath, BACKUP_DIRECTORY);
+  await fs.rm(backupRoot, { recursive: true, force: true });
   await fs.mkdir(backupRoot, { recursive: true, mode: 0o700 });
 
-  const manifest: RuntimeWorkspaceManifest = {
-    schemaVersion: '1.0',
-    sourceRoot: realSource,
-    worktreeRoot: realWorktree,
-    agentId: stripMarkdownSuffix(path.basename(selectedAgentRelativePath)),
-    entries: [],
-    restored: false
-  };
+  const manifest: RuntimeWorkspaceManifest = { schemaVersion: '1.0', sourceRoot: realSource, worktreeRoot: realWorktree, agentId: stripMarkdownSuffix(path.basename(selectedAgentRelativePath)), entries: [], restored: false };
   const recorded = new Set<string>();
   let totalBytes = 0;
 
@@ -171,21 +151,15 @@ export async function prepareAgentRuntimeWorkspace(
     await fs.writeFile(target, content, { mode: 0o600 });
   };
 
-  const agents = await discoverAgents(realSource);
-  for (const agent of agents) {
+  for (const agent of await discoverAgents(realSource)) {
     const source = await fs.readFile(agent.sourcePath, 'utf8');
     const filename = path.basename(agent.relativePath).replace(/\.md$/i, '.agent.md');
     await inject(path.join('.github', 'agents', filename), generatedAgentProfile(agent.name, agent.description, source));
   }
-
   for (const supportPath of SUPPORT_PATHS) {
-    for (const relativeFile of await collectFiles(realSource, supportPath)) {
-      await inject(relativeFile, await fs.readFile(path.join(realSource, relativeFile)));
-    }
+    for (const relativeFile of await collectFiles(realSource, supportPath)) await inject(relativeFile, await fs.readFile(path.join(realSource, relativeFile)));
   }
-
-  const mcpCandidates = [path.join(realSource, '.github', 'mcp.json'), path.join(realSource, '.mcp.json')];
-  for (const candidate of mcpCandidates) {
+  for (const candidate of [path.join(realSource, '.github', 'mcp.json'), path.join(realSource, '.mcp.json')]) {
     try {
       const content = await fs.readFile(candidate);
       JSON.parse(content.toString('utf8'));
@@ -197,35 +171,28 @@ export async function prepareAgentRuntimeWorkspace(
       throw new Error(`Unable to stage MCP configuration: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
-
   await atomicJsonWrite(path.join(storagePath, MANIFEST_NAME), manifest);
   return { agentId: manifest.agentId, mcpConfigPath: manifest.mcpConfigPath, injectedFiles: manifest.entries.length };
 }
 
-export async function restoreAgentRuntimeWorkspace(storagePath: string): Promise<number> {
+export function restoreAgentRuntimeWorkspaceSync(storagePath: string): number {
   const manifestPath = path.join(storagePath, MANIFEST_NAME);
-  let manifest: RuntimeWorkspaceManifest;
-  try {
-    manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8')) as RuntimeWorkspaceManifest;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 0;
-    throw error;
-  }
+  if (!existsSync(manifestPath)) return 0;
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as RuntimeWorkspaceManifest;
   if (manifest.schemaVersion !== '1.0' || manifest.restored) return 0;
-  const realWorktree = await fs.realpath(manifest.worktreeRoot);
   const backupRoot = path.join(storagePath, BACKUP_DIRECTORY);
-
   for (const entry of [...manifest.entries].reverse()) {
-    const target = path.join(realWorktree, safeRelative(entry.relativePath));
+    const target = path.join(manifest.worktreeRoot, safeRelative(entry.relativePath));
     if (entry.existed && entry.backupRelativePath) {
-      await fs.mkdir(path.dirname(target), { recursive: true });
-      await fs.copyFile(path.join(backupRoot, entry.backupRelativePath), target);
-    } else {
-      await fs.rm(target, { force: true });
+      const parent = path.dirname(target);
+      if (!existsSync(parent)) fs.mkdir(parent, { recursive: true });
+      copyFileSync(path.join(backupRoot, entry.backupRelativePath), target);
+    } else if (existsSync(target) && lstatSync(target).isFile()) {
+      rmSync(target, { force: true });
     }
   }
   manifest.restored = true;
-  await atomicJsonWrite(manifestPath, manifest);
+  writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
   return manifest.entries.length;
 }
 
