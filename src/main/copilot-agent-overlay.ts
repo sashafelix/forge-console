@@ -1,4 +1,4 @@
-import { constants as fsConstants, promises as fs, rmSync, writeFileSync, chmodSync, existsSync, mkdirSync } from 'node:fs';
+import { promises as fs, rmSync, writeFileSync, chmodSync, existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 
 const AGENT_ROOTS = [path.join('.github', 'agents'), path.join('.claude', 'agents')];
