@@ -286,7 +286,7 @@ export class RuntimeOutputTracker {
           const item = notice(stream, cleaned, false, true);
           if (item) notices.push(item);
         }
-        this.finalMessage = this.completionSummary ?? cleaned || this.finalMessage;
+        this.finalMessage = this.completionSummary ?? (cleaned || this.finalMessage);
       }
       return this.trackAll(notices);
     }
