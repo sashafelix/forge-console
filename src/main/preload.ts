@@ -38,6 +38,8 @@ const IPC_CHANNELS = {
   prepareAgentExecution: 'agents:prepare-execution',
   approveAndStartAgentExecution: 'agents:approve-start-execution',
   getAgentExecutionRun: 'agents:get-execution',
+  getLatestAgentExecutionRun: 'agents:get-latest-execution',
+  getAgentExecutionEvents: 'agents:get-execution-events',
   cancelAgentExecution: 'agents:cancel-execution',
   openAgentWorkbench: 'windows:open-agent-workbench',
   runEvent: 'runs:event',
@@ -69,6 +71,8 @@ const api: DesktopApi = {
   prepareAgentExecution: (request: AgentExecutionRequest) => ipcRenderer.invoke(IPC_CHANNELS.prepareAgentExecution, request),
   approveAndStartAgentExecution: (runId: string) => ipcRenderer.invoke(IPC_CHANNELS.approveAndStartAgentExecution, runId),
   getAgentExecutionRun: (runId: string) => ipcRenderer.invoke(IPC_CHANNELS.getAgentExecutionRun, runId),
+  getLatestAgentExecutionRun: () => ipcRenderer.invoke(IPC_CHANNELS.getLatestAgentExecutionRun),
+  getAgentExecutionEvents: (runId: string) => ipcRenderer.invoke(IPC_CHANNELS.getAgentExecutionEvents, runId),
   cancelAgentExecution: (runId: string) => ipcRenderer.invoke(IPC_CHANNELS.cancelAgentExecution, runId),
   openAgentWorkbench: () => ipcRenderer.invoke(IPC_CHANNELS.openAgentWorkbench),
   onRunEvent: (listener: RunEventListener) => {
