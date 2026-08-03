@@ -17,6 +17,11 @@ const ACTIVE_RUN_STATUSES = new Set<AgentExecutionRun['status']>([
   'running',
   'validating'
 ]);
+const WORKING_RUN_STATUSES = new Set<AgentExecutionRun['status']>([
+  'preparing',
+  'running',
+  'validating'
+]);
 const RECENT_RUN_RECOVERY_MS = 12 * 60 * 60 * 1_000;
 
 function keyFor(agent: AgentDefinition): string {
@@ -93,6 +98,14 @@ function isRecentRun(run: AgentExecutionRun): boolean {
   return Date.now() - Date.parse(run.updatedAt) <= RECENT_RUN_RECOVERY_MS;
 }
 
+function WorkingDots() {
+  return (
+    <span className="task-working-dots" aria-label="Still working">
+      <i /><i /><i />
+    </span>
+  );
+}
+
 export function TaskWorkbench() {
   const [advancedMode, setAdvancedMode] = useState(false);
   const [library, setLibrary] = useState<AgentLibrarySelection | null>(null);
@@ -118,6 +131,7 @@ export function TaskWorkbench() {
   const active = isActiveRun(run) || busy;
   const runDisplayName = selected ? friendlyName(selected) : run?.agentName ?? 'Previous task';
   const runTargetName = target?.name ?? run?.targetProject.name ?? 'the selected project';
+  const runIsWorking = Boolean(run && WORKING_RUN_STATUSES.has(run.status));
 
   useEffect(() => {
     window.agentPipeline.listRuntimes().then((available) => {
@@ -370,8 +384,19 @@ export function TaskWorkbench() {
                 <small>The workbench automatically chooses an available provider. Continue first performs a short provider readiness check before any worktree is created.</small>
               </details>
 
-              {!run && <div className="task-primary-row"><button className="task-primary" type="button" disabled={!canPrepare} onClick={prepare}>{busy ? 'Checking provider…' : 'Continue'}</button></div>}
+              {!run && <div className="task-primary-row"><button className="task-primary" type="button" disabled={!canPrepare} onClick={prepare}>{busy && <span className="task-inline-spinner" aria-hidden="true" />}{busy ? 'Checking provider…' : 'Continue'}</button></div>}
             </div>
+          </section>
+        )}
+
+        {busy && !run && (
+          <section className="task-busy-card" role="status" aria-live="polite">
+            <span className="task-busy-spinner" aria-hidden="true" />
+            <div>
+              <strong>Getting things ready</strong>
+              <span>Checking {selectedRuntime?.name ?? 'the selected provider'} and preparing a safe workspace. This can take a little while.</span>
+            </div>
+            <WorkingDots />
           </section>
         )}
 
@@ -379,13 +404,13 @@ export function TaskWorkbench() {
           <section className="task-confirmation">
             <span className="task-confirm-icon">✓</span>
             <div><h2>Ready to start</h2><p>The workbench prepared a safe, isolated copy of <strong>{runTargetName}</strong>. It will run <strong>{runDisplayName}</strong> and will not commit, push, merge or deploy anything.</p>{run.runtimePolicy.missingEnvironment.length > 0 && <div className="task-alert warning">Connections still required: {run.runtimePolicy.missingEnvironment.join(', ')}</div>}</div>
-            <div className="task-confirm-actions"><button type="button" onClick={cancel}>Cancel</button><button className="task-primary" type="button" disabled={busy || run.runtimePolicy.missingEnvironment.length > 0} onClick={start}>{busy ? 'Starting…' : 'Start task'}</button></div>
+            <div className="task-confirm-actions"><button type="button" onClick={cancel}>Cancel</button><button className="task-primary" type="button" disabled={busy || run.runtimePolicy.missingEnvironment.length > 0} onClick={start}>{busy && <span className="task-inline-spinner" aria-hidden="true" />}{busy ? 'Starting…' : 'Start task'}</button></div>
           </section>
         )}
 
         {run && run.status !== 'awaiting_approval' && (
-          <section className={`task-progress ${run.status}`}>
-            <div className="task-progress-heading"><div><span className="task-progress-dot"/><h2>{run.status === 'completed' ? 'Task completed' : run.status === 'failed' ? 'Task could not be completed' : run.status === 'cancelled' ? 'Task cancelled' : 'Working on your task…'}</h2></div><button type="button" onClick={() => window.agentPipeline.openPath(run.storagePath)}>Open details</button></div>
+          <section className={`task-progress ${run.status}`} aria-live="polite">
+            <div className="task-progress-heading"><div><span className="task-progress-dot"/><h2>{run.status === 'completed' ? 'Task completed' : run.status === 'failed' ? 'Task could not be completed' : run.status === 'cancelled' ? 'Task cancelled' : 'Working on your task'}</h2>{runIsWorking && <WorkingDots />}</div><button type="button" onClick={() => window.agentPipeline.openPath(run.storagePath)}>Open details</button></div>
             <div className="task-progress-list">
               {visibleEvents.length === 0 && <div><time>Now</time><span>Run status restored. Waiting for the next persisted update…</span></div>}
               {visibleEvents.slice(-8).map((event) => <div key={`${event.runId}-${event.sequence}`}><time>{new Date(event.timestamp).toLocaleTimeString()}</time><span>{event.message.startsWith('{') ? 'Processing workflow step…' : event.message}</span></div>)}
