@@ -23,6 +23,8 @@ export const IPC_CHANNELS = {
   prepareAgentExecution: 'agents:prepare-execution',
   approveAndStartAgentExecution: 'agents:approve-start-execution',
   getAgentExecutionRun: 'agents:get-execution',
+  getLatestAgentExecutionRun: 'agents:get-latest-execution',
+  getAgentExecutionEvents: 'agents:get-execution-events',
   cancelAgentExecution: 'agents:cancel-execution',
   openAgentWorkbench: 'windows:open-agent-workbench',
   runEvent: 'runs:event',
