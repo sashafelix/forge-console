@@ -10,6 +10,15 @@ import type {
 } from '../shared/contracts';
 import { AgentWorkbench } from './AgentWorkbench';
 
+const ACTIVE_RUN_STORAGE_KEY = 'agent-pipeline-ui.active-agent-run';
+const ACTIVE_RUN_STATUSES = new Set<AgentExecutionRun['status']>([
+  'preparing',
+  'awaiting_approval',
+  'running',
+  'validating'
+]);
+const RECENT_RUN_RECOVERY_MS = 12 * 60 * 60 * 1_000;
+
 function keyFor(agent: AgentDefinition): string {
   return `${agent.id}@${agent.relativePath}`;
 }
@@ -58,13 +67,21 @@ function statusFromEvent(event: RunEvent): AgentExecutionRun['status'] | null {
 function providerFailure(events: RunEvent[]): string | null {
   const text = events.map((event) => event.message).join('\n');
   if (/You're not logged in to GitHub|No authentication information found|Authentication token found but could not be validated|copilot_internal\/user|OAuth user login/i.test(text)) {
-    return 'GitHub Copilot could not use its login in this desktop session. The workbench now ignores unrelated GH_TOKEN and GITHUB_TOKEN overrides and prefers the same macOS Keychain or GitHub CLI login used by your terminal. Fully restart the workbench after updating; if the message remains, run `copilot login` once and restart it again.';
+    return 'GitHub Copilot could not use its login in this desktop session. The workbench ignores unrelated GH_TOKEN and GITHUB_TOKEN overrides and prefers the same Keychain or GitHub CLI login used by your terminal. Fully restart the workbench after updating; if the message remains, run `copilot login` once and restart it again.';
   }
   return null;
 }
 
 function isProcessRuntime(runtime: RuntimeAdapterDescriptor): runtime is RuntimeAdapterDescriptor & { id: ProcessRuntimeId } {
   return runtime.kind === 'process' && (runtime.id === 'claude-code' || runtime.id === 'github-copilot');
+}
+
+function isActiveRun(run: AgentExecutionRun | null): boolean {
+  return Boolean(run && ACTIVE_RUN_STATUSES.has(run.status));
+}
+
+function isRecentRun(run: AgentExecutionRun): boolean {
+  return Date.now() - Date.parse(run.updatedAt) <= RECENT_RUN_RECOVERY_MS;
 }
 
 export function TaskWorkbench() {
@@ -77,6 +94,7 @@ export function TaskWorkbench() {
   const [inputs, setInputs] = useState<Record<string, unknown>>({});
   const [run, setRun] = useState<AgentExecutionRun | null>(null);
   const [events, setEvents] = useState<RunEvent[]>([]);
+  const [restoredRun, setRestoredRun] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -88,18 +106,46 @@ export function TaskWorkbench() {
   const selectedRuntime = processRuntimes.find((runtime) => runtime.id === runtimeId) ?? null;
   const visibleEvents = run ? events.filter((event) => event.runId === run.id) : [];
   const friendlyProviderError = providerFailure(visibleEvents);
-  const active = Boolean(run && ['preparing', 'awaiting_approval', 'running', 'validating'].includes(run.status)) || busy;
+  const active = isActiveRun(run) || busy;
+  const runDisplayName = selected ? friendlyName(selected) : run?.agentName ?? 'Previous task';
+  const runTargetName = target?.name ?? run?.targetProject.name ?? 'the selected project';
 
   useEffect(() => {
     window.agentPipeline.listRuntimes().then((available) => {
       setRuntimes(available);
       const preferred = available.find((runtime) => isProcessRuntime(runtime) && runtime.status === 'available');
-      if (preferred && isProcessRuntime(preferred)) setRuntimeId(preferred.id);
+      if (preferred && isProcessRuntime(preferred) && !localStorage.getItem(ACTIVE_RUN_STORAGE_KEY)) setRuntimeId(preferred.id);
     }).catch((reason: unknown) => setError(reason instanceof Error ? reason.message : String(reason)));
   }, []);
 
+  useEffect(() => {
+    let disposed = false;
+    async function restoreRun(): Promise<void> {
+      const storedRunId = localStorage.getItem(ACTIVE_RUN_STORAGE_KEY);
+      let record = storedRunId ? await window.agentPipeline.getAgentExecutionRun(storedRunId) : null;
+      if (!record) record = await window.agentPipeline.getLatestAgentExecutionRun();
+      if (!record || disposed) {
+        if (storedRunId) localStorage.removeItem(ACTIVE_RUN_STORAGE_KEY);
+        return;
+      }
+      if (!storedRunId && !isActiveRun(record) && !isRecentRun(record)) return;
+
+      localStorage.setItem(ACTIVE_RUN_STORAGE_KEY, record.id);
+      setRun(record);
+      setTarget(record.targetProject);
+      setRuntimeId(record.runtimeId);
+      setInputs(record.inputs);
+      setEvents(await window.agentPipeline.getAgentExecutionEvents(record.id));
+      setRestoredRun(true);
+    }
+    void restoreRun().catch((reason: unknown) => {
+      if (!disposed) setError(reason instanceof Error ? reason.message : String(reason));
+    });
+    return () => { disposed = true; };
+  }, []);
+
   useEffect(() => window.agentPipeline.onRunEvent((event) => {
-    setEvents((current) => [...current, event].slice(-1500));
+    setEvents((current) => [...current.filter((existing) => !(existing.runId === event.runId && existing.sequence === event.sequence)), event].slice(-2_000));
     const status = statusFromEvent(event);
     if (!status) return;
     setRun((current) => current?.id === event.runId ? { ...current, status, updatedAt: event.timestamp } : current);
@@ -109,11 +155,42 @@ export function TaskWorkbench() {
   }), []);
 
   useEffect(() => {
-    if (!selected || active) return;
+    if (!run?.id) return;
+    localStorage.setItem(ACTIVE_RUN_STORAGE_KEY, run.id);
+
+    let disposed = false;
+    async function refreshRun(): Promise<void> {
+      const [record, persistedEvents] = await Promise.all([
+        window.agentPipeline.getAgentExecutionRun(run!.id),
+        window.agentPipeline.getAgentExecutionEvents(run!.id)
+      ]);
+      if (disposed) return;
+      if (record) setRun(record);
+      setEvents(persistedEvents);
+    }
+
+    void refreshRun().catch(() => undefined);
+    if (!ACTIVE_RUN_STATUSES.has(run.status)) return () => { disposed = true; };
+    const interval = window.setInterval(() => { void refreshRun().catch(() => undefined); }, 1_500);
+    return () => {
+      disposed = true;
+      window.clearInterval(interval);
+    };
+  }, [run?.id, run?.status]);
+
+  useEffect(() => {
+    if (!selected || active || run) return;
     setInputs(Object.fromEntries(selected.inputs.map((input) => [input.name, ''])));
-    setRun(null);
     setEvents([]);
   }, [selectedKey]);
+
+  function clearCurrentRun(): void {
+    localStorage.removeItem(ACTIVE_RUN_STORAGE_KEY);
+    setRun(null);
+    setEvents([]);
+    setRestoredRun(false);
+    setError('');
+  }
 
   async function chooseWorkflowRepository(): Promise<void> {
     if (active) return;
@@ -121,12 +198,11 @@ export function TaskWorkbench() {
     try {
       const selection = await window.agentPipeline.selectAgentLibrary();
       if (!selection) return;
+      clearCurrentRun();
       setLibrary(selection);
       setTarget(selection.source.isGitRepository ? selection.source : null);
       const preferred = selection.agents.find(isPipeline) ?? selection.agents[0];
       setSelectedKey(preferred ? keyFor(preferred) : '');
-      setRun(null);
-      setEvents([]);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
     }
@@ -138,20 +214,32 @@ export function TaskWorkbench() {
     if (selection) setTarget(selection);
   }
 
+  async function openConnections(): Promise<void> {
+    setError('');
+    try {
+      await window.agentPipeline.openAgentWorkbench();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    }
+  }
+
   async function prepare(): Promise<void> {
     if (!selected || !target?.isGitRepository || !selectedRuntime || selectedRuntime.status !== 'available') return;
     setBusy(true);
     setError('');
     setEvents([]);
     try {
-      setRun(await window.agentPipeline.prepareAgentExecution({
+      const prepared = await window.agentPipeline.prepareAgentExecution({
         agentSourceRoot: selected.sourceRoot,
         agentRelativePath: selected.relativePath,
         agentId: selected.id,
         targetProject: target,
         runtimeId,
         inputs
-      }));
+      });
+      localStorage.setItem(ACTIVE_RUN_STORAGE_KEY, prepared.id);
+      setRun(prepared);
+      setRestoredRun(false);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
     } finally {
@@ -164,7 +252,9 @@ export function TaskWorkbench() {
     setBusy(true);
     setError('');
     try {
-      setRun(await window.agentPipeline.approveAndStartAgentExecution(run.id));
+      const started = await window.agentPipeline.approveAndStartAgentExecution(run.id);
+      localStorage.setItem(ACTIVE_RUN_STORAGE_KEY, started.id);
+      setRun(started);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
       const refreshed = await window.agentPipeline.getAgentExecutionRun(run.id);
@@ -181,7 +271,17 @@ export function TaskWorkbench() {
     if (refreshed) setRun(refreshed);
   }
 
-  if (advancedMode) return <AgentWorkbench />;
+  if (advancedMode) {
+    return (
+      <div className="advanced-workbench-shell">
+        <div className="advanced-workbench-nav">
+          <button type="button" onClick={() => setAdvancedMode(false)}>← Back to guided workbench</button>
+          {run && <span>{runDisplayName} · {run.status.replaceAll('_', ' ')}</span>}
+        </div>
+        <AgentWorkbench />
+      </div>
+    );
+  }
 
   const requiredComplete = Boolean(selected && selected.inputs.every((input) => {
     const value = inputs[input.name];
@@ -198,12 +298,13 @@ export function TaskWorkbench() {
           <p>Choose a workflow, provide the ticket or task, and let the workbench guide the rest.</p>
         </div>
         <div className="task-header-actions">
-          <button type="button" onClick={() => { window.location.href = './connections.html'; }}>Connections</button>
+          <button type="button" onClick={() => { void openConnections(); }}>Connections</button>
           <button type="button" onClick={() => setAdvancedMode(true)}>Advanced</button>
         </div>
       </header>
 
       {error && <div className="task-alert error" role="alert">{error}</div>}
+      {restoredRun && run && <div className="task-alert info" role="status"><strong>Previous run restored</strong><span>The workbench reconnected to {runDisplayName}. Current status: {run.status.replaceAll('_', ' ')}.</span></div>}
       {friendlyProviderError && <div className="task-alert warning" role="alert"><strong>Copilot needs attention</strong><span>{friendlyProviderError}</span></div>}
 
       <main className="task-main">
@@ -268,7 +369,7 @@ export function TaskWorkbench() {
         {run?.status === 'awaiting_approval' && (
           <section className="task-confirmation">
             <span className="task-confirm-icon">✓</span>
-            <div><h2>Ready to start</h2><p>The workbench prepared a safe, isolated copy of <strong>{target?.name}</strong>. It will run <strong>{friendlyName(selected!)}</strong> and will not commit, push, merge or deploy anything.</p>{run.runtimePolicy.missingEnvironment.length > 0 && <div className="task-alert warning">Connections still required: {run.runtimePolicy.missingEnvironment.join(', ')}</div>}</div>
+            <div><h2>Ready to start</h2><p>The workbench prepared a safe, isolated copy of <strong>{runTargetName}</strong>. It will run <strong>{runDisplayName}</strong> and will not commit, push, merge or deploy anything.</p>{run.runtimePolicy.missingEnvironment.length > 0 && <div className="task-alert warning">Connections still required: {run.runtimePolicy.missingEnvironment.join(', ')}</div>}</div>
             <div className="task-confirm-actions"><button type="button" onClick={cancel}>Cancel</button><button className="task-primary" type="button" disabled={busy || run.runtimePolicy.missingEnvironment.length > 0} onClick={start}>{busy ? 'Starting…' : 'Start task'}</button></div>
           </section>
         )}
@@ -276,8 +377,15 @@ export function TaskWorkbench() {
         {run && run.status !== 'awaiting_approval' && (
           <section className={`task-progress ${run.status}`}>
             <div className="task-progress-heading"><div><span className="task-progress-dot"/><h2>{run.status === 'completed' ? 'Task completed' : run.status === 'failed' ? 'Task could not be completed' : run.status === 'cancelled' ? 'Task cancelled' : 'Working on your task…'}</h2></div><button type="button" onClick={() => window.agentPipeline.openPath(run.storagePath)}>Open details</button></div>
-            <div className="task-progress-list">{visibleEvents.slice(-8).map((event) => <div key={`${event.runId}-${event.sequence}`}><time>{new Date(event.timestamp).toLocaleTimeString()}</time><span>{event.message.startsWith('{') ? 'Processing workflow step…' : event.message}</span></div>)}</div>
-            <div className="task-progress-actions"><button type="button" onClick={() => window.agentPipeline.openPath(run.worktreePath)}>Open results</button>{['running', 'validating'].includes(run.status) && <button type="button" onClick={cancel}>Cancel</button>}</div>
+            <div className="task-progress-list">
+              {visibleEvents.length === 0 && <div><time>Now</time><span>Run status restored. Waiting for the next persisted update…</span></div>}
+              {visibleEvents.slice(-8).map((event) => <div key={`${event.runId}-${event.sequence}`}><time>{new Date(event.timestamp).toLocaleTimeString()}</time><span>{event.message.startsWith('{') ? 'Processing workflow step…' : event.message}</span></div>)}
+            </div>
+            <div className="task-progress-actions">
+              <button type="button" onClick={() => window.agentPipeline.openPath(run.worktreePath)}>Open results</button>
+              {['running', 'validating'].includes(run.status) && <button type="button" onClick={cancel}>Cancel</button>}
+              {!ACTIVE_RUN_STATUSES.has(run.status) && <button type="button" onClick={clearCurrentRun}>Start a new task</button>}
+            </div>
           </section>
         )}
       </main>
