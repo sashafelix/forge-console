@@ -6,10 +6,14 @@ import type { ProcessRuntimeId, RuntimeAdapterDescriptor } from '../shared/contr
 import { PROCESS_RUNTIME_SPECS, buildExecutionArgs, getProcessRuntimeSpec } from '../shared/runtime-specs';
 import { buildSearchPath } from '../shared/search-paths';
 import { listConnections } from './connections';
+import { RuntimeOutputTracker, type RuntimeStream } from './runtime-output';
 import { loadSettings } from './settings';
 
 const PROBE_TIMEOUT_MS = 5_000;
+const PREFLIGHT_TIMEOUT_MS = 45_000;
+const PREFLIGHT_CACHE_MS = 5 * 60 * 1_000;
 const MAX_VERSION_OUTPUT = 4_096;
+const successfulPreflights = new Map<ProcessRuntimeId, number>();
 
 export function runtimeSearchPath(): string {
   return buildSearchPath(process.env.PATH ?? '', os.homedir(), process.platform, path.delimiter);
@@ -186,6 +190,100 @@ async function spawnRuntime(
   });
   child.stdin.end(prompt, 'utf8');
   return child;
+}
+
+function preflightArgs(runtimeId: ProcessRuntimeId): string[] {
+  if (runtimeId === 'claude-code') {
+    return [
+      '-p',
+      '--input-format', 'text',
+      '--output-format', 'stream-json',
+      '--verbose',
+      '--max-turns', '1',
+      '--permission-mode', 'plan',
+      '--disallowedTools', 'Bash,Write,Edit,WebFetch,WebSearch,Task'
+    ];
+  }
+  return [
+    '--output-format=json',
+    '--no-ask-user',
+    '--no-color',
+    '--no-remote',
+    '--no-remote-export',
+    '--available-tools=view',
+    '--deny-tool=write,shell,url,memory'
+  ];
+}
+
+function lineConsumer(onLine: (line: string) => void): { push(chunk: Buffer): void; flush(): void } {
+  let buffered = '';
+  return {
+    push(chunk: Buffer) {
+      buffered += chunk.toString('utf8');
+      const lines = buffered.split(/\r?\n/);
+      buffered = lines.pop() ?? '';
+      for (const line of lines) if (line.trim()) onLine(line);
+    },
+    flush() {
+      if (buffered.trim()) onLine(buffered);
+      buffered = '';
+    }
+  };
+}
+
+function preflightGuidance(runtimeId: ProcessRuntimeId, message: string): string {
+  if (runtimeId === 'claude-code' && /oauth session expired|authenticate|authentication|not logged in|unauthori[sz]ed|login|sign.?in|401/i.test(message)) {
+    return 'Claude Code is installed, but its sign-in is not usable on this computer. Open PowerShell or Git Bash, run `claude`, complete the sign-in flow, then fully restart the workbench and try again.';
+  }
+  if (runtimeId === 'github-copilot' && /authenticate|authentication|not logged in|oauth|copilot_internal\/user|unauthori[sz]ed|login|sign.?in|401/i.test(message)) {
+    return 'GitHub Copilot is installed, but its login is not usable in this desktop session. Open a terminal, run `copilot login`, complete sign-in, then fully restart the workbench and try again.';
+  }
+  if (/network|fetch failed|enotfound|econnrefused|certificate|unable to verify|self.signed|proxy|timed out/i.test(message)) {
+    return `${runtimeId === 'claude-code' ? 'Claude Code' : 'GitHub Copilot'} could not reach its service from the desktop process. Check the active VPN, proxy and corporate CA settings, then restart the workbench.`;
+  }
+  return message;
+}
+
+export async function preflightRuntimeSession(runtimeId: ProcessRuntimeId, cwd: string): Promise<void> {
+  const checkedAt = successfulPreflights.get(runtimeId);
+  if (checkedAt && Date.now() - checkedAt < PREFLIGHT_CACHE_MS) return;
+
+  const child = await spawnRuntime(
+    runtimeId,
+    cwd,
+    'This is a provider readiness check. Reply with exactly READY. Do not inspect files and do not use tools.',
+    preflightArgs(runtimeId)
+  );
+  const output = new RuntimeOutputTracker(runtimeId);
+
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      if (error) reject(error);
+      else resolve();
+    };
+    const consume = (stream: RuntimeStream, line: string) => { output.consume(stream, line); };
+    const stdout = lineConsumer((line) => consume('stdout', line));
+    const stderr = lineConsumer((line) => consume('stderr', line));
+    child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk));
+    child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
+    child.once('error', (error) => finish(new Error(preflightGuidance(runtimeId, output.failureMessage(undefined, error.message)))));
+    child.once('close', (code) => {
+      stdout.flush();
+      stderr.flush();
+      if (code === 0) finish();
+      else finish(new Error(preflightGuidance(runtimeId, output.failureMessage(code ?? undefined))));
+    });
+    const timeout = setTimeout(() => {
+      child.kill();
+      finish(new Error(`${runtimeId === 'claude-code' ? 'Claude Code' : 'GitHub Copilot'} readiness check timed out. Check the active VPN, proxy and provider login, then try again.`));
+    }, PREFLIGHT_TIMEOUT_MS);
+  });
+
+  successfulPreflights.set(runtimeId, Date.now());
 }
 
 export async function spawnRuntimePreview(runtimeId: string, cwd: string, prompt: string): Promise<ChildProcessWithoutNullStreams> {
