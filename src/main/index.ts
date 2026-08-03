@@ -1,5 +1,6 @@
 import { app, BrowserWindow, Menu, type MenuItemConstructorOptions } from 'electron';
 import path from 'node:path';
+import { registerAgentRunHistoryIpcHandlers } from './agent-run-history-ipc';
 import { registerIpcHandlers } from './ipc';
 
 let mainWindow: BrowserWindow | null = null;
@@ -102,6 +103,7 @@ function installApplicationMenu(): void {
 
 app.whenReady().then(() => {
   registerIpcHandlers(() => { createConnectionsWindow(); });
+  registerAgentRunHistoryIpcHandlers();
   installApplicationMenu();
   createMainWindow();
   app.on('activate', () => {
