@@ -80,12 +80,12 @@ test('Connections exposes proxy modes and provider-specific tests', async () => 
     'NETWORK &amp; PROXY',
     'Inherit proxy variables from the shell',
     'Use the operating-system proxy',
-    'Use manually configured proxy URLs',
-    'Test Claude Code',
-    'Test GitHub Copilot'
+    'Use manually configured proxy URLs'
   ]) {
     assert.match(workbench, new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
+  assert.match(workbench, /runtimeId === 'claude-code' \? 'Claude Code' : 'GitHub Copilot'/);
+  assert.match(workbench, /`Test \$\{providerName\(runtime\.id\)\}`/);
   assert.match(preload, /saveNetworkSettings/);
   assert.match(preload, /selectNetworkCaCertificate/);
   assert.match(preload, /testRuntimeConnection/);
