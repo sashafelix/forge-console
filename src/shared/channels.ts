@@ -25,6 +25,7 @@ export const IPC_CHANNELS = {
   cancelExecution: 'runs:cancel-execution',
   prepareAgentExecution: 'agents:prepare-execution',
   approveAndStartAgentExecution: 'agents:approve-start-execution',
+  replyToAgentExecution: 'agents:reply-execution',
   getAgentExecutionRun: 'agents:get-execution',
   getLatestAgentExecutionRun: 'agents:get-latest-execution',
   getAgentExecutionEvents: 'agents:get-execution-events',

@@ -11,6 +11,7 @@ import type {
   PipelineManifest,
   ProcessRuntimeId,
   ProjectSelection,
+  ReplyToAgentExecutionRequest,
   RunDraft,
   RunEvent,
   SaveConnectionRequest,
@@ -210,7 +211,16 @@ export function registerIpcHandlers(openAgentWorkbench: () => void): void {
     await ensureRuntimeAvailable(record.runtimeId);
     return agentRuns.start(runId, rendererEmitter(event));
   });
+  ipcMain.handle(IPC_CHANNELS.replyToAgentExecution, async (event, request: ReplyToAgentExecutionRequest) => {
+    const record = await agentRuns.get(request.runId);
+    if (!record) throw new Error('Agent execution was not found');
+    await ensureRuntimeAvailable(record.runtimeId);
+    await preflightRuntimeSession(record.runtimeId, record.workingDirectory);
+    return agentRuns.reply(request, rendererEmitter(event));
+  });
   ipcMain.handle(IPC_CHANNELS.getAgentExecutionRun, (_event, runId: string) => agentRuns.get(runId));
+  ipcMain.handle(IPC_CHANNELS.getLatestAgentExecutionRun, () => agentRuns.getLatest());
+  ipcMain.handle(IPC_CHANNELS.getAgentExecutionEvents, (_event, runId: string) => agentRuns.getEvents(runId));
   ipcMain.handle(IPC_CHANNELS.cancelAgentExecution, (event, runId: string) => agentRuns.cancel(runId, rendererEmitter(event)));
   ipcMain.handle(IPC_CHANNELS.openAgentWorkbench, () => openAgentWorkbench());
   ipcMain.handle(IPC_CHANNELS.openPath, async (_event, targetPath: string) => shell.openPath(path.resolve(targetPath)));
