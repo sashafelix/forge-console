@@ -10,7 +10,7 @@ export interface AgentRuntimeLaunch {
   runtimeId: ProcessRuntimeId;
   cwd: string;
   agentSourceRoot: string;
-  agentRelativePath: string;
+  agentRelativePath?: string;
   prompt: string;
   maxTurns: number;
   permissions: {
@@ -114,6 +114,10 @@ function stripMarkdownSuffix(filename: string): string {
   return filename.replace(/\.agent\.md$|\.md$/i, '');
 }
 
+function agentRelativePathFromPrompt(prompt: string): string | undefined {
+  return prompt.match(/^- Selected agent:\s*(.+)$/m)?.[1]?.trim();
+}
+
 function safeAgentRelativePath(relativePath: string): string {
   if (!relativePath || path.isAbsolute(relativePath)) throw new Error('Copilot agent path must be relative to its repository');
   const normalized = path.normalize(relativePath);
@@ -129,7 +133,9 @@ function safeAgentRelativePath(relativePath: string): string {
 }
 
 async function resolveCopilotAgentId(launch: AgentRuntimeLaunch): Promise<string> {
-  const relativePath = safeAgentRelativePath(launch.agentRelativePath);
+  const requestedPath = launch.agentRelativePath ?? agentRelativePathFromPrompt(launch.prompt);
+  if (!requestedPath) throw new Error('The selected Copilot agent path was not supplied to the runtime');
+  const relativePath = safeAgentRelativePath(requestedPath);
   const worktreeRoot = await fs.realpath(path.resolve(launch.cwd));
   let worktreeAgentPath: string;
   try {
