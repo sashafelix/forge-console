@@ -158,7 +158,6 @@ export class RuntimeOutputTracker {
   private currentSessionId?: string;
   private interaction?: RuntimeInteractionRequest;
   private completionSummary?: string;
-  private meaningfulOutput = false;
 
   constructor(private readonly runtimeId: ProcessRuntimeId) {}
 
@@ -196,11 +195,11 @@ export class RuntimeOutputTracker {
   }
 
   resultSummary(): string | undefined {
-    return this.completionSummary ?? this.finalMessage;
+    return this.completionSummary;
   }
 
   hasMeaningfulOutput(): boolean {
-    return this.meaningfulOutput;
+    return Boolean(this.completionSummary);
   }
 
   failureMessage(exitCode?: number, fallback?: string): string {
@@ -347,7 +346,6 @@ export class RuntimeOutputTracker {
     if (item.error) this.push(this.errors, item.message);
     this.push(this.recent, item.message);
     if (item.final) this.finalMessage = item.message;
-    if (!/^Claude Code session started\.$/.test(item.message)) this.meaningfulOutput = true;
   }
 
   private push(target: string[], value: string): void {
