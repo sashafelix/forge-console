@@ -27,6 +27,15 @@ interface McpConfig {
   serverNames: string[];
 }
 
+interface CopilotCliCapabilities {
+  options: Set<string>;
+  helpText: string;
+}
+
+const COPILOT_HELP_TIMEOUT_MS = 8_000;
+const MAX_HELP_OUTPUT = 256 * 1024;
+const copilotCapabilityCache = new Map<string, Promise<CopilotCliCapabilities>>();
+
 async function resolveExecutable(runtimeId: ProcessRuntimeId): Promise<string> {
   const runtime = (await discoverRuntimeAdapters()).find((candidate) => candidate.id === runtimeId);
   if (!runtime || runtime.status !== 'available' || !runtime.executablePath) {
@@ -72,10 +81,6 @@ async function runtimeEnvironment(
       delete env.GITHUB_TOKEN;
     }
 
-    // Copilot prompt mode deliberately disables repository MCP sources unless the
-    // caller opts in. The workbench only enables this after the operator selected
-    // the agent library and approved the run; the actual MCP configuration is also
-    // supplied explicitly with --additional-mcp-config.
     env.GITHUB_COPILOT_PROMPT_MODE_WORKSPACE_MCP = 'true';
   }
   return env;
@@ -143,7 +148,7 @@ async function resolveCopilotAgentId(launch: AgentRuntimeLaunch): Promise<string
   } catch {
     throw new Error(
       `The selected Copilot agent ${relativePath} is not present in the isolated target worktree. `
-      + 'Copilot currently requires the agent definition to exist in the target repository.'
+      + 'Commit or save the agent in the selected repository, then create a new run.'
     );
   }
   if (worktreeAgentPath !== worktreeRoot && !worktreeAgentPath.startsWith(`${worktreeRoot}${path.sep}`)) {
@@ -151,9 +156,6 @@ async function resolveCopilotAgentId(launch: AgentRuntimeLaunch): Promise<string
   }
   const details = await fs.stat(worktreeAgentPath);
   if (!details.isFile()) throw new Error('Selected Copilot agent definition is not a file');
-
-  // GitHub Copilot CLI defines the agent ID from the filename. The optional
-  // frontmatter `name` field is display text and must not be passed to --agent.
   return stripMarkdownSuffix(path.basename(worktreeAgentPath));
 }
 
@@ -166,11 +168,58 @@ function secretEnvironmentNames(environment: Record<string, string>): string[] {
   return Object.keys(environment).filter((name) => /(?:TOKEN|SECRET|PASSWORD|API_KEY|AUTH)/i.test(name));
 }
 
-function repeatedOption(option: string, values: Iterable<string>): string[] {
-  return [...new Set(values)].flatMap((value) => [option, value]);
+function collectHelpCapabilities(executable: string, environment: NodeJS.ProcessEnv): Promise<CopilotCliCapabilities> {
+  const cached = copilotCapabilityCache.get(executable);
+  if (cached) return cached;
+
+  const probe = new Promise<CopilotCliCapabilities>((resolve) => {
+    const child = spawn(executable, ['--help'], {
+      env: environment,
+      shell: requiresCommandShell(executable),
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    let output = '';
+    const collect = (chunk: Buffer) => {
+      if (output.length < MAX_HELP_OUTPUT) output += chunk.toString('utf8');
+    };
+    child.stdout.on('data', collect);
+    child.stderr.on('data', collect);
+    const timeout = setTimeout(() => child.kill(), COPILOT_HELP_TIMEOUT_MS);
+    const finish = () => {
+      clearTimeout(timeout);
+      const options = new Set(output.match(/--[a-z0-9][a-z0-9-]*/gi) ?? []);
+      resolve({ options, helpText: output });
+    };
+    child.once('error', finish);
+    child.once('close', finish);
+  });
+  copilotCapabilityCache.set(executable, probe);
+  return probe;
 }
 
-export async function buildCopilotArgs(launch: AgentRuntimeLaunch): Promise<string[]> {
+function supports(capabilities: CopilotCliCapabilities | undefined, option: string): boolean {
+  return !capabilities || capabilities.options.has(option);
+}
+
+function requireOption(capabilities: CopilotCliCapabilities | undefined, option: string, purpose: string): void {
+  if (!supports(capabilities, option)) {
+    throw new Error(`The installed GitHub Copilot CLI does not support ${option}, which is required to ${purpose}. Update the CLI or choose Claude Code.`);
+  }
+}
+
+function optionalFlag(args: string[], capabilities: CopilotCliCapabilities | undefined, option: string): void {
+  if (supports(capabilities, option)) args.push(option);
+}
+
+export async function buildCopilotArgs(
+  launch: AgentRuntimeLaunch,
+  capabilities?: CopilotCliCapabilities
+): Promise<string[]> {
+  requireOption(capabilities, '--agent', 'run repository custom agents');
+  requireOption(capabilities, '--allow-tool', 'approve non-interactive tool use');
+  requireOption(capabilities, '--deny-tool', 'enforce denied tool permissions');
+
   const allowedPermissions = new Set<string>(['read']);
   const deniedPermissions = new Set<string>(['url', 'memory']);
 
@@ -185,22 +234,41 @@ export async function buildCopilotArgs(launch: AgentRuntimeLaunch): Promise<stri
 
   const selectedAgent = await resolveCopilotAgentId(launch);
   const secrets = secretEnvironmentNames(launch.environment);
+  const args: string[] = [];
 
-  return [
-    '-p', customAgentPrompt(launch.prompt),
-    '--output-format=json',
-    '--no-banner',
-    '--no-color',
-    '--no-remote',
-    '--no-remote-export',
-    `--agent=${selectedAgent}`,
-    ...(path.resolve(launch.agentSourceRoot) !== path.resolve(launch.cwd) ? ['--add-dir', launch.agentSourceRoot] : []),
-    ...(mcp.path ? [`--additional-mcp-config=@${mcp.path}`, '--allow-all-mcp-server-instructions'] : []),
-    ...repeatedOption('--allow-tool', allowedPermissions),
-    ...repeatedOption('--deny-tool', deniedPermissions),
-    ...(secrets.length > 0 ? [`--secret-env-vars=${secrets.join(',')}`] : []),
-    ...(launch.sessionId ? [`--resume=${launch.sessionId}`] : [])
-  ];
+  if (supports(capabilities, '--prompt')) args.push('--prompt', customAgentPrompt(launch.prompt));
+  else args.push('-p', customAgentPrompt(launch.prompt));
+
+  if (supports(capabilities, '--output-format')) args.push('--output-format=json');
+  optionalFlag(args, capabilities, '--no-banner');
+  optionalFlag(args, capabilities, '--no-color');
+  optionalFlag(args, capabilities, '--no-remote');
+  optionalFlag(args, capabilities, '--no-remote-export');
+  args.push(`--agent=${selectedAgent}`);
+
+  if (path.resolve(launch.agentSourceRoot) !== path.resolve(launch.cwd) && supports(capabilities, '--add-dir')) {
+    args.push('--add-dir', launch.agentSourceRoot);
+  }
+
+  if (mcp.path) {
+    requireOption(capabilities, '--additional-mcp-config', 'load the selected repository MCP configuration');
+    args.push(`--additional-mcp-config=@${mcp.path}`);
+    optionalFlag(args, capabilities, '--allow-all-mcp-server-instructions');
+  }
+
+  // The public and older enterprise CLIs both accept one comma-separated value.
+  // Repeated `--allow-tool value` pairs are rejected by some corporate builds.
+  args.push(`--allow-tool=${[...allowedPermissions].join(',')}`);
+  args.push(`--deny-tool=${[...deniedPermissions].join(',')}`);
+
+  if (secrets.length > 0 && supports(capabilities, '--secret-env-vars')) {
+    args.push(`--secret-env-vars=${secrets.join(',')}`);
+  }
+  if (launch.sessionId) {
+    requireOption(capabilities, '--resume', 'resume an interactive workflow conversation');
+    args.push(`--resume=${launch.sessionId}`);
+  }
+  return args;
 }
 
 export async function spawnAgentRuntime(launch: AgentRuntimeLaunch): Promise<ChildProcessWithoutNullStreams> {
@@ -208,10 +276,13 @@ export async function spawnAgentRuntime(launch: AgentRuntimeLaunch): Promise<Chi
     throw new Error('maxTurns must be from 1 to 100');
   }
   const executable = await resolveExecutable(launch.runtimeId);
-  const args = launch.runtimeId === 'claude-code' ? await claudeArgs(launch) : await buildCopilotArgs(launch);
+  const environment = await runtimeEnvironment(launch.runtimeId, launch.environment);
+  const args = launch.runtimeId === 'claude-code'
+    ? await claudeArgs(launch)
+    : await buildCopilotArgs(launch, await collectHelpCapabilities(executable, environment));
   const child = manageAgentProcess(spawn(executable, args, {
     cwd: launch.cwd,
-    env: await runtimeEnvironment(launch.runtimeId, launch.environment),
+    env: environment,
     shell: requiresCommandShell(executable),
     windowsHide: true,
     stdio: ['pipe', 'pipe', 'pipe']
