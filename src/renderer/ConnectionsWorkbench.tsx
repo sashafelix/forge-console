@@ -2,6 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import type {
   ConnectionId,
   ConnectionSummary,
+  NetworkProxyMode,
+  NetworkSettings,
+  ProcessRuntimeId,
+  RuntimeAdapterDescriptor,
+  RuntimeConnectionTestResult,
   SaveConnectionRequest,
   SystemInfo
 } from '../shared/contracts';
@@ -15,6 +20,13 @@ interface ConnectionDraft {
 }
 
 const IDS: ConnectionId[] = ['jira-atc', 'confluence-atc', 'bmw-llm'];
+const DEFAULT_NETWORK: NetworkSettings = {
+  proxyMode: 'inherit',
+  httpProxy: '',
+  httpsProxy: '',
+  noProxy: '',
+  caCertificatePath: ''
+};
 
 function draftFrom(summary: ConnectionSummary): ConnectionDraft {
   return {
@@ -36,6 +48,17 @@ function secretLabel(id: ConnectionId): string {
   return id === 'bmw-llm' ? 'API token' : 'Personal access token';
 }
 
+function proxyModeLabel(mode: NetworkProxyMode): string {
+  if (mode === 'inherit') return 'Inherit launcher environment';
+  if (mode === 'system') return 'Use operating-system proxy';
+  if (mode === 'manual') return 'Manual proxy';
+  return 'Direct connection';
+}
+
+function providerName(runtimeId: ProcessRuntimeId): string {
+  return runtimeId === 'claude-code' ? 'Claude Code' : 'GitHub Copilot';
+}
+
 function returnToWorkbench(): void {
   window.close();
   window.setTimeout(() => {
@@ -47,13 +70,21 @@ export function ConnectionsWorkbench() {
   const [system, setSystem] = useState<SystemInfo | null>(null);
   const [connections, setConnections] = useState<ConnectionSummary[]>([]);
   const [drafts, setDrafts] = useState<Partial<Record<ConnectionId, ConnectionDraft>>>({});
+  const [network, setNetwork] = useState<NetworkSettings>(DEFAULT_NETWORK);
+  const [runtimes, setRuntimes] = useState<RuntimeAdapterDescriptor[]>([]);
+  const [providerTests, setProviderTests] = useState<Partial<Record<ProcessRuntimeId, RuntimeConnectionTestResult>>>({});
   const [busyId, setBusyId] = useState<ConnectionId | null>(null);
+  const [networkBusy, setNetworkBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
   const byId = useMemo(
     () => Object.fromEntries(connections.map((connection) => [connection.id, connection])) as Partial<Record<ConnectionId, ConnectionSummary>>,
     [connections]
+  );
+  const processRuntimes = useMemo(
+    () => runtimes.filter((runtime): runtime is RuntimeAdapterDescriptor & { id: ProcessRuntimeId } => runtime.kind === 'process' && (runtime.id === 'claude-code' || runtime.id === 'github-copilot')),
+    [runtimes]
   );
 
   function applyConnections(next: ConnectionSummary[]): void {
@@ -71,10 +102,17 @@ export function ConnectionsWorkbench() {
   }
 
   useEffect(() => {
-    Promise.all([window.agentPipeline.getSystemInfo(), window.agentPipeline.listConnections()])
-      .then(([info, configured]) => {
+    Promise.all([
+      window.agentPipeline.getSystemInfo(),
+      window.agentPipeline.listConnections(),
+      window.agentPipeline.getSettings(),
+      window.agentPipeline.listRuntimes()
+    ])
+      .then(([info, configured, settings, runtimeList]) => {
         setSystem(info);
         applyConnections(configured);
+        setNetwork(settings.network);
+        setRuntimes(runtimeList);
       })
       .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : String(reason)));
   }, []);
@@ -95,6 +133,49 @@ export function ConnectionsWorkbench() {
       authScheme: draft.authScheme,
       secret: draft.secret || undefined
     };
+  }
+
+  async function saveNetwork(): Promise<void> {
+    setNetworkBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      const settings = await window.agentPipeline.saveNetworkSettings(network);
+      setNetwork(settings.network);
+      setProviderTests({});
+      setMessage('Network and proxy settings saved. Provider readiness checks will use them immediately.');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      setNetworkBusy(false);
+    }
+  }
+
+  async function chooseCaCertificate(): Promise<void> {
+    try {
+      const selected = await window.agentPipeline.selectNetworkCaCertificate();
+      if (selected) setNetwork((current) => ({ ...current, caCertificatePath: selected }));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    }
+  }
+
+  async function testProvider(runtimeId: ProcessRuntimeId): Promise<void> {
+    setNetworkBusy(true);
+    setError('');
+    setMessage('');
+    try {
+      const settings = await window.agentPipeline.saveNetworkSettings(network);
+      setNetwork(settings.network);
+      const result = await window.agentPipeline.testRuntimeConnection(runtimeId);
+      setProviderTests((current) => ({ ...current, [runtimeId]: result }));
+      if (result.ok) setMessage(result.message);
+      else setError(result.message);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      setNetworkBusy(false);
+    }
   }
 
   async function save(id: ConnectionId): Promise<void> {
@@ -153,7 +234,7 @@ export function ConnectionsWorkbench() {
           <button className="connections-back-button" type="button" onClick={returnToWorkbench}>← Back to workbench</button>
           <span className="eyebrow">LOCAL AGENT WORKBENCH</span>
           <h1>Connections</h1>
-          <p>Configure service credentials once and expose them only to approved agents that explicitly declare them.</p>
+          <p>Configure service credentials and the network route used by local AI providers.</p>
         </div>
         <div className="system-pill"><span className="status-dot" />{system ? `${system.platform} · ${system.arch} · v${system.appVersion}` : 'Loading system…'}</div>
       </header>
@@ -164,8 +245,77 @@ export function ConnectionsWorkbench() {
       <main className="connections-content">
         <div className="security-note">
           <strong>Secure storage</strong>
-          <span>Tokens are encrypted by Electron safeStorage using the operating system credential service. Testing current values saves them securely first; saved secrets are never returned to this screen, written into repositories, or persisted in run records.</span>
+          <span>Tokens are encrypted by Electron safeStorage using the operating system credential service. Proxy URLs must not contain credentials. Saved secrets are never returned to this screen, written into repositories, or persisted in run records.</span>
         </div>
+
+        <section className="connection-card network-card">
+          <div className="connection-heading">
+            <div>
+              <span className="eyebrow">NETWORK &amp; PROXY</span>
+              <h2>Provider network route</h2>
+              <p>Used by Claude Code, GitHub Copilot, Jira, Confluence, and future HTTP providers launched by this desktop app.</p>
+            </div>
+            <span className={`connection-status ${network.proxyMode === 'inherit' ? 'missing' : 'configured'}`}>{proxyModeLabel(network.proxyMode)}</span>
+          </div>
+
+          <label className="field network-mode-field">
+            <span>Proxy mode</span>
+            <select disabled={networkBusy} value={network.proxyMode} onChange={(event) => setNetwork((current) => ({ ...current, proxyMode: event.target.value as NetworkProxyMode }))}>
+              <option value="inherit">Inherit proxy variables from the shell that launched the app</option>
+              <option value="system">Use the operating-system proxy / PAC configuration</option>
+              <option value="manual">Use manually configured proxy URLs</option>
+              <option value="direct">Connect directly without a proxy</option>
+            </select>
+            <small>Use “inherit” when starting the app from a terminal after running your corporate proxy command. Use “system” for macOS or Windows PAC/WPAD settings.</small>
+          </label>
+
+          {network.proxyMode === 'manual' && (
+            <div className="network-proxy-grid">
+              <label className="field">
+                <span>HTTP proxy</span>
+                <input disabled={networkBusy} placeholder="http://proxy.company.net:8080" value={network.httpProxy} onChange={(event) => setNetwork((current) => ({ ...current, httpProxy: event.target.value }))} />
+              </label>
+              <label className="field">
+                <span>HTTPS proxy</span>
+                <input disabled={networkBusy} placeholder="http://proxy.company.net:8080" value={network.httpsProxy} onChange={(event) => setNetwork((current) => ({ ...current, httpsProxy: event.target.value }))} />
+              </label>
+            </div>
+          )}
+
+          <label className="field">
+            <span>NO_PROXY / bypass hosts</span>
+            <input disabled={networkBusy || network.proxyMode === 'direct'} placeholder="localhost,127.0.0.1,.bmwgroup.net" value={network.noProxy} onChange={(event) => setNetwork((current) => ({ ...current, noProxy: event.target.value }))} />
+          </label>
+
+          <div className="network-ca-row">
+            <label className="field">
+              <span>Corporate CA certificate bundle</span>
+              <input disabled={networkBusy} placeholder="Optional .pem, .crt, or .cer file" value={network.caCertificatePath} onChange={(event) => setNetwork((current) => ({ ...current, caCertificatePath: event.target.value }))} />
+              <small>Applied to provider child processes through NODE_EXTRA_CA_CERTS and SSL_CERT_FILE. Electron service tests continue to use the operating-system trust store.</small>
+            </label>
+            <button className="secondary" type="button" disabled={networkBusy} onClick={chooseCaCertificate}>Choose certificate</button>
+          </div>
+
+          <div className="provider-test-grid">
+            {processRuntimes.map((runtime) => {
+              const result = providerTests[runtime.id];
+              return (
+                <div className="provider-test" key={runtime.id}>
+                  <div>
+                    <strong>{runtime.name}</strong>
+                    <span className={result ? (result.ok ? 'ok' : 'failed') : ''}>{result?.message ?? (runtime.status === 'available' ? 'Installed — not tested with these settings' : runtime.configurationHint ?? 'Unavailable')}</span>
+                    {result && <small>{new Date(result.testedAt).toLocaleString()}</small>}
+                  </div>
+                  <button className="secondary" type="button" disabled={networkBusy || runtime.status !== 'available'} onClick={() => testProvider(runtime.id)}>{networkBusy ? 'Testing…' : `Test ${providerName(runtime.id)}`}</button>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="network-actions">
+            <button className="primary" type="button" disabled={networkBusy} onClick={saveNetwork}>{networkBusy ? 'Applying…' : 'Save network settings'}</button>
+          </div>
+        </section>
 
         <div className="connection-grid">
           {IDS.map((id) => {
