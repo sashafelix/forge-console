@@ -49,10 +49,10 @@ async function appendRecoveryEvent(runDirectory: string, runId: string, message:
   await fs.appendFile(eventPath, `${JSON.stringify(event)}\n`, { encoding: 'utf8', mode: 0o600 });
 }
 
-export async function recoverInterruptedAgentRuns(): Promise<number> {
+export async function recoverInterruptedRunsAtRoot(root: string): Promise<number> {
   let entries: string[];
   try {
-    entries = await fs.readdir(runRoot());
+    entries = await fs.readdir(root);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 0;
     throw error;
@@ -60,7 +60,7 @@ export async function recoverInterruptedAgentRuns(): Promise<number> {
 
   let recovered = 0;
   for (const runId of entries.filter((entry) => RUN_ID_PATTERN.test(entry))) {
-    const runDirectory = path.join(runRoot(), runId);
+    const runDirectory = path.join(root, runId);
     const recordPath = path.join(runDirectory, 'run.json');
     let record: AgentExecutionRun;
     try {
@@ -83,4 +83,8 @@ export async function recoverInterruptedAgentRuns(): Promise<number> {
   }
 
   return recovered;
+}
+
+export async function recoverInterruptedAgentRuns(): Promise<number> {
+  return recoverInterruptedRunsAtRoot(runRoot());
 }
