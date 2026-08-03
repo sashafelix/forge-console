@@ -1,6 +1,7 @@
 import { app, BrowserWindow, Menu, type MenuItemConstructorOptions } from 'electron';
 import path from 'node:path';
 import { registerAgentRunHistoryIpcHandlers } from './agent-run-history-ipc';
+import { recoverInterruptedAgentRuns } from './interrupted-run-recovery';
 import { registerIpcHandlers } from './ipc';
 
 let mainWindow: BrowserWindow | null = null;
@@ -101,7 +102,9 @@ function installApplicationMenu(): void {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  const recoveredRuns = await recoverInterruptedAgentRuns();
+  if (recoveredRuns > 0) console.warn(`Recovered ${recoveredRuns} agent run(s) interrupted by a previous app shutdown.`);
   registerIpcHandlers(() => { createConnectionsWindow(); });
   registerAgentRunHistoryIpcHandlers();
   installApplicationMenu();
