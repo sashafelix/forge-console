@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { RuntimeOutputTracker } from '../src/main/runtime-output';
+import { RuntimeOutputTracker, redactRuntimeLine } from '../src/main/runtime-output';
 
 test('Claude stream JSON becomes readable progress messages', () => {
   const tracker = new RuntimeOutputTracker('claude-code');
@@ -80,6 +80,70 @@ test('portable agent-input and agent-result contracts are parsed and hidden from
   assert.equal(tracker.resultSummary(), 'Reviewed NSCNL-17491 and wrote the evidence-backed draft.');
 });
 
+test('nested Copilot JSONL assistant messages capture session and final question', () => {
+  const tracker = new RuntimeOutputTracker('github-copilot');
+
+  const delta = tracker.consume('stdout', JSON.stringify({
+    eventType: 'assistant.message_delta',
+    data: {
+      session_id: '12345678-abcd-4321-9999-123456789abc',
+      message: { role: 'assistant', content: 'Which legal entity owns this' }
+    }
+  }));
+  assert.equal(delta[0]?.message, 'Which legal entity owns this');
+  assert.equal(tracker.pendingInteraction(), undefined);
+
+  const final = tracker.consume('stdout', JSON.stringify({
+    eventType: 'assistant.message',
+    data: {
+      session_id: '12345678-abcd-4321-9999-123456789abc',
+      message: { role: 'assistant', content: 'Which legal entity owns this approval?' }
+    }
+  }));
+
+  assert.equal(final[0]?.message, 'Which legal entity owns this approval?');
+  assert.equal(tracker.sessionId(), '12345678-abcd-4321-9999-123456789abc');
+  assert.deepEqual(tracker.pendingInteraction(), {
+    question: 'Which legal entity owns this approval?',
+    choices: [],
+    allowFreeText: true
+  });
+});
+
+test('nested Copilot tool calls become readable technical progress', () => {
+  const tracker = new RuntimeOutputTracker('github-copilot');
+  const notices = tracker.consume('stdout', JSON.stringify({
+    eventType: 'tool.execution_start',
+    payload: {
+      toolName: 'jira-atc',
+      arguments: { issue: 'FSMNL-4790' }
+    }
+  }));
+
+  assert.match(notices[0]?.message ?? '', /^Using jira-atc/);
+});
+
+test('unknown Copilot events remain visible with sensitive values redacted', () => {
+  const tracker = new RuntimeOutputTracker('github-copilot');
+  const notices = tracker.consume('stdout', JSON.stringify({
+    type: 'enterprise.policy.event',
+    payload: {
+      token: 'super-secret-token-value',
+      status: 'blocked',
+      detail: 'MCP server requires approval'
+    }
+  }));
+
+  assert.match(notices[0]?.message ?? '', /Unparsed Copilot event/);
+  assert.match(notices[0]?.message ?? '', /\[REDACTED\]/);
+  assert.doesNotMatch(notices[0]?.message ?? '', /super-secret-token-value/);
+
+  const raw = redactRuntimeLine(JSON.stringify({ Authorization: 'Bearer abcdefghijklmnop', safe: 'visible' }));
+  assert.match(raw, /\[REDACTED\]/);
+  assert.match(raw, /visible/);
+  assert.doesNotMatch(raw, /abcdefghijklmnop/);
+});
+
 test('Claude result errors become the persisted failure reason', () => {
   const tracker = new RuntimeOutputTracker('claude-code');
   const notices = tracker.consume('stdout', JSON.stringify({
@@ -112,7 +176,7 @@ test('Copilot resume hints are captured from plain output', () => {
   assert.equal(tracker.sessionId(), '12345678-abcd-4321-9999-123456789abc');
 });
 
-test('unknown structured progress is omitted instead of displayed as JSON noise', () => {
+test('unknown Claude structured progress stays hidden', () => {
   const tracker = new RuntimeOutputTracker('claude-code');
   assert.deepEqual(tracker.consume('stdout', JSON.stringify({ type: 'system', subtype: 'heartbeat', internal: true })), []);
 });
