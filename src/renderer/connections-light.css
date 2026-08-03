@@ -17,12 +17,20 @@
 .connections-shell .field select { border-color: #cbd5e3; background: #fff; color: #172033; }
 .connections-shell .field input:focus,
 .connections-shell .field select:focus { border-color: #4f7fbe; box-shadow: 0 0 0 3px rgba(79,127,190,.12); }
+.network-ca-row > button,
+.provider-test button { border: 1px solid #c8d2e3; background: #fff; color: #24334f; }
+.provider-test-grid { border-top-color: #e1e7ef; }
+.provider-test { border-color: #dbe3ee; background: #f8fafc; }
+.provider-test span { color: #65738b; }
+.provider-test span.ok { color: #26704c; }
+.provider-test span.failed { color: #a43b48; }
 .connection-test-state { border-top-color: #e1e7ef; }
 .connection-test-state .ok { color: #26704c; }
 .connection-test-state .failed { color: #a43b48; }
 .connection-actions .secondary { border-color: #c8d2e3; background: #fff; color: #24334f; }
 .connection-actions .danger { border-color: #e1a8b0; background: #fff3f4; color: #9c3442; }
-.connection-actions .primary { border-color: #235a9f; background: #2f6fbd; color: #fff; }
+.connection-actions .primary,
+.network-actions .primary { border-color: #235a9f; background: #2f6fbd; color: #fff; }
 .adapter-warning { border-color: #dfc676; background: #fff8df; color: #795d15; }
 .success-banner { border-color: #9fc8b2; background: #f2fbf5; color: #26704c; }
 .error-banner { border-color: #e1a8b0; background: #fff3f4; color: #9c3442; }
