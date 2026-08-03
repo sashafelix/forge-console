@@ -1,6 +1,9 @@
 export const IPC_CHANNELS = {
   getSystemInfo: 'system:get-info',
   getSettings: 'settings:get',
+  saveNetworkSettings: 'settings:save-network',
+  selectNetworkCaCertificate: 'settings:select-network-ca-certificate',
+  testRuntimeConnection: 'settings:test-runtime-connection',
   listPipelines: 'catalog:list-pipelines',
   installPipelinePack: 'catalog:install-pipeline-pack',
   listRuntimes: 'catalog:list-runtimes',
