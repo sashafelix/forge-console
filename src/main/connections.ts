@@ -31,25 +31,25 @@ interface SecretStore {
 }
 
 const CONNECTION_NAMES: Record<ConnectionId, string> = {
-  'jira-atc': 'Jira ATC',
-  'confluence-atc': 'Confluence ATC',
-  'bmw-llm': 'BMW LLM'
+  jira: 'Jira',
+  confluence: 'Confluence',
+  'self-hosted-llm': 'Self hosted LLM'
 };
 
 const DEFAULT_CONNECTIONS: Record<ConnectionId, ConnectionMetadata> = {
-  'jira-atc': {
-    serviceUrl: 'https://atc.bmwgroup.net/jira',
-    authHeader: 'X-Atlassian-Jira-Personal-Token',
-    authScheme: 'raw',
+  jira: {
+    serviceUrl: '',
+    authHeader: 'Authorization',
+    authScheme: 'bearer',
     lastTestStatus: 'untested'
   },
-  'confluence-atc': {
-    serviceUrl: 'https://atc.bmwgroup.net/confluence',
-    authHeader: 'X-Atlassian-Confluence-Personal-Token',
-    authScheme: 'raw',
+  confluence: {
+    serviceUrl: '',
+    authHeader: 'Authorization',
+    authScheme: 'bearer',
     lastTestStatus: 'untested'
   },
-  'bmw-llm': {
+  'self-hosted-llm': {
     serviceUrl: '',
     model: '',
     authHeader: 'Authorization',
@@ -67,7 +67,7 @@ function secretsPath(): string {
 }
 
 function isConnectionId(value: unknown): value is ConnectionId {
-  return value === 'jira-atc' || value === 'confluence-atc' || value === 'bmw-llm';
+  return value === 'jira' || value === 'confluence' || value === 'self-hosted-llm';
 }
 
 function validateUrl(value: string, label: string): string {
@@ -169,7 +169,7 @@ export async function saveConnection(request: SaveConnectionRequest): Promise<Co
   metadata.connections[request.id] = {
     ...existing,
     serviceUrl: validateUrl(request.serviceUrl, 'Service URL'),
-    model: request.id === 'bmw-llm' ? request.model?.trim() ?? '' : undefined,
+    model: request.id === 'self-hosted-llm' ? request.model?.trim() ?? '' : undefined,
     authHeader: validateHeader(request.authHeader ?? existing.authHeader),
     authScheme: request.authScheme ?? existing.authScheme,
     lastTestedAt: undefined,
@@ -177,7 +177,9 @@ export async function saveConnection(request: SaveConnectionRequest): Promise<Co
     lastTestMessage: undefined
   };
 
-  if (request.id === 'bmw-llm' && !metadata.connections[request.id]?.model) throw new Error('BMW LLM model is required');
+  if (request.id === 'self-hosted-llm' && !metadata.connections[request.id]?.model) {
+    throw new Error('Self hosted LLM model is required');
+  }
 
   await saveMetadata(metadata);
   if (request.secret !== undefined && request.secret.trim()) {
@@ -201,27 +203,9 @@ function authorizationValue(metadata: ConnectionMetadata, secret: string): strin
   return metadata.authScheme === 'bearer' ? `Bearer ${secret}` : secret;
 }
 
-function atcHeaders(id: 'jira-atc' | 'confluence-atc', metadata: ConnectionMetadata, secret: string): Record<string, string> {
-  const targetHeader = id === 'jira-atc' ? 'X-Atlassian-Jira-Url' : 'X-Atlassian-Confluence-Url';
-  return {
-    Accept: 'application/json, text/event-stream',
-    'Content-Type': 'application/json',
-    [metadata.authHeader]: authorizationValue(metadata, secret),
-    [targetHeader]: metadata.serviceUrl
-  };
-}
-
-function mcpInitializeBody(): string {
-  return JSON.stringify({
-    jsonrpc: '2.0',
-    id: 1,
-    method: 'initialize',
-    params: {
-      protocolVersion: '2025-03-26',
-      capabilities: {},
-      clientInfo: { name: 'agent-pipeline-ui', version: app.getVersion() }
-    }
-  });
+function connectionTestUrl(id: ConnectionId, metadata: ConnectionMetadata): string {
+  if (id === 'self-hosted-llm') return `${metadata.serviceUrl.replace(/\/v1$/, '')}/v1/models`;
+  return metadata.serviceUrl;
 }
 
 export async function testConnection(id: ConnectionId): Promise<ConnectionTestResult> {
@@ -237,21 +221,19 @@ export async function testConnection(id: ConnectionId): Promise<ConnectionTestRe
   const testedAt = new Date().toISOString();
   let result: ConnectionTestResult;
   try {
-    const isAtc = id === 'jira-atc' || id === 'confluence-atc';
-    const response = await net.fetch(isAtc ? 'https://atc.bmwgroup.net/mcp' : `${metadata.serviceUrl.replace(/\/v1$/, '')}/v1/models`, {
-      method: isAtc ? 'POST' : 'GET',
-      headers: isAtc
-        ? atcHeaders(id, metadata, secret)
-        : { Accept: 'application/json', [metadata.authHeader]: authorizationValue(metadata, secret) },
-      body: isAtc ? mcpInitializeBody() : undefined,
+    const response = await net.fetch(connectionTestUrl(id, metadata), {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        [metadata.authHeader]: authorizationValue(metadata, secret)
+      },
       signal: controller.signal,
       redirect: 'follow'
     });
     const authenticationRejected = response.status === 401 || response.status === 403;
-    const accepted = response.ok || (isAtc && !authenticationRejected);
     result = {
       id,
-      ok: accepted,
+      ok: response.ok,
       status: response.status,
       testedAt,
       message: response.ok
@@ -259,8 +241,8 @@ export async function testConnection(id: ConnectionId): Promise<ConnectionTestRe
         : authenticationRejected
           ? `Authentication rejected with HTTP ${response.status}`
           : response.status === 429
-            ? 'ATC accepted the request but rate-limited the connection test (HTTP 429)'
-            : `ATC gateway reached and credentials were not rejected (HTTP ${response.status})`
+            ? 'Service reached but rate-limited the connection test (HTTP 429)'
+            : `Service returned HTTP ${response.status}`
     };
   } catch (error) {
     result = { id, ok: false, testedAt, message: error instanceof Error ? error.message : String(error) };
@@ -279,13 +261,13 @@ export async function testConnection(id: ConnectionId): Promise<ConnectionTestRe
 }
 
 const ENVIRONMENT_CONNECTIONS: Record<string, { id: ConnectionId; field: 'secret' | 'serviceUrl' | 'model' }> = {
-  ATC_JIRA_TOKEN: { id: 'jira-atc', field: 'secret' },
-  ATC_JIRA_URL: { id: 'jira-atc', field: 'serviceUrl' },
-  ATC_CONFLUENCE_TOKEN: { id: 'confluence-atc', field: 'secret' },
-  ATC_CONFLUENCE_URL: { id: 'confluence-atc', field: 'serviceUrl' },
-  BMW_LLM_TOKEN: { id: 'bmw-llm', field: 'secret' },
-  BMW_LLM_ENDPOINT: { id: 'bmw-llm', field: 'serviceUrl' },
-  BMW_LLM_MODEL: { id: 'bmw-llm', field: 'model' }
+  JIRA_TOKEN: { id: 'jira', field: 'secret' },
+  JIRA_URL: { id: 'jira', field: 'serviceUrl' },
+  CONFLUENCE_TOKEN: { id: 'confluence', field: 'secret' },
+  CONFLUENCE_URL: { id: 'confluence', field: 'serviceUrl' },
+  SELF_HOSTED_LLM_TOKEN: { id: 'self-hosted-llm', field: 'secret' },
+  SELF_HOSTED_LLM_ENDPOINT: { id: 'self-hosted-llm', field: 'serviceUrl' },
+  SELF_HOSTED_LLM_MODEL: { id: 'self-hosted-llm', field: 'model' }
 };
 
 export async function resolveAgentEnvironment(required: string[]): Promise<{ values: Record<string, string>; missing: string[] }> {
