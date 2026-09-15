@@ -56,7 +56,7 @@ Initial connection profiles:
 
 - Jira ATC
 - Confluence ATC
-- BMW LLM
+- Selfhosted LLM
 
 Tokens are encrypted with Electron `safeStorage`, backed by the operating system credential service. React receives only configured/not-configured metadata; saved secret values are never returned to the renderer.
 
