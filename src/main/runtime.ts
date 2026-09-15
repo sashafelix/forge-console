@@ -126,18 +126,18 @@ export async function discoverRuntimeAdapters(): Promise<RuntimeAdapterDescripto
     });
   }
 
-  const bmw = (await listConnections()).find((connection) => connection.id === 'bmw-llm');
+  const selfHosted = (await listConnections()).find((connection) => connection.id === 'self-hosted-llm');
   discovered.push({
-    id: 'bmw-llm',
-    name: 'BMW LLM',
-    description: 'Controller-mediated HTTP adapter for the internal BMW model gateway.',
+    id: 'self-hosted-llm',
+    name: 'Self hosted LLM',
+    description: 'Controller-mediated HTTP adapter for an OpenAI-compatible self-hosted model endpoint.',
     kind: 'http',
-    status: bmw?.configured ? 'unavailable' : 'unconfigured',
+    status: selfHosted?.configured ? 'unavailable' : 'unconfigured',
     capabilities: ['structured.output', 'mcp.tools'],
     checkedAt: new Date().toISOString(),
-    configurationHint: bmw?.configured
-      ? `Configured for ${bmw.model ?? 'the selected model'}; HTTP execution is not enabled yet.`
-      : 'Configure the internal endpoint, model and credential in Connections.'
+    configurationHint: selfHosted?.configured
+      ? `Configured for ${selfHosted.model ?? 'the selected model'}; HTTP execution is not enabled yet.`
+      : 'Configure the endpoint, model and credential in Connections.'
   });
 
   return discovered;
