@@ -19,7 +19,7 @@ interface ConnectionDraft {
   secret: string;
 }
 
-const IDS: ConnectionId[] = ['jira-atc', 'confluence-atc', 'bmw-llm'];
+const IDS: ConnectionId[] = ['jira', 'confluence', 'self-hosted-llm'];
 const DEFAULT_NETWORK: NetworkSettings = {
   proxyMode: 'inherit',
   httpProxy: '',
@@ -39,13 +39,13 @@ function draftFrom(summary: ConnectionSummary): ConnectionDraft {
 }
 
 function description(id: ConnectionId): string {
-  if (id === 'jira-atc') return 'Used by agents that declare ATC_JIRA_TOKEN or ATC_JIRA_URL.';
-  if (id === 'confluence-atc') return 'Used by agents that declare ATC_CONFLUENCE_TOKEN or ATC_CONFLUENCE_URL.';
-  return 'Internal model endpoint, deployment/model name and authentication settings.';
+  if (id === 'jira') return 'Used by agents that declare JIRA_TOKEN or JIRA_URL.';
+  if (id === 'confluence') return 'Used by agents that declare CONFLUENCE_TOKEN or CONFLUENCE_URL.';
+  return 'OpenAI-compatible self-hosted endpoint, model name and authentication settings.';
 }
 
 function secretLabel(id: ConnectionId): string {
-  return id === 'bmw-llm' ? 'API token' : 'Personal access token';
+  return id === 'self-hosted-llm' ? 'API token' : 'Personal access token';
 }
 
 function proxyModeLabel(mode: NetworkProxyMode): string {
@@ -128,7 +128,7 @@ export function ConnectionsWorkbench() {
     return {
       id,
       serviceUrl: draft.serviceUrl,
-      model: id === 'bmw-llm' ? draft.model : undefined,
+      model: id === 'self-hosted-llm' ? draft.model : undefined,
       authHeader: draft.authHeader,
       authScheme: draft.authScheme,
       secret: draft.secret || undefined
@@ -266,7 +266,7 @@ export function ConnectionsWorkbench() {
               <option value="manual">Use manually configured proxy URLs</option>
               <option value="direct">Connect directly without a proxy</option>
             </select>
-            <small>Use “inherit” when starting the app from a terminal after running your corporate proxy command. Use “system” for macOS or Windows PAC/WPAD settings.</small>
+            <small>Use “inherit” when starting the app from a terminal after configuring proxy variables. Use “system” for macOS or Windows PAC/WPAD settings.</small>
           </label>
 
           {network.proxyMode === 'manual' && (
@@ -284,7 +284,7 @@ export function ConnectionsWorkbench() {
 
           <label className="field">
             <span>NO_PROXY / bypass hosts</span>
-            <input disabled={networkBusy || network.proxyMode === 'direct'} placeholder="localhost,127.0.0.1,.bmwgroup.net" value={network.noProxy} onChange={(event) => setNetwork((current) => ({ ...current, noProxy: event.target.value }))} />
+            <input disabled={networkBusy || network.proxyMode === 'direct'} placeholder="localhost,127.0.0.1,.example.internal" value={network.noProxy} onChange={(event) => setNetwork((current) => ({ ...current, noProxy: event.target.value }))} />
           </label>
 
           <div className="network-ca-row">
@@ -328,7 +328,7 @@ export function ConnectionsWorkbench() {
               <section className="connection-card" key={id}>
                 <div className="connection-heading">
                   <div>
-                    <span className="eyebrow">{id === 'bmw-llm' ? 'MODEL PROVIDER' : 'SERVICE CONNECTION'}</span>
+                    <span className="eyebrow">{id === 'self-hosted-llm' ? 'MODEL PROVIDER' : 'SERVICE CONNECTION'}</span>
                     <h2>{summary.name}</h2>
                     <p>{description(id)}</p>
                   </div>
@@ -342,7 +342,7 @@ export function ConnectionsWorkbench() {
                   <input value={draft.serviceUrl} disabled={busy} onChange={(event) => updateDraft(id, { serviceUrl: event.target.value })} />
                 </label>
 
-                {id === 'bmw-llm' && (
+                {id === 'self-hosted-llm' && (
                   <label className="field">
                     <span>Model / deployment name *</span>
                     <input value={draft.model} disabled={busy} onChange={(event) => updateDraft(id, { model: event.target.value })} />
@@ -374,8 +374,8 @@ export function ConnectionsWorkbench() {
                   {summary.lastTestedAt && <small>{new Date(summary.lastTestedAt).toLocaleString()}</small>}
                 </div>
 
-                {id === 'bmw-llm' && summary.configured && (
-                  <div className="adapter-warning">The BMW endpoint is now configured and testable. Direct BMW LLM agent execution remains disabled until the controller-mediated HTTP tool loop is implemented.</div>
+                {id === 'self-hosted-llm' && summary.configured && (
+                  <div className="adapter-warning">The endpoint is configured and testable. Direct Self hosted LLM agent execution remains disabled until the controller-mediated HTTP execution loop is implemented.</div>
                 )}
 
                 <div className="connection-actions">
