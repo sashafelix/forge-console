@@ -1,82 +1,76 @@
 # Agent Pipeline UI
 
-A private, cross-platform, repository-first workbench for discovering, configuring, running and monitoring standalone agents and multi-agent pipelines with interchangeable AI runtimes.
+A cross-platform, repository-first desktop workbench for discovering, configuring, running and monitoring standalone agents and multi-agent workflows with interchangeable AI runtimes.
 
-The application is deliberately independent of any one pipeline, agent library, model provider or IDE. Workflows are discovered from the repository selected by the operator; target code repositories remain separate when an agent library is reused across projects.
+The application is deliberately independent of any one pipeline, agent library, model provider or IDE. Workflows are discovered from the repository selected by the operator, target code repositories remain separate when required, and privileged actions are surfaced for explicit approval.
 
 ## Current capabilities
 
 - Electron desktop shell for macOS, Windows and Linux
-- repository-native standalone-agent discovery from:
+- task-first guided workbench with an advanced specialist-agent view
+- repository-native agent discovery from:
   - `agents/`
   - `.github/agents/`
   - `.claude/agents/`
-- no workflow list before a repository is selected
 - separate workflow-source and target-code repository selection
-- automatic parsing of agent frontmatter, tools, `${input:...}` placeholders, declared writes and required environment variables
-- isolated Git worktrees for approved writes
+- automatic parsing of agent frontmatter, inputs, tools, declared writes and required environment variables
+- isolated Git worktrees for approved repository changes
 - explicit approval for shell, network, credentials and file-write access
-- runtime discovery and version probing for Claude Code and GitHub Copilot CLI
-- persisted manual executable selection for GUI-launched desktop environments
-- encrypted Jira, Confluence and BMW LLM connection profiles
+- runtime discovery, readiness checks and execution for Claude Code and GitHub Copilot CLI
+- encrypted Jira, Confluence and Self hosted LLM connection profiles
 - per-agent secret injection based only on declared environment-variable requirements
-- BMW LLM endpoint/model/authentication configuration and connection testing
-- local run records, prompts and append-only event logs without secret values
+- configurable proxy, `NO_PROXY` and corporate CA settings
+- local run records, prompts, conversations and append-only event logs without persisted secret values
+- interrupted-run recovery and interactive agent questions
 - post-run `git diff --check`, changed-file collection and rejection of agent-created commits
 - narrow Electron IPC boundary with no arbitrary renderer shell endpoint
 
-## Repository Workbench
+## Guided workbench
 
-The default window begins empty. Choose a repository and the workbench discovers only the agents present in that repository.
+The default screen is task-first. Choose a repository and the workbench discovers the workflows and specialist agents contained in that repository.
 
-A standalone run can use two repositories:
+A run can use two repositories:
 
 1. **Workflow repository** — supplies the selected agent definition.
-2. **Target code repository** — supplies the source code, tests and Git history the agent must inspect.
+2. **Target code repository** — supplies the source code, tests and Git history the agent must inspect or modify.
 
-Typical defect-investigation flow:
+Typical flow:
 
-1. choose the Java Cloud AI Dev Kit as the workflow repository;
-2. select `investigate-defect`;
-3. choose the affected service repository as the target codebase;
-4. enter the Jira ticket key;
+1. choose a repository containing agent definitions;
+2. select a guided workflow or specialist;
+3. choose the target codebase when it differs from the workflow repository;
+4. provide the task or ticket reference;
 5. review requested tools, credentials, writes, shell and network access;
 6. approve the run;
-7. review generated investigation artifacts in the isolated worktree.
+7. review the result and isolated worktree changes.
 
-The app does not copy or modify the workflow repository. It renders the selected instructions, substitutes declared inputs, and executes the runtime with the target worktree as its working directory.
-
-Standalone agents that request shell access are treated as trusted local instructions. A Git worktree limits ordinary repository changes and the controller rejects commits, but shell access is **not** an operating-system sandbox. Only approve agent definitions you trust.
+Agent definitions that request shell access are treated as trusted local instructions. A Git worktree limits ordinary repository changes, but it is **not** an operating-system sandbox. Only approve agent definitions you trust.
 
 ## Connections
 
-Open **Workspaces → Connections**, press `Cmd/Ctrl+,`, or use the **Connections** button in the repository workbench.
+Open **Workspaces → Connections**, press `Cmd/Ctrl+,`, or use the Connections control in the workbench.
 
-Initial connection profiles:
+Available connection profiles:
 
-- Jira ATC
-- Confluence ATC
-- Selfhosted LLM
+- Jira
+- Confluence
+- Self hosted LLM
 
-Tokens are encrypted with Electron `safeStorage`, backed by the operating system credential service. React receives only configured/not-configured metadata; saved secret values are never returned to the renderer.
+Tokens are encrypted with Electron `safeStorage`, backed by the operating-system credential service. The renderer receives only configured/not-configured metadata; saved secret values are never returned to the UI.
 
-When a selected agent declares `ATC_JIRA_TOKEN`, `ATC_CONFLUENCE_TOKEN`, or another supported connection variable, the main process decrypts only that value and injects it into the approved runtime process. Secret values are not written into prompts, repositories, events or `run.json`.
+When an approved agent declares a supported environment variable such as `JIRA_TOKEN`, `CONFLUENCE_TOKEN` or `SELF_HOSTED_LLM_TOKEN`, the main process decrypts only the required value and injects it into that runtime process. Secret values are not written into prompts, repositories, events or `run.json`.
 
-BMW LLM can be configured and connection-tested in version `0.6.0`. Direct BMW LLM agent execution remains deliberately unavailable until the controller-mediated HTTP tool loop is implemented.
+The Self hosted LLM profile supports endpoint, model and authentication configuration plus a `/v1/models` connectivity check. Direct agent execution through the HTTP adapter remains disabled until the controller-mediated HTTP execution loop is implemented.
 
 ## Pipeline packs
 
-Manifest-driven pipeline packs remain supported by the execution backend and may be installed explicitly. They are no longer shown as though they belong to every selected repository.
+Manifest-driven pipeline packs remain supported by the execution backend and may be installed explicitly. A local pack folder contains `pipeline.json` at its root and declares identity, version, inputs, supported runtimes, required capabilities, stages and an optional execution contract.
 
-A local pack folder must contain `pipeline.json` at its root. The manifest declares identity, version, inputs, supported runtimes, required capabilities, stages and an optional execution contract.
-
-Schema `1.1` packs may declare an isolated execution contract. The controller creates a separate Git worktree, requires explicit approval, runs exact controller-owned validation commands, and leaves commit, push, merge and deployment actions manual.
+Schema `1.1` packs may declare an isolated execution contract. The controller creates a separate Git worktree, requires explicit approval, runs controller-owned validation commands and leaves commit, push, merge and deployment actions manual.
 
 ## Runtime setup
 
-The app searches the inherited `PATH` plus common local CLI locations. On macOS this includes Apple Silicon Homebrew, `/usr/local/bin`, `~/.local/bin`, Volta and pnpm locations.
-
-A runtime executable can also be selected explicitly in the UI. The chosen path is stored in the app's per-user settings file; provider credentials are managed separately through the Connections vault or by the provider CLI itself.
+The app searches the inherited `PATH` plus common local CLI locations. A runtime executable can also be selected explicitly in the UI. Provider credentials are managed separately through the Connections vault or by the provider CLI itself.
 
 ## Development
 
@@ -108,12 +102,12 @@ npm run package
 
 The **Package desktop** GitHub Actions workflow builds independent artifacts for macOS Apple Silicon, macOS Intel, Windows x64 and Linux x64.
 
-Run it manually from the Actions tab or push a `v*` tag. The current packages are unsigned development builds, so macOS Gatekeeper and Windows SmartScreen may warn until signing and notarisation are configured.
+Current packages are unsigned development builds, so macOS Gatekeeper and Windows SmartScreen may warn until signing and notarisation are configured.
 
-## Architecture
+## Architecture and security
 
 See [docs/architecture.md](docs/architecture.md), [docs/security.md](docs/security.md), [docs/distribution.md](docs/distribution.md) and [docs/troubleshooting.md](docs/troubleshooting.md).
 
 ## Status
 
-Version `0.6.0` makes the repository the source of truth for workflow discovery and adds encrypted Jira, Confluence and BMW LLM connection profiles. Repository-native multi-agent pipeline discovery, direct BMW LLM execution, controller-mediated shell allowlisting, native clarification prompts and richer artifact review remain incremental milestones.
+Version `0.8.6` provides the task-first repository workbench, secure connection vault, network/proxy configuration, interactive agent runs and recovery of interrupted work. The Self hosted LLM connection is configuration/test-only; controller-mediated HTTP execution, stronger sandboxing and signed distribution remain incremental milestones.

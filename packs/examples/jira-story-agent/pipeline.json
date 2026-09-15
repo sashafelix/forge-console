@@ -8,14 +8,14 @@
     "type": "object",
     "required": ["projectKey", "sourceKey", "storyGoal"],
     "properties": {
-      "projectKey": { "type": "string", "title": "Jira project key", "description": "Target Jira project, for example HOM or VROB." },
+      "projectKey": { "type": "string", "title": "Jira project key", "description": "Target Jira project, for example APP or TEAM." },
       "sourceKey": { "type": "string", "title": "Source epic or feature", "description": "Epic, feature or initiative that supplies context." },
       "storyGoal": { "type": "string", "title": "Story-generation goal", "description": "Explain what stories or refinement outcome is needed.", "multiline": true },
       "publishMode": { "type": "string", "title": "Publish mode", "enum": ["draft-only", "approval-required", "publish-after-review"], "default": "approval-required" }
     }
   },
   "requiredCapabilities": ["jira.read", "structured.output"],
-  "supportedRuntimes": ["claude-code", "github-copilot", "bmw-llm"],
+  "supportedRuntimes": ["claude-code", "github-copilot", "self-hosted-llm"],
   "stages": [
     { "id": "retrieve", "name": "Retrieve", "description": "Load bounded Jira and linked context.", "order": 1, "role": "context_retriever", "requiredCapabilities": ["jira.read"] },
     { "id": "analyze", "name": "Analyze", "description": "Identify requirements, gaps and dependencies.", "order": 2, "role": "requirements_analyst", "requiredCapabilities": ["structured.output"] },

@@ -15,7 +15,7 @@
     }
   },
   "requiredCapabilities": ["repository.read", "repository.write", "command.execute", "git.worktree", "structured.output"],
-  "supportedRuntimes": ["claude-code", "github-copilot", "bmw-llm"],
+  "supportedRuntimes": ["claude-code", "github-copilot", "self-hosted-llm"],
   "stages": [
     { "id": "prepare", "name": "Prepare", "description": "Build repository intelligence and bounded context.", "order": 1, "role": "repository_analyst", "requiredCapabilities": ["repository.read", "command.execute"] },
     { "id": "brainstorm", "name": "Brainstorm", "description": "Convert intent into observable success criteria.", "order": 2, "role": "specifier", "requiredCapabilities": ["repository.read", "structured.output"] },

@@ -101,7 +101,7 @@ function extractInputs(source: string, orchestrator: boolean): AgentInputDefinit
       name: 'task',
       title: orchestrator ? 'Workflow task' : 'Task',
       description: orchestrator
-        ? 'Describe the outcome needed from the complete workflow, for example: Review NSCNL-123456.'
+        ? 'Describe the outcome needed from the complete workflow, for example: Review APP-1234.'
         : 'Describe what this specialist should do.',
       required: true
     });
@@ -123,8 +123,8 @@ function requestedCapabilities(tools: string[], source: string, interactive: boo
   const capabilities = new Set<Capability>(['repository.read', 'structured.output', 'git.worktree']);
   if (['edit', 'create', 'write', 'apply_patch'].some((tool) => normalized.has(tool))) capabilities.add('repository.write');
   if (['bash', 'shell', 'terminal'].some((tool) => normalized.has(tool))) capabilities.add('command.execute');
-  if (/\bjira\b|ATC_JIRA_TOKEN/i.test(source)) capabilities.add('jira.read');
-  if (/\bconfluence\b|ATC_CONFLUENCE_TOKEN/i.test(source)) capabilities.add('confluence.read');
+  if (/\bjira\b|JIRA_TOKEN/i.test(source)) capabilities.add('jira.read');
+  if (/\bconfluence\b|CONFLUENCE_TOKEN/i.test(source)) capabilities.add('confluence.read');
   if (/\bmcp\b/i.test(source)) capabilities.add('mcp.tools');
   if (interactive) capabilities.add('user.input');
   return [...capabilities];
