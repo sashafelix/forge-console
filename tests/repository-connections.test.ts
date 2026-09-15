@@ -73,9 +73,9 @@ test('Connections closes its separate window when returning to the workbench', a
   assert.doesNotMatch(workbench, /window\.history\.back\(\)/);
 });
 
-test('BMW LLM remains non-executable after configuration', async () => {
+test('Self hosted LLM remains non-executable after configuration', async () => {
   const runtime = await source('src/main/runtime.ts');
 
-  assert.match(runtime, /status: bmw\?\.configured \? 'unavailable' : 'unconfigured'/);
+  assert.match(runtime, /status: selfHosted\?\.configured \? 'unavailable' : 'unconfigured'/);
   assert.match(runtime, /HTTP execution is not enabled yet/);
 });
