@@ -21,7 +21,7 @@ Investigate **\${input:ticket}**.
 - \`defects/\${input:ticket}.md\`
 - \`BASELINE-SCAN-REPORT.md\`
 
-Run curl with $ATC_JIRA_TOKEN against https://jira.example.test.
+Run curl with $JIRA_TOKEN against https://jira.example.test.
 `;
 
 const ORCHESTRATOR = `---
@@ -83,7 +83,7 @@ test('discovers agent metadata, inputs, permissions, writes and environment requ
     assert.equal(agent.shellRequested, true);
     assert.equal(agent.networkRequested, true);
     assert.equal(agent.interactive, true);
-    assert.deepEqual(agent.requiredEnvironment, ['ATC_JIRA_TOKEN']);
+    assert.deepEqual(agent.requiredEnvironment, ['JIRA_TOKEN']);
     assert.deepEqual(agent.writes, ['`defects/${input:ticket}.md`', '`BASELINE-SCAN-REPORT.md`']);
   } finally {
     await rm(root, { recursive: true, force: true });
