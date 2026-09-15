@@ -168,7 +168,7 @@ export interface AgentExecutionRequest {
   inputs: Record<string, unknown>;
 }
 
-export type ConnectionId = 'jira-atc' | 'confluence-atc' | 'bmw-llm';
+export type ConnectionId = 'jira' | 'confluence' | 'self-hosted-llm';
 export type ConnectionTestStatus = 'untested' | 'ok' | 'failed';
 
 export interface ConnectionSummary {
