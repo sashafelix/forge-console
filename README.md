@@ -2,9 +2,9 @@
 
 ## AI Dev Pipeline configuration
 
-Use **Pipeline configuration** in the guided workbench to prepare and preview a Local RGR `project-profile.json`. Export is an explicit native save operation and only creates a new file. Project facts are checked in both renderer and main process; commands remain unexecuted text. Validate and explicitly supply the file to [agent-dev-pipeline](https://github.com/sashafelix/agent-dev-pipeline) in your usual coding environment.
+Use **Pipeline configuration** to manage providers, model profiles and role routing, or prepare a Local RGR `project-profile.json`. Models can be discovered or entered manually using OpenAI Responses, OpenAI-compatible Chat Completions, Anthropic Messages or Gemini protocols. The UI provides explicit synthetic capability tests, encrypted credentials, reusable profiles and reviewed secret-free exports.
 
-This integration configures project facts only. It does not launch the RGR orchestrator, translate stages into generic workbench runs, bind profiles, select RGR risk/runtime policy, approve runs or publish changes. Existing workflows for other agents remain available. See [the configuration boundary](docs/pipeline-configuration.md).
+Validate and explicitly supply exported files to [agent-dev-pipeline](https://github.com/sashafelix/agent-dev-pipeline) in your usual coding environment. Execution, stage authority, risk policy and approvals remain owned by the pipeline. HTTP execution adapters are not installed by the configuration screen. See [model configuration](docs/model-configuration.md) and [the configuration boundary](docs/pipeline-configuration.md).
 
 A cross-platform, repository-first desktop workbench for discovering, configuring, running and monitoring standalone agents and multi-agent workflows with interchangeable AI runtimes.
 
@@ -23,6 +23,7 @@ The application is deliberately independent of any one pipeline, agent library, 
 - isolated Git worktrees for approved repository changes
 - explicit approval for shell, network, credentials and file-write access
 - runtime discovery, readiness checks and execution for Claude Code and GitHub Copilot CLI
+- multiple provider/model profiles with capability diagnostics, per-role fallbacks and local-only policy
 - encrypted Jira, Confluence and Self hosted LLM connection profiles
 - per-agent secret injection based only on declared environment-variable requirements
 - configurable proxy, `NO_PROXY` and corporate CA settings
@@ -116,4 +117,4 @@ See [docs/architecture.md](docs/architecture.md), [docs/security.md](docs/securi
 
 ## Status
 
-Version `0.8.6` provides the task-first repository workbench, secure connection vault, network/proxy configuration, interactive agent runs and recovery of interrupted work. The Self hosted LLM connection is configuration/test-only; controller-mediated HTTP execution, stronger sandboxing and signed distribution remain incremental milestones.
+The workbench provides the task-first repository workbench, secure connection vault, network/proxy configuration, interactive agent runs and recovery of interrupted work. The model registry and legacy Self hosted LLM connection are configuration/test-only; controller-mediated HTTP execution, stronger sandboxing and signed distribution remain incremental milestones.

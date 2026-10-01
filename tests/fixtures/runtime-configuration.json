@@ -1,0 +1,171 @@
+{
+  "schema_version": "1.0",
+  "kind": "rgr-runtime-configuration",
+  "profile": {
+    "id": "hybrid",
+    "name": "Hybrid development",
+    "projectId": null,
+    "localOnly": false,
+    "models": [
+      {
+        "id": "local-coder",
+        "name": "Local coding model",
+        "providerId": "homelab",
+        "model": "example-coder",
+        "maxOutputTokens": 4096,
+        "contextWindow": null,
+        "temperature": null,
+        "reasoningEffort": null
+      },
+      {
+        "id": "frontier-reviewer",
+        "name": "Frontier review model",
+        "providerId": "frontier",
+        "model": "example-reviewer",
+        "maxOutputTokens": 4096,
+        "contextWindow": null,
+        "temperature": null,
+        "reasoningEffort": null
+      }
+    ],
+    "routes": [
+      {
+        "role": "orchestrator",
+        "models": [
+          "local-coder",
+          "frontier-reviewer"
+        ]
+      },
+      {
+        "role": "repository_analyst",
+        "models": [
+          "local-coder",
+          "frontier-reviewer"
+        ]
+      },
+      {
+        "role": "specifier",
+        "models": [
+          "local-coder",
+          "frontier-reviewer"
+        ]
+      },
+      {
+        "role": "consistency_analyst",
+        "models": [
+          "local-coder",
+          "frontier-reviewer"
+        ]
+      },
+      {
+        "role": "test_author",
+        "models": [
+          "local-coder",
+          "frontier-reviewer"
+        ]
+      },
+      {
+        "role": "implementer",
+        "models": [
+          "local-coder",
+          "frontier-reviewer"
+        ]
+      },
+      {
+        "role": "refactorer",
+        "models": [
+          "local-coder",
+          "frontier-reviewer"
+        ]
+      },
+      {
+        "role": "independent_verifier",
+        "models": [
+          "frontier-reviewer",
+          "local-coder"
+        ]
+      },
+      {
+        "role": "convergence_reviewer",
+        "models": [
+          "local-coder",
+          "frontier-reviewer"
+        ]
+      },
+      {
+        "role": "risk_reviewer",
+        "models": [
+          "local-coder",
+          "frontier-reviewer"
+        ]
+      },
+      {
+        "role": "threat_modeler",
+        "models": [
+          "local-coder",
+          "frontier-reviewer"
+        ]
+      },
+      {
+        "role": "migration_reviewer",
+        "models": [
+          "local-coder",
+          "frontier-reviewer"
+        ]
+      },
+      {
+        "role": "infrastructure_reviewer",
+        "models": [
+          "local-coder",
+          "frontier-reviewer"
+        ]
+      },
+      {
+        "role": "contract_reviewer",
+        "models": [
+          "local-coder",
+          "frontier-reviewer"
+        ]
+      },
+      {
+        "role": "accessibility_reviewer",
+        "models": [
+          "local-coder",
+          "frontier-reviewer"
+        ]
+      }
+    ]
+  },
+  "providers": [
+    {
+      "id": "homelab",
+      "name": "Homelab Ollama",
+      "protocol": "openai-chat",
+      "baseUrl": "http://localhost:11434/v1",
+      "locality": "local",
+      "auth": {
+        "mode": "none",
+        "header": "Authorization",
+        "credentialRef": null
+      },
+      "allowInsecureHttp": false,
+      "timeoutMs": 30000,
+      "discoveryRetries": 1
+    },
+    {
+      "id": "frontier",
+      "name": "Frontier API",
+      "protocol": "openai-responses",
+      "baseUrl": "https://api.openai.com/v1",
+      "locality": "external",
+      "auth": {
+        "mode": "bearer",
+        "header": "Authorization",
+        "credentialRef": "env:OPENAI_API_KEY"
+      },
+      "allowInsecureHttp": false,
+      "timeoutMs": 30000,
+      "discoveryRetries": 1
+    }
+  ]
+}

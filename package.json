@@ -23,6 +23,8 @@
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@testing-library/dom": "10.4.1",
+    "@testing-library/react": "16.3.3",
     "@types/node": "26.1.1",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
@@ -31,6 +33,7 @@
     "cross-env": "10.1.0",
     "electron": "43.2.0",
     "electron-builder": "26.15.3",
+    "jsdom": "26.1.0",
     "tsx": "4.22.5",
     "typescript": "6.0.3",
     "vite": "8.1.5",
@@ -60,14 +63,23 @@
     "mac": {
       "category": "public.app-category.developer-tools",
       "identity": null,
-      "target": ["dmg", "zip"]
+      "target": [
+        "dmg",
+        "zip"
+      ]
     },
     "win": {
-      "target": ["nsis", "portable"]
+      "target": [
+        "nsis",
+        "portable"
+      ]
     },
     "linux": {
       "category": "Development",
-      "target": ["AppImage", "deb"]
+      "target": [
+        "AppImage",
+        "deb"
+      ]
     }
   }
 }

@@ -6,6 +6,7 @@ import { IPC_CHANNELS } from '../shared/channels';
 import { buildProjectProfile } from '../shared/project-profile';
 import { writeProjectProfile } from './project-profile';
 import { assertWorkbenchExecutionAllowed } from '../shared/pipeline-boundary';
+import { registerProviderIpc } from './provider-ipc';
 import type {
   AgentExecutionRequest,
   AgentLibrarySelection,
@@ -149,6 +150,7 @@ function rendererEmitter(event: Electron.IpcMainInvokeEvent): (runEvent: RunEven
 }
 
 export function registerIpcHandlers(openAgentWorkbench: () => void): void {
+  registerProviderIpc();
   ipcMain.handle(IPC_CHANNELS.exportProjectProfile, async (_event, draft: unknown) => {
     buildProjectProfile(draft); // Revalidate IPC input before displaying a save dialog.
     const result = await dialog.showSaveDialog({

@@ -363,6 +363,16 @@ export interface ReplyToAgentExecutionRequest {
 export type RunEventListener = (event: RunEvent) => void;
 
 export interface DesktopApi {
+  listModelConfiguration(): Promise<import('./providers').ProviderLibraryView>;
+  saveModelProvider(request: import('./providers').SaveProviderRequest): Promise<import('./providers').ProviderLibraryView>;
+  saveModelProfile(request: import('./providers').SaveProfileRequest): Promise<import('./providers').ProviderLibraryView>;
+  removeModelConfiguration(request: { kind: 'provider' | 'profile'; id: string; expectedRevision: number }): Promise<import('./providers').ProviderLibraryView>;
+  discoverProviderModels(providerId: string): Promise<import('./providers').ModelDiscovery>;
+  probeProviderModel(request: import('./providers').ProbeRequest & { operationId: string }): Promise<import('./providers').ProviderLibraryView>;
+  cancelProviderProbe(operationId: string): Promise<boolean>;
+  selectModelConfiguration(): Promise<import('./providers').RuntimeConfiguration | null>;
+  importModelConfiguration(request: { configuration: import('./providers').RuntimeConfiguration; expectedRevision: number }): Promise<import('./providers').ProviderLibraryView>;
+  exportModelConfiguration(request: { profileId: string; expectedRevision: number }): Promise<string | null>;
   exportProjectProfile(draft: import('./project-profile').ProjectProfileDraft): Promise<string | null>;
   getSystemInfo(): Promise<SystemInfo>;
   getSettings(): Promise<AppSettings>;

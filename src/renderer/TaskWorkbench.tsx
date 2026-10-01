@@ -9,7 +9,7 @@ import type {
   RuntimeAdapterDescriptor
 } from '../shared/contracts';
 import { AgentWorkbench } from './AgentWorkbench';
-import { PipelineConfiguration } from './PipelineConfiguration';
+import { ConfigurationWorkbench } from './ConfigurationWorkbench';
 import { isConfigurationOnlyPipeline, RGR_CONFIGURATION_MESSAGE } from '../shared/pipeline-boundary';
 
 const ACTIVE_RUN_STORAGE_KEY = 'agent-pipeline-ui.active-agent-run';
@@ -346,7 +346,7 @@ export function TaskWorkbench() {
     if (refreshed) setRun(refreshed);
   }
 
-  if (configurationMode) return <PipelineConfiguration onBack={() => setConfigurationMode(false)} />;
+  if (configurationMode) return <ConfigurationWorkbench onBack={() => setConfigurationMode(false)} />;
 
   if (advancedMode) {
     return (
