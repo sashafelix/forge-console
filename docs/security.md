@@ -67,3 +67,10 @@ Changing network settings clears cached provider-readiness state. Operators shou
 ## Publication boundary
 
 No current workflow automatically commits, pushes, opens a pull request, edits Jira, writes Confluence, merges or deploys. Those actions require separate capability contracts and explicit operator approval before they should be automated.
+
+
+## Model configuration registry
+
+The separate provider registry supports multiple encrypted credentials, refuses Linux's `basic_text` fallback and returns credential-presence metadata only. Secret values are excluded from renderer drafts, imports, exports and diagnostic messages. Removing a credential drops its active reference; unreferenced encrypted slots are reclaimed on subsequent credential writes. Provider and profile writes are serialized and revision checked. Reviewed exports require the same registry revision.
+
+Imports assign fresh provider identities and never bind an imported endpoint to an existing credential. Probes reject redirects, use bounded responses and timeouts, and send synthetic prompts only. Tool-call tests inspect output without invoking tools. These checks are diagnostics, not trusted capability registrations. See [model configuration](model-configuration.md) for protocol, certificate and execution limitations.

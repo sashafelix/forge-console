@@ -1,19 +1,21 @@
 # AI Dev Pipeline configuration boundary
 
-The first integration with `sashafelix/agent-dev-pipeline` is a file handoff. Keep both repositories independent: the UI prepares project facts, and the pipeline owns execution and governance.
+The first integration with `sashafelix/agent-dev-pipeline` is a file handoff. Keep both repositories independent: the UI prepares project facts and model configuration, and the pipeline owns execution and governance.
 
 | Concern | Owner |
 |---|---|
-| Edit project facts and preview/export JSON | UI configuration form |
+| Edit project facts, model preferences and preview/export JSON | UI configuration forms |
 | Explicitly supply and validate a project profile | Operator and pipeline |
 | Stage order, role authority and risk resolution | Pipeline |
 | Runtime routing and command permissions | Pipeline and its runtime adapter |
 | Checkpoints, independent verification and evidence | Pipeline |
 | Merge/deployment decisions | Existing operator/platform process |
 
-## Current handoff
+See [Models, providers and routing](model-configuration.md) for the separate runtime configuration workflow, including discovery, diagnostic probes, named profiles, local-only policy and trusted pipeline validation. These preferences do not install execution adapters or grant role authority.
 
-1. Open **Pipeline configuration** from the guided workbench.
+## Project-facts handoff
+
+1. Open **Pipeline configuration → Project facts** from the guided workbench.
 2. Enter project identity, stack, architecture references, command descriptions and constraints. Unknown optional facts can remain blank. Credentials belong in the existing connection system, never in project facts.
 3. Preview the generated JSON and confirm the facts have been reviewed.
 4. Export to a new file through the native save dialog. Existing files are never overwritten, including when the OS dialog offers replacement. Use a new filename for a revision.

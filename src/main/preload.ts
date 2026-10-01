@@ -16,6 +16,16 @@ import type {
 // Keep runtime values in this file so the emitted preload has no local module dependency.
 // Type-only imports above are erased by TypeScript.
 const IPC_CHANNELS = {
+  listModelConfiguration: 'models:list',
+  saveModelProvider: 'models:save-provider',
+  saveModelProfile: 'models:save-profile',
+  removeModelConfiguration: 'models:remove',
+  discoverProviderModels: 'models:discover',
+  probeProviderModel: 'models:probe',
+  cancelProviderProbe: 'models:cancel-probe',
+  selectModelConfiguration: 'models:select-import',
+  importModelConfiguration: 'models:import',
+  exportModelConfiguration: 'models:export',
   exportProjectProfile: 'configuration:export-project-profile',
   getSystemInfo: 'system:get-info',
   getSettings: 'settings:get',
@@ -54,6 +64,16 @@ const IPC_CHANNELS = {
 } as const;
 
 const api: DesktopApi = {
+  listModelConfiguration: () => ipcRenderer.invoke(IPC_CHANNELS.listModelConfiguration),
+  saveModelProvider: (request) => ipcRenderer.invoke(IPC_CHANNELS.saveModelProvider, request),
+  saveModelProfile: (request) => ipcRenderer.invoke(IPC_CHANNELS.saveModelProfile, request),
+  removeModelConfiguration: (request) => ipcRenderer.invoke(IPC_CHANNELS.removeModelConfiguration, request),
+  discoverProviderModels: (request) => ipcRenderer.invoke(IPC_CHANNELS.discoverProviderModels, request),
+  probeProviderModel: (request) => ipcRenderer.invoke(IPC_CHANNELS.probeProviderModel, request),
+  cancelProviderProbe: (request) => ipcRenderer.invoke(IPC_CHANNELS.cancelProviderProbe, request),
+  selectModelConfiguration: () => ipcRenderer.invoke(IPC_CHANNELS.selectModelConfiguration),
+  importModelConfiguration: (request) => ipcRenderer.invoke(IPC_CHANNELS.importModelConfiguration, request),
+  exportModelConfiguration: (request) => ipcRenderer.invoke(IPC_CHANNELS.exportModelConfiguration, request),
   exportProjectProfile: (draft) => ipcRenderer.invoke(IPC_CHANNELS.exportProjectProfile, draft),
   getSystemInfo: () => ipcRenderer.invoke(IPC_CHANNELS.getSystemInfo),
   getSettings: () => ipcRenderer.invoke(IPC_CHANNELS.getSettings),
