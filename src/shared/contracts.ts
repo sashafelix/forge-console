@@ -363,6 +363,7 @@ export interface ReplyToAgentExecutionRequest {
 export type RunEventListener = (event: RunEvent) => void;
 
 export interface DesktopApi {
+  exportProjectProfile(draft: import('./project-profile').ProjectProfileDraft): Promise<string | null>;
   getSystemInfo(): Promise<SystemInfo>;
   getSettings(): Promise<AppSettings>;
   saveNetworkSettings(request: SaveNetworkSettingsRequest): Promise<AppSettings>;

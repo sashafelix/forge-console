@@ -1,5 +1,11 @@
 # Agent Pipeline UI
 
+## AI Dev Pipeline configuration
+
+Use **Pipeline configuration** in the guided workbench to prepare and preview a Local RGR `project-profile.json`. Export is an explicit native save operation and only creates a new file. Project facts are checked in both renderer and main process; commands remain unexecuted text. Validate and explicitly supply the file to [agent-dev-pipeline](https://github.com/sashafelix/agent-dev-pipeline) in your usual coding environment.
+
+This integration configures project facts only. It does not launch the RGR orchestrator, translate stages into generic workbench runs, bind profiles, select RGR risk/runtime policy, approve runs or publish changes. Existing workflows for other agents remain available. See [the configuration boundary](docs/pipeline-configuration.md).
+
 A cross-platform, repository-first desktop workbench for discovering, configuring, running and monitoring standalone agents and multi-agent workflows with interchangeable AI runtimes.
 
 The application is deliberately independent of any one pipeline, agent library, model provider or IDE. Workflows are discovered from the repository selected by the operator, target code repositories remain separate when required, and privileged actions are surfaced for explicit approval.

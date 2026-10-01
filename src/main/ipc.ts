@@ -3,6 +3,9 @@ import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { IPC_CHANNELS } from '../shared/channels';
+import { buildProjectProfile } from '../shared/project-profile';
+import { writeProjectProfile } from './project-profile';
+import { assertWorkbenchExecutionAllowed } from '../shared/pipeline-boundary';
 import type {
   AgentExecutionRequest,
   AgentLibrarySelection,
@@ -146,6 +149,16 @@ function rendererEmitter(event: Electron.IpcMainInvokeEvent): (runEvent: RunEven
 }
 
 export function registerIpcHandlers(openAgentWorkbench: () => void): void {
+  ipcMain.handle(IPC_CHANNELS.exportProjectProfile, async (_event, draft: unknown) => {
+    buildProjectProfile(draft); // Revalidate IPC input before displaying a save dialog.
+    const result = await dialog.showSaveDialog({
+      title: 'Export a new project profile', defaultPath: 'project-profile.json',
+      filters: [{ name: 'JSON configuration', extensions: ['json'] }]
+    });
+    if (result.canceled || !result.filePath) return null;
+    await writeProjectProfile(result.filePath, draft);
+    return result.filePath;
+  });
   ipcMain.handle(IPC_CHANNELS.getSystemInfo, (): SystemInfo => ({
     platform: process.platform,
     arch: process.arch,
@@ -186,6 +199,7 @@ export function registerIpcHandlers(openAgentWorkbench: () => void): void {
   ipcMain.handle(IPC_CHANNELS.getPreviewRun, (_event, runId: string) => previewRuns.get(runId));
   ipcMain.handle(IPC_CHANNELS.cancelPreviewRun, (_event, runId: string) => previewRuns.cancel(runId));
   ipcMain.handle(IPC_CHANNELS.prepareExecution, async (event, request: CreateRunDraftRequest) => {
+    assertWorkbenchExecutionAllowed(request.pipelineId);
     const pack = await resolvePipelinePack(request.pipelineId, request.pipelineVersion);
     if (!pack.manifest.supportedRuntimes.includes(request.runtimeId)) throw new Error(`Pipeline ${pack.manifest.id} does not support runtime ${request.runtimeId}`);
     await ensureRuntimeAvailable(request.runtimeId);
@@ -194,6 +208,7 @@ export function registerIpcHandlers(openAgentWorkbench: () => void): void {
   ipcMain.handle(IPC_CHANNELS.approveAndStartExecution, async (event, runId: string) => {
     const record = await executionRuns.get(runId);
     if (!record) throw new Error('Execution run was not found');
+    assertWorkbenchExecutionAllowed(record.pipelineId);
     await ensureRuntimeAvailable(record.runtimeId);
     const pack = await resolvePipelinePack(record.pipelineId, record.pipelineVersion);
     return executionRuns.start(runId, pack, rendererEmitter(event));
@@ -201,6 +216,7 @@ export function registerIpcHandlers(openAgentWorkbench: () => void): void {
   ipcMain.handle(IPC_CHANNELS.getExecutionRun, (_event, runId: string) => executionRuns.get(runId));
   ipcMain.handle(IPC_CHANNELS.cancelExecution, (event, runId: string) => executionRuns.cancel(runId, rendererEmitter(event)));
   ipcMain.handle(IPC_CHANNELS.prepareAgentExecution, async (event, request: AgentExecutionRequest) => {
+    assertWorkbenchExecutionAllowed(request.agentId, request.agentRelativePath);
     await ensureRuntimeAvailable(request.runtimeId);
     await preflightRuntimeSession(request.runtimeId, request.targetProject.path);
     return agentRuns.prepare(request, rendererEmitter(event));
@@ -208,12 +224,14 @@ export function registerIpcHandlers(openAgentWorkbench: () => void): void {
   ipcMain.handle(IPC_CHANNELS.approveAndStartAgentExecution, async (event, runId: string) => {
     const record = await agentRuns.get(runId);
     if (!record) throw new Error('Agent execution was not found');
+    assertWorkbenchExecutionAllowed(record.agentId, record.agentRelativePath);
     await ensureRuntimeAvailable(record.runtimeId);
     return agentRuns.start(runId, rendererEmitter(event));
   });
   ipcMain.handle(IPC_CHANNELS.replyToAgentExecution, async (event, request: ReplyToAgentExecutionRequest) => {
     const record = await agentRuns.get(request.runId);
     if (!record) throw new Error('Agent execution was not found');
+    assertWorkbenchExecutionAllowed(record.agentId, record.agentRelativePath);
     await ensureRuntimeAvailable(record.runtimeId);
     await preflightRuntimeSession(record.runtimeId, record.workingDirectory);
     return agentRuns.reply(request, rendererEmitter(event));
