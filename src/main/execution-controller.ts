@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { constants as fsConstants, promises as fs } from 'node:fs';
 import path from 'node:path';
+import { assertWorkbenchExecutionAllowed } from '../shared/pipeline-boundary';
 import type {
   CreateRunDraftRequest,
   ExecutionRun,
@@ -286,6 +287,7 @@ export class ExecutionController {
     emitToRenderer: (event: RunEvent) => void
   ): Promise<ExecutionRun> {
     const execution = pack.manifest.execution;
+    assertWorkbenchExecutionAllowed(request.pipelineId, pack.manifest.id);
     if (!execution) throw new Error(`Pipeline ${pack.manifest.id} does not declare an execution contract`);
     if (!isProcessRuntimeId(request.runtimeId)) throw new Error(`Runtime ${request.runtimeId} does not support isolated local execution`);
     if (!pack.manifest.supportedRuntimes.includes(request.runtimeId)) {
@@ -370,6 +372,7 @@ export class ExecutionController {
     emitToRenderer: (event: RunEvent) => void
   ): Promise<ExecutionRun> {
     assertRunId(runId);
+    assertWorkbenchExecutionAllowed(pack.manifest.id);
     if (this.active.has(runId)) throw new Error('Execution is already active');
     if (!pack.manifest.execution) throw new Error(`Pipeline ${pack.manifest.id} does not declare an execution contract`);
 

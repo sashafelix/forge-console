@@ -9,6 +9,8 @@ import type {
   RuntimeAdapterDescriptor
 } from '../shared/contracts';
 import { AgentWorkbench } from './AgentWorkbench';
+import { PipelineConfiguration } from './PipelineConfiguration';
+import { isConfigurationOnlyPipeline, RGR_CONFIGURATION_MESSAGE } from '../shared/pipeline-boundary';
 
 const ACTIVE_RUN_STORAGE_KEY = 'agent-pipeline-ui.active-agent-run';
 const ACTIVE_RUN_STATUSES = new Set<AgentExecutionRun['status']>([
@@ -127,6 +129,7 @@ function runHeading(status: AgentExecutionRun['status']): string {
 }
 
 export function TaskWorkbench() {
+  const [configurationMode, setConfigurationMode] = useState(false);
   const [advancedMode, setAdvancedMode] = useState(false);
   const [library, setLibrary] = useState<AgentLibrarySelection | null>(null);
   const [selectedKey, setSelectedKey] = useState('');
@@ -343,6 +346,8 @@ export function TaskWorkbench() {
     if (refreshed) setRun(refreshed);
   }
 
+  if (configurationMode) return <PipelineConfiguration onBack={() => setConfigurationMode(false)} />;
+
   if (advancedMode) {
     return (
       <div className="advanced-workbench-shell">
@@ -359,7 +364,8 @@ export function TaskWorkbench() {
     const value = inputs[input.name];
     return !input.required || String(value ?? '').trim().length > 0;
   }));
-  const canPrepare = Boolean(selected && target?.isGitRepository && selectedRuntime?.status === 'available' && requiredComplete && !active);
+  const configurationOnly = Boolean(selected && isConfigurationOnlyPipeline(selected.id, selected.relativePath));
+  const canPrepare = Boolean(selected && !configurationOnly && target?.isGitRepository && selectedRuntime?.status === 'available' && requiredComplete && !active);
   const canSendReply = Boolean(pendingQuestion && reply.trim() && !busy && (pendingQuestion.allowFreeText || pendingQuestion.choices.includes(reply.trim())));
 
   return (
@@ -371,12 +377,14 @@ export function TaskWorkbench() {
           <p>Choose a workflow, provide the ticket or task, and let the workbench guide the rest.</p>
         </div>
         <div className="task-header-actions">
+          <button type="button" disabled={active} onClick={() => setConfigurationMode(true)}>Pipeline configuration</button>
           <button type="button" onClick={() => { void openConnections(); }}>Connections</button>
           <button type="button" onClick={() => setAdvancedMode(true)}>Advanced</button>
         </div>
       </header>
 
       {error && <div className="task-alert error" role="alert">{error}</div>}
+      {configurationOnly && <div className="task-alert info" role="status">{RGR_CONFIGURATION_MESSAGE}</div>}
       {restoredRun && run && <div className="task-alert info" role="status"><strong>Previous run restored</strong><span>The workbench reconnected to {runDisplayName}. Current status: {run.status.replaceAll('_', ' ')}.</span></div>}
       {friendlyProviderError && <div className="task-alert warning" role="alert"><strong>{friendlyProviderError.title}</strong><span>{friendlyProviderError.message}</span></div>}
 

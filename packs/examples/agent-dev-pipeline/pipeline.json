@@ -2,8 +2,8 @@
   "schemaVersion": "1.0",
   "id": "agent-dev-pipeline",
   "name": "Agent Development Pipeline",
-  "description": "Repository-scoped software delivery through preparation, specification, test-first implementation, independent verification and convergence.",
-  "version": "2.0.0",
+  "description": "Non-executable reference for Local RGR. Configure project facts in Pipeline configuration; execute through the pipeline's own orchestrator.",
+  "version": "2.3.0",
   "inputSchema": {
     "type": "object",
     "required": ["taskId", "task"],
@@ -21,10 +21,10 @@
     { "id": "brainstorm", "name": "Brainstorm", "description": "Convert intent into observable success criteria.", "order": 2, "role": "specifier", "requiredCapabilities": ["repository.read", "structured.output"] },
     { "id": "plan", "name": "Plan", "description": "Create the locked task graph.", "order": 3, "role": "planner", "requiredCapabilities": ["repository.read", "structured.output"] },
     { "id": "analyze", "name": "Analyze", "description": "Detect contradictions and missing coverage.", "order": 4, "role": "consistency_analyst", "requiredCapabilities": ["repository.read", "command.execute"] },
-    { "id": "red", "name": "Red", "description": "Create failing executable evidence.", "order": 5, "role": "test_author", "requiredCapabilities": ["repository.read", "repository.write", "command.execute"] },
-    { "id": "green", "name": "Green", "description": "Implement the minimum authorised change.", "order": 6, "role": "implementer", "requiredCapabilities": ["repository.read", "repository.write", "command.execute"] },
+    { "id": "red_test", "name": "Red", "description": "Create failing executable evidence.", "order": 5, "role": "test_author", "requiredCapabilities": ["repository.read", "repository.write", "command.execute"] },
+    { "id": "green_code", "name": "Green", "description": "Implement the minimum authorised change.", "order": 6, "role": "implementer", "requiredCapabilities": ["repository.read", "repository.write", "command.execute"] },
     { "id": "refactor", "name": "Refactor", "description": "Improve maintainability without behaviour drift.", "order": 7, "role": "refactorer", "requiredCapabilities": ["repository.read", "repository.write", "command.execute"] },
-    { "id": "verify", "name": "Verify", "description": "Independently verify criteria and evidence.", "order": 8, "role": "independent_verifier", "requiredCapabilities": ["repository.read", "command.execute"] },
+    { "id": "quality_gate", "name": "Verify", "description": "Independently verify criteria and evidence.", "order": 8, "role": "independent_verifier", "requiredCapabilities": ["repository.read", "command.execute"] },
     { "id": "converge", "name": "Converge", "description": "Confirm final consistency or request bounded remediation.", "order": 9, "role": "convergence_reviewer", "requiredCapabilities": ["repository.read", "structured.output"] }
   ]
 }

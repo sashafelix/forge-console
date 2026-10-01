@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { assertWorkbenchExecutionAllowed } from '../shared/pipeline-boundary';
 import type {
   AgentConversationMessage,
   AgentExecutionRequest,
@@ -294,10 +295,12 @@ export class AgentExecutionController {
   private readonly active = new Map<string, ActiveAgentExecution>();
 
   async prepare(request: AgentExecutionRequest, emitToRenderer: (event: RunEvent) => void): Promise<AgentExecutionRun> {
+    assertWorkbenchExecutionAllowed(request.agentId, request.agentRelativePath);
     if (!isProcessRuntimeId(request.runtimeId)) throw new Error(`Runtime ${request.runtimeId} does not support local agent execution`);
     if (!request.targetProject?.isGitRepository) throw new Error('A target Git repository is required');
 
     const resolved = await resolveAgentDefinition(request.agentSourceRoot, request.agentRelativePath);
+    assertWorkbenchExecutionAllowed(resolved.definition.id, resolved.definition.relativePath);
     if (resolved.definition.id !== request.agentId) throw new Error('Selected agent no longer matches its source definition');
     if (!resolved.definition.supportedRuntimes.includes(request.runtimeId)) {
       throw new Error(`Agent ${resolved.definition.name} does not support runtime ${request.runtimeId}`);
@@ -491,6 +494,7 @@ export class AgentExecutionController {
     if (this.active.has(runId)) throw new Error('Agent execution is already active');
     const record = await this.get(runId);
     if (!record) throw new Error('Agent execution was not found');
+    assertWorkbenchExecutionAllowed(record.agentId, record.agentRelativePath);
     if (!isProcessRuntimeId(record.runtimeId)) throw new Error(`Runtime ${record.runtimeId} does not support local agent execution`);
     return record;
   }

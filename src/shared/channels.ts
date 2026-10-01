@@ -1,4 +1,5 @@
 export const IPC_CHANNELS = {
+  exportProjectProfile: 'configuration:export-project-profile',
   getSystemInfo: 'system:get-info',
   getSettings: 'settings:get',
   saveNetworkSettings: 'settings:save-network',

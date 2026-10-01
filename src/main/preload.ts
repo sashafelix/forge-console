@@ -16,6 +16,7 @@ import type {
 // Keep runtime values in this file so the emitted preload has no local module dependency.
 // Type-only imports above are erased by TypeScript.
 const IPC_CHANNELS = {
+  exportProjectProfile: 'configuration:export-project-profile',
   getSystemInfo: 'system:get-info',
   getSettings: 'settings:get',
   saveNetworkSettings: 'settings:save-network',
@@ -53,6 +54,7 @@ const IPC_CHANNELS = {
 } as const;
 
 const api: DesktopApi = {
+  exportProjectProfile: (draft) => ipcRenderer.invoke(IPC_CHANNELS.exportProjectProfile, draft),
   getSystemInfo: () => ipcRenderer.invoke(IPC_CHANNELS.getSystemInfo),
   getSettings: () => ipcRenderer.invoke(IPC_CHANNELS.getSettings),
   saveNetworkSettings: (request: SaveNetworkSettingsRequest) => ipcRenderer.invoke(IPC_CHANNELS.saveNetworkSettings, request),
