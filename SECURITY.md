@@ -8,8 +8,8 @@ Agent Pipeline UI is a local developer tool that can execute configured AI runti
 - Electron context isolation is enabled and Node integration is disabled;
 - renderer-to-main communication uses a narrow preload API;
 - the UI cannot submit arbitrary shell strings through IPC;
-- provider commands and arguments are fixed adapter definitions;
-- preview and execution prompts are sent over standard input rather than shell interpolation;
+- provider executables and argument structure are constructed by adapter code, with task content passed as data;
+- Claude Code and manifest/preview prompts use standard input; standalone Copilot prompts use a CLI argument (without shell interpolation), which may be visible to local process inspection;
 - Claude and Copilot permissions are mapped explicitly from the approved run policy;
 - repository writes occur in isolated Git worktrees;
 - the controller rejects agent-created commits and runs `git diff --check` after execution;
@@ -17,14 +17,18 @@ Agent Pipeline UI is a local developer tool that can execute configured AI runti
 - installed packs reject symlinks, unsupported file types and configured size limits;
 - `.git`, dependencies, build output and prior run evidence are excluded from pack copies;
 - connection secrets are encrypted with Electron `safeStorage` and are never returned to the renderer;
-- only credentials explicitly required by an approved agent are injected into that runtime process;
-- saved secret values are excluded from prompts, repositories, run records and persisted events;
+- only declared managed connection values are added for an approved agent; child processes also inherit the launcher environment;
+- the connection layer does not directly write saved values into prompts or run records; runtime-output redaction is best-effort, not a complete secret filter;
 - proxy URLs reject embedded credentials;
 - runtime discovery adds known local binary directories without sourcing interactive shell configuration;
 - the Self hosted LLM adapter is not marked executable until the controller-mediated HTTP execution path exists;
-- no automatic merge, deployment or publication capability exists.
+- the controllers do not automatically merge, deploy or publish; approved shell/MCP tools still carry the access available to their process.
 
 ## Important limitations
+
+- legacy Connections checks `safeStorage.isEncryptionAvailable()` but does not reject Linux `basic_text`; the model registry additionally rejects that fallback;
+- inherited process environment variables are not a general credential allowlist; launch from an appropriately scoped environment;
+- arbitrary runtime output can contain secrets that pattern redaction misses, and legacy preview stdout/stderr is persisted without the standalone run-output sanitizer; review records before sharing;
 
 - a Git worktree is a repository-isolation mechanism, **not** an operating-system sandbox;
 - an approved shell-capable AI process may technically access commands, files and networks available to the current user account;

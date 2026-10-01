@@ -12,6 +12,8 @@ Agent Pipeline UI is a local orchestration workbench. It does not treat an AI ru
 
 ## Pipeline execution
 
+Known Local RGR packs/agents are blocked from execution by the main-process boundary checks. The UI only prepares their project/model configuration; see [the pipeline boundary](pipeline-configuration.md). The following describes other executable packs.
+
 Executable pipeline packs must declare a schema `1.1` execution contract. The controller:
 
 - creates an isolated Git worktree;
@@ -49,12 +51,16 @@ Future hardening should replace broad model shell access with controller-mediate
 Jira, Confluence and Self hosted LLM connection profiles are persisted by the main process.
 
 - connection metadata such as service URL, authentication header and model name is stored separately from secrets;
-- secrets are encrypted with Electron `safeStorage`, backed by the operating-system credential service;
+- legacy connection secrets use Electron `safeStorage` when `isEncryptionAvailable()` succeeds; unlike the model registry, this store does not reject Linux `basic_text`, so do not assume equivalent keyring protection;
 - saved secrets are never returned to the renderer;
-- a runtime receives only values corresponding to environment variables declared by the approved agent;
+- the connection layer adds managed values only for environment variables declared by the approved agent; the process also inherits the launcher environment, so this is not a full environment allowlist;
 - inherited environment variables take precedence only when the same declared variable is already present in the launcher environment;
 - secrets are not written into prompts, repositories, run records or persisted event messages by the connection layer;
 - removing a connection deletes both its metadata and encrypted secret entry.
+
+Standalone run output uses pattern-based redaction, which cannot detect every secret. Legacy preview stdout/stderr is written to events without that sanitizer. Agents, tools and external services may echo sensitive inputs; inspect prompts, conversations and output before sharing run records.
+
+Claude Code and manifest/preview prompts are sent on stdin. Standalone Copilot passes the prompt through `--prompt`/`-p` without shell interpolation; local process inspection may expose those arguments.
 
 The Self hosted LLM connection can be configured and connectivity-tested against an OpenAI-compatible `/v1/models` endpoint. Direct agent execution through that HTTP adapter is intentionally disabled until a controller-mediated execution loop exists.
 
@@ -66,7 +72,7 @@ Changing network settings clears cached provider-readiness state. Operators shou
 
 ## Publication boundary
 
-No current workflow automatically commits, pushes, opens a pull request, edits Jira, writes Confluence, merges or deploys. Those actions require separate capability contracts and explicit operator approval before they should be automated.
+The built-in controllers do not publish agent changes onto the source branch, push, open pull requests, edit Jira, write Confluence, merge or deploy. Worktree preparation does create an ephemeral Git snapshot commit without moving the selected branch or changing its index. This is controller behaviour, not an operating-system restriction on approved shell/MCP tools. Automating these actions requires separate capability contracts and explicit operator approval.
 
 
 ## Model configuration registry

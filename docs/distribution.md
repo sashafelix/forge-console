@@ -45,7 +45,7 @@ npm run package:dir
 
 ## Signing status
 
-Version 0.3 produces unsigned development packages.
+Current packaging produces unsigned development builds. The version is taken from `package.json` (currently `0.8.6`), not from a separate distribution version.
 
 Consequences:
 
@@ -66,4 +66,4 @@ Before public or organisational rollout, add:
 
 Applications launched from Finder often receive a smaller environment than terminal shells. The application therefore searches common Homebrew and user CLI paths and also supports explicit executable selection in the UI.
 
-Runtime credentials remain owned by Claude Code, GitHub Copilot or the future BMW LLM adapter. Agent Pipeline UI stores only a non-secret executable path override.
+Claude Code and GitHub Copilot own their CLI authentication. The UI separately stores a non-secret executable-path override, managed service connections and model-registry credentials; see [the security model](security.md) for their different storage guarantees. Self hosted HTTP configuration and tests do not enable execution.
