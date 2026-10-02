@@ -83,6 +83,8 @@ The app searches the inherited `PATH` plus common local CLI locations. A runtime
 
 ## Development
 
+Keep documentation, UI placeholders and test fixtures generic: use fictional project IDs, ordinary role names and reserved example domains. Do not copy employer-specific names, internal ticket keys, account identifiers or operational data into examples.
+
 Requirements:
 
 - Node.js 22.12 or newer
