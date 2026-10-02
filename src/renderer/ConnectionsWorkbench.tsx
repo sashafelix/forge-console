@@ -273,11 +273,11 @@ export function ConnectionsWorkbench() {
             <div className="network-proxy-grid">
               <label className="field">
                 <span>HTTP proxy</span>
-                <input disabled={networkBusy} placeholder="http://proxy.company.net:8080" value={network.httpProxy} onChange={(event) => setNetwork((current) => ({ ...current, httpProxy: event.target.value }))} />
+                <input disabled={networkBusy} placeholder="http://proxy.example:8080" value={network.httpProxy} onChange={(event) => setNetwork((current) => ({ ...current, httpProxy: event.target.value }))} />
               </label>
               <label className="field">
                 <span>HTTPS proxy</span>
-                <input disabled={networkBusy} placeholder="http://proxy.company.net:8080" value={network.httpsProxy} onChange={(event) => setNetwork((current) => ({ ...current, httpsProxy: event.target.value }))} />
+                <input disabled={networkBusy} placeholder="http://proxy.example:8080" value={network.httpsProxy} onChange={(event) => setNetwork((current) => ({ ...current, httpsProxy: event.target.value }))} />
               </label>
             </div>
           )}

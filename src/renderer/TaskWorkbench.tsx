@@ -426,7 +426,7 @@ export function TaskWorkbench() {
               <p>{friendlyDescription(selected)}</p>
               <div className="task-form">
                 {selected.inputs.map((input) => (
-                  <label key={input.name}><span>{input.title}{input.required ? ' *' : ''}</span><textarea rows={input.name === 'task' ? 4 : 2} disabled={active} placeholder={input.name === 'task' ? 'For example: Review NSCNL-123456 and clarify anything that is incomplete.' : `Enter ${input.title.toLowerCase()}`} value={String(inputs[input.name] ?? '')} onChange={(event) => setInputs((current) => ({ ...current, [input.name]: event.target.value }))} /></label>
+                  <label key={input.name}><span>{input.title}{input.required ? ' *' : ''}</span><textarea rows={input.name === 'task' ? 4 : 2} disabled={active} placeholder={input.name === 'task' ? 'For example: Review APP-1234 and clarify anything that is incomplete.' : `Enter ${input.title.toLowerCase()}`} value={String(inputs[input.name] ?? '')} onChange={(event) => setInputs((current) => ({ ...current, [input.name]: event.target.value }))} /></label>
                 ))}
                 {selected.inputs.length === 0 && <div className="task-alert warning">This workflow has not declared a user input. Open Advanced to inspect its definition.</div>}
               </div>

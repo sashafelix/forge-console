@@ -39,7 +39,7 @@ test('native ask-user tools become a durable interaction request', () => {
           questions: [{
             question: 'Which user role owns this decision?',
             description: 'The story cannot assign ownership without this answer.',
-            options: [{ label: 'Credit analyst' }, { label: 'Dealer' }]
+            options: [{ label: 'Project owner' }, { label: 'Reviewer' }]
           }]
         }
       }]
@@ -51,7 +51,7 @@ test('native ask-user tools become a durable interaction request', () => {
   assert.deepEqual(tracker.pendingInteraction(), {
     question: 'Which user role owns this decision?',
     reason: 'The story cannot assign ownership without this answer.',
-    choices: ['Credit analyst', 'Dealer'],
+    choices: ['Project owner', 'Reviewer'],
     allowFreeText: true
   });
 });
@@ -73,11 +73,11 @@ test('portable agent-input and agent-result contracts are parsed and hidden from
   const resultText = [
     'The review is ready.',
     '```agent-result',
-    '{"summary":"Reviewed NSCNL-17491 and wrote the evidence-backed draft."}',
+    '{"summary":"Reviewed APP-1234 and wrote the evidence-backed draft."}',
     '```'
   ].join('\n');
   tracker.consume('stdout', JSON.stringify({ type: 'result', result: resultText }));
-  assert.equal(tracker.resultSummary(), 'Reviewed NSCNL-17491 and wrote the evidence-backed draft.');
+  assert.equal(tracker.resultSummary(), 'Reviewed APP-1234 and wrote the evidence-backed draft.');
 });
 
 test('nested Copilot JSONL assistant messages capture session and final question', () => {
@@ -87,24 +87,24 @@ test('nested Copilot JSONL assistant messages capture session and final question
     eventType: 'assistant.message_delta',
     data: {
       session_id: '12345678-abcd-4321-9999-123456789abc',
-      message: { role: 'assistant', content: 'Which legal entity owns this' }
+      message: { role: 'assistant', content: 'Which team owns this' }
     }
   }));
-  assert.equal(delta[0]?.message, 'Which legal entity owns this');
+  assert.equal(delta[0]?.message, 'Which team owns this');
   assert.equal(tracker.pendingInteraction(), undefined);
 
   const final = tracker.consume('stdout', JSON.stringify({
     eventType: 'assistant.message',
     data: {
       session_id: '12345678-abcd-4321-9999-123456789abc',
-      message: { role: 'assistant', content: 'Which legal entity owns this approval?' }
+      message: { role: 'assistant', content: 'Which team owns this approval?' }
     }
   }));
 
-  assert.equal(final[0]?.message, 'Which legal entity owns this approval?');
+  assert.equal(final[0]?.message, 'Which team owns this approval?');
   assert.equal(tracker.sessionId(), '12345678-abcd-4321-9999-123456789abc');
   assert.deepEqual(tracker.pendingInteraction(), {
-    question: 'Which legal entity owns this approval?',
+    question: 'Which team owns this approval?',
     choices: [],
     allowFreeText: true
   });
@@ -115,12 +115,12 @@ test('nested Copilot tool calls become readable technical progress', () => {
   const notices = tracker.consume('stdout', JSON.stringify({
     eventType: 'tool.execution_start',
     payload: {
-      toolName: 'jira-atc',
-      arguments: { issue: 'FSMNL-4790' }
+      toolName: 'jira-tool',
+      arguments: { issue: 'APP-5678' }
     }
   }));
 
-  assert.match(notices[0]?.message ?? '', /^Using jira-atc/);
+  assert.match(notices[0]?.message ?? '', /^Using jira-tool/);
 });
 
 test('unknown Copilot events remain visible with sensitive values redacted', () => {
