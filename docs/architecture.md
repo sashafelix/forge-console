@@ -12,6 +12,12 @@ The operator independently selects:
 4. optional service connections and network settings;
 5. the permissions required for the run.
 
+## Pipeline configuration
+
+For `agent-dev-pipeline`, this UI is a configuration companion. It exports reviewed project facts and schema `1.0` runtime configuration; the pipeline performs canonical validation and retains all execution/governance authority. Main-process guards reject recognised RGR pack/agent prepare, start and reply/resume requests, while history and cancellation remain available. See [the boundary](pipeline-configuration.md).
+
+The model registry stores providers and named routing profiles, keeps encrypted credentials in the main process, and performs bounded synthetic diagnostics for four HTTP protocols. Exports and successful tests do not install an HTTP execution adapter or establish trusted pipeline capabilities. See [model configuration](model-configuration.md).
+
 ## Repository-native agents
 
 The workbench discovers Markdown agent definitions from `agents/`, `.github/agents/` and `.claude/agents/`. Agent frontmatter and instructions are parsed into a provider-neutral contract describing inputs, requested tools, declared writes, required environment variables and execution characteristics.
@@ -35,9 +41,9 @@ Process-runtime executable discovery combines the inherited environment with sta
 Jira, Confluence and Self hosted LLM connection profiles are stored by the main process.
 
 - non-secret metadata is persisted as versioned JSON;
-- secrets are encrypted with Electron `safeStorage`, backed by the operating-system credential service;
+- legacy connection secrets use Electron `safeStorage`; its Linux fallback protection differs from the model registry (see [security](security.md));
 - the renderer receives only connection metadata and configured/not-configured state;
-- only environment variables explicitly required by an approved agent are resolved and injected into the runtime process;
+- only declared managed connection variables are added; the runtime process also inherits the launcher environment;
 - network settings support inherited, operating-system, manual and direct proxy modes plus `NO_PROXY` and an optional corporate CA bundle.
 
 ## Execution boundary
@@ -50,7 +56,7 @@ A worktree limits ordinary repository changes but does not sandbox the operating
 
 ## Interactive runs
 
-Interactive agents may request operator input during execution. Conversation state, pending questions and lifecycle events are persisted with the run so an interrupted desktop session can recover recent work.
+Interactive agents may request operator input during execution. Conversation state, pending questions and lifecycle events are persisted with the run. On restart, runs left preparing, running or validating are marked failed with a recovery event and their worktree is preserved. This does not restart an interrupted process. Runs waiting for input retain their pending question and can continue through the supported reply path, subject to the current execution guards.
 
 ## Pipeline packs
 
@@ -71,6 +77,10 @@ src/
 ├── main/
 │   ├── agents.ts                      repository agent discovery
 │   ├── agent-execution-controller.ts  isolated agent-run lifecycle
+│   ├── provider-registry.ts           model profiles, credentials and diagnostic state
+│   ├── provider-ipc.ts                reviewed model exports and main-process probes
+│   ├── agent-runtime.ts               standalone Claude/Copilot invocation
+│   ├── interrupted-run-recovery-core.ts persisted interruption handling
 │   ├── connections.ts                 encrypted service connections
 │   ├── execution-controller.ts        manifest execution lifecycle
 │   ├── ipc.ts                         narrow renderer boundary

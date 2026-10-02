@@ -6,6 +6,8 @@ Use **Pipeline configuration** to manage providers, model profiles and role rout
 
 Validate and explicitly supply exported files to [agent-dev-pipeline](https://github.com/sashafelix/agent-dev-pipeline) in your usual coding environment. Execution, stage authority, risk policy and approvals remain owned by the pipeline. HTTP execution adapters are not installed by the configuration screen. See [model configuration](docs/model-configuration.md) and [the configuration boundary](docs/pipeline-configuration.md).
 
+Known Local RGR packs and agents are configuration-only in this app: the main process rejects prepare, start and reply/resume for recognised identifiers and filenames. Run the pipeline in its own coding environment. The standalone execution capabilities below apply to other agent definitions.
+
 A cross-platform, repository-first desktop workbench for discovering, configuring, running and monitoring standalone agents and multi-agent workflows with interchangeable AI runtimes.
 
 The application is deliberately independent of any one pipeline, agent library, model provider or IDE. Workflows are discovered from the repository selected by the operator, target code repositories remain separate when required, and privileged actions are surfaced for explicit approval.
@@ -25,10 +27,10 @@ The application is deliberately independent of any one pipeline, agent library, 
 - runtime discovery, readiness checks and execution for Claude Code and GitHub Copilot CLI
 - multiple provider/model profiles with capability diagnostics, per-role fallbacks and local-only policy
 - encrypted Jira, Confluence and Self hosted LLM connection profiles
-- per-agent secret injection based only on declared environment-variable requirements
+- managed connection-secret additions based on declared environment-variable requirements; child processes also inherit the launcher environment
 - configurable proxy, `NO_PROXY` and corporate CA settings
-- local run records, prompts, conversations and append-only event logs without persisted secret values
-- interrupted-run recovery and interactive agent questions
+- local run records, prompts, conversations and append-only event logs; output redaction is best-effort and records need review before sharing
+- recovery of interrupted-run records/worktrees and interactive agent questions; interrupted active processes are marked failed, not automatically restarted
 - post-run `git diff --check`, changed-file collection and rejection of agent-created commits
 - narrow Electron IPC boundary with no arbitrary renderer shell endpoint
 
@@ -63,9 +65,9 @@ Available connection profiles:
 - Confluence
 - Self hosted LLM
 
-Tokens are encrypted with Electron `safeStorage`, backed by the operating-system credential service. The renderer receives only configured/not-configured metadata; saved secret values are never returned to the UI.
+Connection tokens are encrypted with Electron `safeStorage` when encryption is available. This legacy connection store does not reject Linux’s `basic_text` backend; the separate model registry does. See [security limitations](docs/security.md). The renderer receives only configured/not-configured metadata; saved secret values are never returned to the UI.
 
-When an approved agent declares a supported environment variable such as `JIRA_TOKEN`, `CONFLUENCE_TOKEN` or `SELF_HOSTED_LLM_TOKEN`, the main process decrypts only the required value and injects it into that runtime process. Secret values are not written into prompts, repositories, events or `run.json`.
+When an approved agent declares a supported environment variable such as `JIRA_TOKEN`, `CONFLUENCE_TOKEN` or `SELF_HOSTED_LLM_TOKEN`, the main process decrypts only the required value and injects it into that runtime process. The connection layer does not directly add saved values to prompts or run records. The child still inherits the launcher environment, and runtime output may echo sensitive data; this is not a guarantee that persisted records are secret-free.
 
 The Self hosted LLM profile supports endpoint, model and authentication configuration plus a `/v1/models` connectivity check. Direct agent execution through the HTTP adapter remains disabled until the controller-mediated HTTP execution loop is implemented.
 
@@ -77,7 +79,7 @@ Schema `1.1` packs may declare an isolated execution contract. The controller cr
 
 ## Runtime setup
 
-The app searches the inherited `PATH` plus common local CLI locations. A runtime executable can also be selected explicitly in the UI. Provider credentials are managed separately through the Connections vault or by the provider CLI itself.
+The app searches the inherited `PATH` plus common local CLI locations. A runtime executable can also be selected explicitly in the UI. Install Git and the selected Claude Code or GitHub Copilot CLI separately, authenticate that CLI and confirm it works against the selected repository. Provider login belongs to that CLI; the Connections vault supplies declared service variables. HTTP provider credentials belong to the separate model registry. Copilot custom-agent execution requires an agent under `.github/agents/` or `.claude/agents/`; discovery under `agents/` alone does not make it runnable by Copilot.
 
 ## Development
 
