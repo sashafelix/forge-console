@@ -30,7 +30,7 @@ export function PipelineConfiguration({ onBack }: { onBack: () => void }) {
   }
   return <div className="task-shell pipeline-configuration">
     <header className="task-header">
-      <div><span className="task-kicker">AI DEV PIPELINE · CONFIGURATION</span>
+      <div><span className="task-kicker">FORGE · CONFIGURATION</span>
         <h1>Prepare your project profile</h1>
         <p>Describe your project, review the file, then supply it to the pipeline in your usual coding environment.</p>
       </div>
@@ -65,7 +65,7 @@ export function PipelineConfiguration({ onBack }: { onBack: () => void }) {
         </section>
       </form>
       <section className="configuration-review"><h2>Use it with the pipeline</h2>
-        <p>From your agent-dev-pipeline checkout, validate the exported file:</p>
+        <p>From your Forge checkout, validate the exported file:</p>
         <pre>python3 scripts/validate-project-profile.py /path/to/project-profile.json</pre>
         <p>Then explicitly supply the reviewed file to the pipeline orchestrator. A provenance label in a file alone does not establish trust. The pipeline checks it against repository evidence and retains its own governance.</p>
       </section>

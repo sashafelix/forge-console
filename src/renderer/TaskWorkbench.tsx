@@ -372,7 +372,7 @@ export function TaskWorkbench() {
     <div className="task-shell">
       <header className="task-header">
         <div>
-          <span className="task-kicker">QUALITY WORKBENCH</span>
+          <span className="task-kicker">FORGE CONSOLE · QUALITY WORKBENCH</span>
           <h1>What would you like help with?</h1>
           <p>Choose a workflow, provide the ticket or task, and let the workbench guide the rest.</p>
         </div>

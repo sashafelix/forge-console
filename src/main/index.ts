@@ -1,8 +1,15 @@
 import { app, BrowserWindow, Menu, type MenuItemConstructorOptions } from 'electron';
 import path from 'node:path';
+import { mkdirSync } from 'node:fs';
 import { terminateAllAgentProcesses } from './agent-processes';
 import { recoverInterruptedAgentRuns } from './interrupted-run-recovery';
 import { registerIpcHandlers } from './ipc';
+
+// Keep existing settings, credentials and run history across the product rename.
+const userDataDirectory = path.join(app.getPath('appData'), app.isPackaged ? 'Agent Pipeline UI' : 'agent-pipeline-ui');
+mkdirSync(userDataDirectory, { recursive: true });
+app.setPath('userData', userDataDirectory);
+app.setName('Forge Console');
 
 let mainWindow: BrowserWindow | null = null;
 let connectionsWindow: BrowserWindow | null = null;
@@ -46,7 +53,7 @@ function createMainWindow(): BrowserWindow {
     mainWindow.focus();
     return mainWindow;
   }
-  mainWindow = new BrowserWindow(windowOptions('Agent Pipeline UI — Quality Workbench'));
+  mainWindow = new BrowserWindow(windowOptions('Forge Console — Quality Workbench'));
   loadRenderer(mainWindow, 'index.html');
   mainWindow.on('closed', () => { mainWindow = null; });
   return mainWindow;
@@ -57,7 +64,7 @@ function createConnectionsWindow(): BrowserWindow {
     connectionsWindow.focus();
     return connectionsWindow;
   }
-  connectionsWindow = new BrowserWindow(windowOptions('Agent Pipeline UI — Connections'));
+  connectionsWindow = new BrowserWindow(windowOptions('Forge Console — Connections'));
   loadRenderer(connectionsWindow, 'connections.html');
   connectionsWindow.on('closed', () => { connectionsWindow = null; });
   return connectionsWindow;

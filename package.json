@@ -2,7 +2,7 @@
   "name": "agent-pipeline-ui",
   "version": "0.8.6",
   "private": true,
-  "description": "Cross-platform, task-first quality workbench for repository agents and pipelines",
+  "description": "Forge Console: cross-platform configuration companion and quality workbench for repository agents",
   "main": "dist/electron/main/index.js",
   "scripts": {
     "clean": "node -e \"const fs=require('node:fs'); for (const p of ['dist','release']) fs.rmSync(p,{recursive:true,force:true})\"",
@@ -44,7 +44,7 @@
   },
   "build": {
     "appId": "com.frankhaughton.agentpipelineui",
-    "productName": "Agent Pipeline UI",
+    "productName": "Forge Console",
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "asar": true,
     "directories": {

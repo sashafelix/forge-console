@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0",
   "id": "agent-dev-pipeline",
-  "name": "Agent Development Pipeline",
+  "name": "Forge",
   "description": "Non-executable reference for Local RGR. Configure project facts in Pipeline configuration; execute through the pipeline's own orchestrator.",
   "version": "2.3.0",
   "inputSchema": {

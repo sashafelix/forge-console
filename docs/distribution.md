@@ -2,7 +2,7 @@
 
 ## Supported development packages
 
-Agent Pipeline UI is built from one Electron/React/TypeScript codebase and packaged independently on the target operating system.
+Forge Console is built from one Electron/React/TypeScript codebase and packaged independently on the target operating system.
 
 | Platform | Architecture | GitHub runner | Outputs |
 | --- | --- | --- | --- |
@@ -12,6 +12,10 @@ Agent Pipeline UI is built from one Electron/React/TypeScript codebase and packa
 | Linux | x64 | `ubuntu-latest` | AppImage and DEB |
 
 Building on target operating systems avoids relying on unsupported cross-platform native packaging assumptions.
+
+## Forge Console naming and existing data
+
+Desktop windows, application menus and package filenames use **Forge Console**. The application ID remains `com.frankhaughton.agentpipelineui`. Existing data stays in the legacy `Agent Pipeline UI` directory for packaged builds and `agent-pipeline-ui` for development, preserving settings, encrypted credentials, installed packs and run history. Renderer draft keys and pack/agent identifiers also remain compatible. The source repository is [forge-console](https://github.com/sashafelix/forge-console).
 
 ## Producing artifacts
 

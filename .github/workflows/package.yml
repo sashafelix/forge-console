@@ -53,7 +53,7 @@ jobs:
       - name: Upload package artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: agent-pipeline-ui-${{ matrix.artifact }}
+          name: forge-console-${{ matrix.artifact }}
           path: release/*
           if-no-files-found: error
           retention-days: 14

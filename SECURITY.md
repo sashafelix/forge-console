@@ -1,6 +1,6 @@
 # Security
 
-Agent Pipeline UI is a local developer tool that can execute configured AI runtimes against selected projects. Security boundaries are therefore part of the product contract.
+Forge Console is a local developer tool that can execute configured AI runtimes against selected projects. Security boundaries are therefore part of the product contract.
 
 ## Current guarantees
 

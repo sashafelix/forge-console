@@ -1,6 +1,6 @@
-# AI Dev Pipeline configuration boundary
+# Forge configuration boundary
 
-The first integration with `sashafelix/agent-dev-pipeline` is a file handoff. Keep both repositories independent: the UI prepares project facts and model configuration, and the pipeline owns execution and governance.
+The first integration with [Forge](https://github.com/sashafelix/forge) is a file handoff. Keep both repositories independent: the UI prepares project facts and model configuration, and the pipeline owns execution and governance.
 
 | Concern | Owner |
 |---|---|
@@ -25,7 +25,7 @@ The export matches project-profile schema `1.0` from Local RGR `2.3.0` (upstream
 
 Validation in the UI checks its bounded form input and emits a fixed contract shape. The pipeline's schema/authority validator remains canonical. A `provenance.source` label is an assertion, not authentication; only an independently supplied operator/platform file may be bound as trusted. Repository-discovered files cannot promote themselves. Export does not bind a run, execute commands, test a runtime, resolve a risk profile or approve anything.
 
-The bundled pipeline manifest is a non-executable reference/preview of the nine stages. It has no execution contract and is not the pipeline engine. The main-process controllers also reject known RGR pack/agent identifiers and filenames on prepare, start and reply/resume, including previously prepared records. History and cancellation remain available. Other agents retain their existing workflow. This guard prevents accidental launch of recognised RGR definitions; it is not a sandbox for renamed or arbitrary agent content.
+The bundled pipeline manifest is a non-executable reference/preview of the nine stages. It has no execution contract and is not the pipeline engine. The main-process controllers also reject known Forge and legacy RGR pack/agent identifiers and filenames on prepare, start and reply/resume, including previously prepared records. History and cancellation remain available. Other agents retain their existing workflow. This guard prevents accidental launch of recognised RGR definitions; it is not a sandbox for renamed or arbitrary agent content.
 
 ## Future execution integration
 

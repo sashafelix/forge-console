@@ -2,7 +2,7 @@
 
 ## Product boundary
 
-Agent Pipeline UI is a local, single-user desktop workbench. It is not itself a pipeline and it is not tied to one model provider, IDE or agent repository.
+Forge Console is a local, single-user desktop workbench. It is not itself a pipeline and it is not tied to one model provider, IDE or agent repository.
 
 The operator independently selects:
 
@@ -14,7 +14,7 @@ The operator independently selects:
 
 ## Pipeline configuration
 
-For `agent-dev-pipeline`, this UI is a configuration companion. It exports reviewed project facts and schema `1.0` runtime configuration; the pipeline performs canonical validation and retains all execution/governance authority. Main-process guards reject recognised RGR pack/agent prepare, start and reply/resume requests, while history and cancellation remain available. See [the boundary](pipeline-configuration.md).
+For Forge, this UI is a configuration companion. It exports reviewed project facts and schema `1.0` runtime configuration; the pipeline performs canonical validation and retains all execution/governance authority. Main-process guards reject recognised RGR pack/agent prepare, start and reply/resume requests, while history and cancellation remain available. See [the boundary](pipeline-configuration.md).
 
 The model registry stores providers and named routing profiles, keeps encrypted credentials in the main process, and performs bounded synthetic diagnostics for four HTTP protocols. Exports and successful tests do not install an HTTP execution adapter or establish trusted pipeline capabilities. See [model configuration](model-configuration.md).
 

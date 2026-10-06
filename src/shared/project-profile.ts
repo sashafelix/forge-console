@@ -1,4 +1,4 @@
-/** Project facts only, compatible with agent-dev-pipeline 2.3 / profile schema 1.0. */
+/** Project facts only, compatible with Forge / Local RGR 2.3 / profile schema 1.0. */
 export const PROFILE_FIELDS = {
   projectId: 'Project ID', profileVersion: 'Profile version', issuedBy: 'Prepared by',
   root: 'Project root', stack: 'Languages / stack (one per line)', frameworks: 'Frameworks (one per line)',
