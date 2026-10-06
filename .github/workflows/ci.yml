@@ -18,6 +18,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Install dependencies
         run: npm install
       - name: Typecheck
@@ -26,5 +29,16 @@ jobs:
         run: npm test
       - name: Build
         run: npm run build
+      - name: Install UI browser
+        run: npx playwright install --with-deps chromium
+      - name: Browser UI smoke and screenshots
+        run: npm run test:ui
+      - name: Upload UI screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-cockpit-ui
+          path: test-artifacts/ui/
+          if-no-files-found: error
       - name: Package smoke test
         run: npx electron-builder --linux --x64 --dir --publish never

@@ -1,5 +1,7 @@
 import { app, BrowserWindow, Menu, type MenuItemConstructorOptions } from 'electron';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { registerTrustedSender } from './trusted-senders';
 import { terminateAllAgentProcesses } from './agent-processes';
 import { recoverInterruptedAgentRuns } from './interrupted-run-recovery';
 import { registerIpcHandlers } from './ipc';
@@ -33,6 +35,15 @@ function windowOptions(title: string): Electron.BrowserWindowConstructorOptions 
 
 function loadRenderer(window: BrowserWindow, page: 'index.html' | 'connections.html'): void {
   const developmentUrl = process.env.VITE_DEV_SERVER_URL;
+  const target = developmentUrl
+    ? new URL(page, developmentUrl.endsWith('/') ? developmentUrl : `${developmentUrl}/`).toString()
+    : pathToFileURL(path.join(__dirname, '..', '..', 'renderer', page)).toString();
+  const unregister = registerTrustedSender(window.webContents.id, [target]);
+  window.once('closed', unregister);
+  window.webContents.on('will-navigate', (event, url) => { const parsed = new URL(url); parsed.hash = ''; if (parsed.toString() !== target) event.preventDefault(); });
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  window.webContents.on('will-attach-webview', (event) => event.preventDefault());
+  window.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
   if (developmentUrl) {
     void window.loadURL(new URL(page, developmentUrl.endsWith('/') ? developmentUrl : `${developmentUrl}/`).toString());
     if (process.env.OPEN_DEVTOOLS === '1') window.webContents.openDevTools({ mode: 'detach' });

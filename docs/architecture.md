@@ -14,7 +14,7 @@ The operator independently selects:
 
 ## Pipeline configuration
 
-For Forge, this UI is a configuration companion. It exports reviewed project facts and schema `1.0` runtime configuration; the pipeline performs canonical validation and retains all execution/governance authority. Main-process guards reject recognised RGR pack/agent prepare, start and reply/resume requests, while history and cancellation remain available. See [the boundary](pipeline-configuration.md).
+For Forge, the UI exports reviewed project/model facts and provides a separate governed-host cockpit. Native host registration pins code/Python; operator inputs are hashed and copied privately per run. The bridge consumes host state and cursor events and sends only currently available actions with exact approval bindings. Read-only imports have no execution handle. Generic controllers retain their recognised-RGR guards. See [the boundary](pipeline-configuration.md) and [cockpit](cockpit.md).
 
 The model registry stores providers and named routing profiles, keeps encrypted credentials in the main process, and performs bounded synthetic diagnostics for four HTTP protocols. Exports and successful tests do not install an HTTP execution adapter or establish trusted pipeline capabilities. See [model configuration](model-configuration.md).
 
@@ -41,9 +41,9 @@ Process-runtime executable discovery combines the inherited environment with sta
 Jira, Confluence and Self hosted LLM connection profiles are stored by the main process.
 
 - non-secret metadata is persisted as versioned JSON;
-- legacy connection secrets use Electron `safeStorage`; its Linux fallback protection differs from the model registry (see [security](security.md));
+- both credential stores require a secure Electron `safeStorage` backend (see [security](security.md));
 - the renderer receives only connection metadata and configured/not-configured state;
-- only declared managed connection variables are added; the runtime process also inherits the launcher environment;
+- child environments contain platform/network essentials, selected CLI authentication and explicitly approved required variables;
 - network settings support inherited, operating-system, manual and direct proxy modes plus `NO_PROXY` and an optional corporate CA bundle.
 
 ## Execution boundary

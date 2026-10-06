@@ -1,9 +1,13 @@
-import { app, dialog, ipcMain, shell } from 'electron';
+import { app, dialog, shell } from 'electron';
+import { guardedIpcMain as ipcMain } from './secure-ipc';
 import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { IPC_CHANNELS } from '../shared/channels';
-import { buildProjectProfile } from '../shared/project-profile';
+import { buildProjectProfile, importProjectProfile } from '../shared/project-profile';
+import { readBoundedJson } from './provider-registry';
+import { registerForgeIpc } from './forge-ipc';
+import { approvedOpenDirectory } from './path-scope';
 import { writeProjectProfile } from './project-profile';
 import { assertWorkbenchExecutionAllowed } from '../shared/pipeline-boundary';
 import { registerProviderIpc } from './provider-ipc';
@@ -37,6 +41,7 @@ import { clearRuntimeExecutableOverride, loadSettings, setNetworkSettings, setRu
 const previewRuns = new PreviewRunController();
 const executionRuns = new ExecutionController();
 const agentRuns = new AgentExecutionController();
+const approvedProjects = new Set<string>();
 
 async function describeDirectory(selectedPath: string): Promise<ProjectSelection> {
   const realPath = await fs.realpath(path.resolve(selectedPath));
@@ -53,7 +58,9 @@ async function describeDirectory(selectedPath: string): Promise<ProjectSelection
 async function selectProjectDirectory(): Promise<ProjectSelection | null> {
   const result = await dialog.showOpenDialog({ title: 'Choose a local project repository', properties: ['openDirectory', 'createDirectory'] });
   if (result.canceled || result.filePaths.length === 0) return null;
-  return describeDirectory(result.filePaths[0]);
+  const project = await describeDirectory(result.filePaths[0]);
+  approvedProjects.add(project.path);
+  return project;
 }
 
 async function selectAgentLibrary(): Promise<AgentLibrarySelection | null> {
@@ -63,6 +70,7 @@ async function selectAgentLibrary(): Promise<AgentLibrarySelection | null> {
   });
   if (result.canceled || result.filePaths.length === 0) return null;
   const source = await describeDirectory(result.filePaths[0]);
+  approvedProjects.add(source.path);
   const agents = await discoverAgents(source.path);
   if (agents.length === 0) {
     throw new Error('No agents were found under agents/, .github/agents/, or .claude/agents/.');
@@ -151,6 +159,12 @@ function rendererEmitter(event: Electron.IpcMainInvokeEvent): (runEvent: RunEven
 
 export function registerIpcHandlers(openAgentWorkbench: () => void): void {
   registerProviderIpc();
+  registerForgeIpc(approvedProjects);
+  ipcMain.handle(IPC_CHANNELS.selectProjectProfile, async () => {
+    const selected = await dialog.showOpenDialog({ title: 'Import project facts, modules and decisions', properties: ['openFile'], filters: [{ name: 'Project profile', extensions: ['json'] }] });
+    if (selected.canceled || !selected.filePaths[0]) return null;
+    return importProjectProfile(await readBoundedJson(selected.filePaths[0]));
+  });
   ipcMain.handle(IPC_CHANNELS.exportProjectProfile, async (_event, draft: unknown) => {
     buildProjectProfile(draft); // Revalidate IPC input before displaying a save dialog.
     const result = await dialog.showSaveDialog({
@@ -243,5 +257,5 @@ export function registerIpcHandlers(openAgentWorkbench: () => void): void {
   ipcMain.handle(IPC_CHANNELS.getAgentExecutionEvents, (_event, runId: string) => agentRuns.getEvents(runId));
   ipcMain.handle(IPC_CHANNELS.cancelAgentExecution, (event, runId: string) => agentRuns.cancel(runId, rendererEmitter(event)));
   ipcMain.handle(IPC_CHANNELS.openAgentWorkbench, () => openAgentWorkbench());
-  ipcMain.handle(IPC_CHANNELS.openPath, async (_event, targetPath: string) => shell.openPath(path.resolve(targetPath)));
+  ipcMain.handle(IPC_CHANNELS.openPath, async (_event, targetPath: string) => shell.openPath(await approvedOpenDirectory(targetPath, [...approvedProjects, app.getPath('userData')])));
 }

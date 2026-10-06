@@ -2,6 +2,12 @@ name: Package desktop
 
 on:
   workflow_dispatch:
+    inputs:
+      sign_artifacts:
+        description: 'Sign macOS/Windows and notarize macOS using configured repository secrets'
+        type: boolean
+        required: true
+        default: false
   push:
     tags:
       - 'v*'
@@ -19,18 +25,22 @@ jobs:
           - name: macOS Apple Silicon
             os: macos-15
             command: npx electron-builder --mac --arm64 --publish never
+            signed_command: npx electron-builder --mac --arm64 --publish never --config.forceCodeSigning=true --config.mac.notarize=true
             artifact: macos-arm64
           - name: macOS Intel
             os: macos-15-intel
             command: npx electron-builder --mac --x64 --publish never
+            signed_command: npx electron-builder --mac --x64 --publish never --config.forceCodeSigning=true --config.mac.notarize=true
             artifact: macos-x64
           - name: Windows x64
             os: windows-latest
             command: npx electron-builder --win --x64 --publish never
+            signed_command: npx electron-builder --win --x64 --publish never --config.forceCodeSigning=true
             artifact: windows-x64
           - name: Linux x64
             os: ubuntu-latest
             command: npx electron-builder --linux --x64 --publish never
+            signed_command: npx electron-builder --linux --x64 --publish never
             artifact: linux-x64
     runs-on: ${{ matrix.os }}
     env:
@@ -40,6 +50,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Install dependencies
         run: npm install
       - name: Typecheck
@@ -49,7 +62,41 @@ jobs:
       - name: Build application
         run: npm run build
       - name: Package desktop application
+        if: ${{ !inputs.sign_artifacts }}
         run: ${{ matrix.command }}
+      - name: Sign and package desktop application
+        if: ${{ inputs.sign_artifacts }}
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'true'
+          CSC_LINK: ${{ runner.os == 'macOS' && secrets.MAC_CSC_LINK || runner.os == 'Windows' && secrets.WIN_CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ runner.os == 'macOS' && secrets.MAC_CSC_KEY_PASSWORD || runner.os == 'Windows' && secrets.WIN_CSC_KEY_PASSWORD || '' }}
+          APPLE_ID: ${{ runner.os == 'macOS' && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ runner.os == 'macOS' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ runner.os == 'macOS' && secrets.APPLE_TEAM_ID || '' }}
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" != "Linux" ] && [ -z "$CSC_LINK" ]; then
+            echo 'Signing was requested but the platform certificate is not configured.' >&2
+            exit 1
+          fi
+          if [ "$RUNNER_OS" = "macOS" ] && { [ -z "$APPLE_ID" ] || [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] || [ -z "$APPLE_TEAM_ID" ]; }; then
+            echo 'macOS notarization credentials are required for a signed build.' >&2
+            exit 1
+          fi
+          ${{ matrix.signed_command }}
+      - name: Record package checksums and source revision
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, subprocess
+          root = Path('release')
+          suffixes = {'.dmg', '.zip', '.exe', '.AppImage', '.deb'}
+          files = sorted(p for p in root.iterdir() if p.is_file() and p.suffix in suffixes)
+          if not files: raise SystemExit('No desktop packages found')
+          (root / 'SHA256SUMS').write_text(''.join(hashlib.sha256(p.read_bytes()).hexdigest() + '  ' + p.name + '\n' for p in files))
+          (root / 'SOURCE_REVISION').write_text(subprocess.check_output(['git','rev-parse','HEAD'], text=True))
+          PY
       - name: Upload package artifacts
         uses: actions/upload-artifact@v4
         with:

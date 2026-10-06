@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { childEnvironment } from './child-environment';
 import { assertWorkbenchExecutionAllowed } from '../shared/pipeline-boundary';
 import type {
   AgentConversationMessage,
@@ -247,7 +248,7 @@ function runCommand(executable: string, args: string[], cwd: string, timeoutMs =
   return new Promise((resolve, reject) => {
     const child = spawn(executable, args, {
       cwd,
-      env: { ...process.env, PATH: runtimeSearchPath(), NO_COLOR: '1', GIT_TERMINAL_PROMPT: '0' },
+      env: { ...childEnvironment(), PATH: runtimeSearchPath(), NO_COLOR: '1', GIT_TERMINAL_PROMPT: '0' },
       shell: false,
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe']

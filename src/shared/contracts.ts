@@ -1,3 +1,5 @@
+import type { ForgeApi } from './forge';
+
 export type Capability =
   | 'repository.read'
   | 'repository.write'
@@ -362,7 +364,7 @@ export interface ReplyToAgentExecutionRequest {
 
 export type RunEventListener = (event: RunEvent) => void;
 
-export interface DesktopApi {
+export interface DesktopApi extends ForgeApi {
   listModelConfiguration(): Promise<import('./providers').ProviderLibraryView>;
   saveModelProvider(request: import('./providers').SaveProviderRequest): Promise<import('./providers').ProviderLibraryView>;
   saveModelProfile(request: import('./providers').SaveProfileRequest): Promise<import('./providers').ProviderLibraryView>;
@@ -374,6 +376,7 @@ export interface DesktopApi {
   importModelConfiguration(request: { configuration: import('./providers').RuntimeConfiguration; expectedRevision: number }): Promise<import('./providers').ProviderLibraryView>;
   exportModelConfiguration(request: { profileId: string; expectedRevision: number }): Promise<string | null>;
   exportProjectProfile(draft: import('./project-profile').ProjectProfileDraft): Promise<string | null>;
+  selectProjectProfile(): Promise<import('./project-profile').ProjectProfileDraft | null>;
   getSystemInfo(): Promise<SystemInfo>;
   getSettings(): Promise<AppSettings>;
   saveNetworkSettings(request: SaveNetworkSettingsRequest): Promise<AppSettings>;

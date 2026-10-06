@@ -122,7 +122,7 @@ async function saveMetadata(store: ConnectionStore): Promise<void> {
 async function loadSecrets(): Promise<SecretStore> {
   try {
     const encrypted = await fs.readFile(secretsPath());
-    if (!safeStorage.isEncryptionAvailable()) throw new Error('Secure credential storage is unavailable on this operating system');
+    requireSecureStorage();
     const parsed = JSON.parse(safeStorage.decryptString(encrypted)) as SecretStore;
     if (parsed.schemaVersion !== '1.0' || typeof parsed.secrets !== 'object' || parsed.secrets === null) {
       throw new Error('Unsupported encrypted credential format');
@@ -135,8 +135,12 @@ async function loadSecrets(): Promise<SecretStore> {
 }
 
 async function saveSecrets(store: SecretStore): Promise<void> {
-  if (!safeStorage.isEncryptionAvailable()) throw new Error('Secure credential storage is unavailable on this operating system');
+  requireSecureStorage();
   await atomicWrite(secretsPath(), safeStorage.encryptString(JSON.stringify(store)));
+}
+
+function requireSecureStorage(): void {
+  if (!safeStorage.isEncryptionAvailable() || (process.platform === 'linux' && safeStorage.getSelectedStorageBackend() === 'basic_text')) throw new Error('A secure operating-system keyring is required. The basic_text credential backend is disabled; configure a keyring before saving or reading credentials.');
 }
 
 function mergedMetadata(store: ConnectionStore, id: ConnectionId): ConnectionMetadata {
@@ -228,7 +232,7 @@ export async function testConnection(id: ConnectionId): Promise<ConnectionTestRe
         [metadata.authHeader]: authorizationValue(metadata, secret)
       },
       signal: controller.signal,
-      redirect: 'follow'
+      redirect: 'error'
     });
     const authenticationRejected = response.status === 401 || response.status === 403;
     result = {

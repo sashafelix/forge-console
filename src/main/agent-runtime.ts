@@ -1,6 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { childEnvironment } from './child-environment';
 import type { ProcessRuntimeId } from '../shared/contracts';
 import { manageAgentProcess } from './agent-processes';
 import { createCopilotAgentOverlay } from './copilot-agent-overlay';
@@ -68,8 +69,7 @@ async function runtimeEnvironment(
   approvedEnvironment: Record<string, string>
 ): Promise<NodeJS.ProcessEnv> {
   let env: NodeJS.ProcessEnv = {
-    ...process.env,
-    ...approvedEnvironment,
+    ...childEnvironment(process.env, approvedEnvironment, runtimeId),
     PATH: runtimeSearchPath(),
     NO_COLOR: '1'
   };
