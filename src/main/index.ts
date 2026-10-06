@@ -1,15 +1,8 @@
 import { app, BrowserWindow, Menu, type MenuItemConstructorOptions } from 'electron';
 import path from 'node:path';
-import { mkdirSync } from 'node:fs';
 import { terminateAllAgentProcesses } from './agent-processes';
 import { recoverInterruptedAgentRuns } from './interrupted-run-recovery';
 import { registerIpcHandlers } from './ipc';
-
-// Keep existing settings, credentials and run history across the product rename.
-const userDataDirectory = path.join(app.getPath('appData'), app.isPackaged ? 'Agent Pipeline UI' : 'agent-pipeline-ui');
-mkdirSync(userDataDirectory, { recursive: true });
-app.setPath('userData', userDataDirectory);
-app.setName('Forge Console');
 
 let mainWindow: BrowserWindow | null = null;
 let connectionsWindow: BrowserWindow | null = null;
@@ -74,7 +67,7 @@ function installApplicationMenu(): void {
   const template: MenuItemConstructorOptions[] = [];
   if (process.platform === 'darwin') {
     template.push({
-      label: app.name,
+      label: 'Forge Console',
       submenu: [
         { role: 'about' },
         { type: 'separator' },
@@ -120,6 +113,7 @@ app.whenReady().then(async () => {
   const recoveredRuns = await recoverInterruptedAgentRuns();
   if (recoveredRuns > 0) console.warn(`Recovered ${recoveredRuns} agent run(s) interrupted by a previous app shutdown.`);
   registerIpcHandlers(() => { createConnectionsWindow(); });
+  app.setAboutPanelOptions({ applicationName: 'Forge Console' });
   installApplicationMenu();
   createMainWindow();
   app.on('activate', () => {

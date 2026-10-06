@@ -15,7 +15,7 @@ Building on target operating systems avoids relying on unsupported cross-platfor
 
 ## Forge Console naming and existing data
 
-Desktop windows, application menus and package filenames use **Forge Console**. The application ID remains `com.frankhaughton.agentpipelineui`. Existing data stays in the legacy `Agent Pipeline UI` directory for packaged builds and `agent-pipeline-ui` for development, preserving settings, encrypted credentials, installed packs and run history. Renderer draft keys and pack/agent identifiers also remain compatible. The source repository is [forge-console](https://github.com/sashafelix/forge-console).
+Desktop windows, application menus and package filenames use **Forge Console**. The application ID remains `com.frankhaughton.agentpipelineui`. The npm package name and internal Electron application identity stay `agent-pipeline-ui`, preserving the existing data directory and OS credential-store namespace for settings, encrypted credentials, installed packs and run history. Renderer draft keys and pack/agent identifiers also remain compatible. The source repository is [forge-console](https://github.com/sashafelix/forge-console).
 
 ## Producing artifacts
 
