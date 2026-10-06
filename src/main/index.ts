@@ -46,7 +46,7 @@ function createMainWindow(): BrowserWindow {
     mainWindow.focus();
     return mainWindow;
   }
-  mainWindow = new BrowserWindow(windowOptions('Agent Pipeline UI — Quality Workbench'));
+  mainWindow = new BrowserWindow(windowOptions('Forge Console — Quality Workbench'));
   loadRenderer(mainWindow, 'index.html');
   mainWindow.on('closed', () => { mainWindow = null; });
   return mainWindow;
@@ -57,7 +57,7 @@ function createConnectionsWindow(): BrowserWindow {
     connectionsWindow.focus();
     return connectionsWindow;
   }
-  connectionsWindow = new BrowserWindow(windowOptions('Agent Pipeline UI — Connections'));
+  connectionsWindow = new BrowserWindow(windowOptions('Forge Console — Connections'));
   loadRenderer(connectionsWindow, 'connections.html');
   connectionsWindow.on('closed', () => { connectionsWindow = null; });
   return connectionsWindow;
@@ -67,7 +67,7 @@ function installApplicationMenu(): void {
   const template: MenuItemConstructorOptions[] = [];
   if (process.platform === 'darwin') {
     template.push({
-      label: app.name,
+      label: 'Forge Console',
       submenu: [
         { role: 'about' },
         { type: 'separator' },
@@ -113,6 +113,7 @@ app.whenReady().then(async () => {
   const recoveredRuns = await recoverInterruptedAgentRuns();
   if (recoveredRuns > 0) console.warn(`Recovered ${recoveredRuns} agent run(s) interrupted by a previous app shutdown.`);
   registerIpcHandlers(() => { createConnectionsWindow(); });
+  app.setAboutPanelOptions({ applicationName: 'Forge Console' });
   installApplicationMenu();
   createMainWindow();
   app.on('activate', () => {

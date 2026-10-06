@@ -1,10 +1,12 @@
-# Agent Pipeline UI
+# Forge Console
 
-## AI Dev Pipeline configuration
+The desktop companion for **[Forge](https://github.com/sashafelix/forge)** and a standalone repository-agent workbench. Formerly Agent Pipeline UI; existing settings, credentials, run history and technical identifiers are retained.
+
+## Forge configuration
 
 Use **Pipeline configuration** to manage providers, model profiles and role routing, or prepare a Local RGR `project-profile.json`. Models can be discovered or entered manually using OpenAI Responses, OpenAI-compatible Chat Completions, Anthropic Messages or Gemini protocols. The UI provides explicit synthetic capability tests, encrypted credentials, reusable profiles and reviewed secret-free exports.
 
-Validate and explicitly supply exported files to [agent-dev-pipeline](https://github.com/sashafelix/agent-dev-pipeline) in your usual coding environment. Execution, stage authority, risk policy and approvals remain owned by the pipeline. HTTP execution adapters are not installed by the configuration screen. See [model configuration](docs/model-configuration.md) and [the configuration boundary](docs/pipeline-configuration.md).
+Validate and explicitly supply exported files to [Forge](https://github.com/sashafelix/forge) in your usual coding environment. Execution, stage authority, risk policy and approvals remain owned by the pipeline. HTTP execution adapters are not installed by the configuration screen. See [model configuration](docs/model-configuration.md) and [the configuration boundary](docs/pipeline-configuration.md).
 
 Known Local RGR packs and agents are configuration-only in this app: the main process rejects prepare, start and reply/resume for recognised identifiers and filenames. Run the pipeline in its own coding environment. The standalone execution capabilities below apply to other agent definitions.
 

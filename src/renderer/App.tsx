@@ -368,7 +368,7 @@ export function App() {
       <header className="topbar">
         <div>
           <span className="eyebrow">LOCAL AGENT WORKBENCH</span>
-          <h1>Agent Pipeline UI</h1>
+          <h1>Forge Console</h1>
           <p>Preview any compatible pipeline, or explicitly approve isolated write execution for packs that declare a validated execution contract.</p>
         </div>
         <div className="system-pill">

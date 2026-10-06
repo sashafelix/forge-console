@@ -1,6 +1,6 @@
 # Security model
 
-Agent Pipeline UI is a local orchestration workbench. It does not treat an AI runtime, pipeline pack, agent definition, selected repository or external service as inherently trusted.
+Forge Console is a local orchestration workbench. It does not treat an AI runtime, pipeline pack, agent definition, selected repository or external service as inherently trusted.
 
 ## Renderer boundary
 

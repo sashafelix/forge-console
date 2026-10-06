@@ -68,9 +68,9 @@ function taskIdentifier(inputs: Record<string, unknown>): string {
 
 function snapshotIdentity(runId: string): NodeJS.ProcessEnv {
   return {
-    GIT_AUTHOR_NAME: 'Agent Pipeline UI',
+    GIT_AUTHOR_NAME: 'Forge Console',
     GIT_AUTHOR_EMAIL: 'agent-pipeline-ui@localhost',
-    GIT_COMMITTER_NAME: 'Agent Pipeline UI',
+    GIT_COMMITTER_NAME: 'Forge Console',
     GIT_COMMITTER_EMAIL: 'agent-pipeline-ui@localhost',
     GIT_AUTHOR_DATE: new Date().toISOString(),
     GIT_COMMITTER_DATE: new Date().toISOString(),
@@ -103,7 +103,7 @@ async function createRepositorySnapshot(
 
     const snapshot = (await runCommand(
       git,
-      ['commit-tree', tree, '-p', headRevision, '-m', `Agent Pipeline UI snapshot ${runId}`],
+      ['commit-tree', tree, '-p', headRevision, '-m', `Forge Console snapshot ${runId}`],
       repositoryRoot,
       { environment }
     )).stdout.trim();

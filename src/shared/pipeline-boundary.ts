@@ -1,12 +1,12 @@
 /** Known Local RGR entry points stay in the pipeline's own governed runner. */
 const RGR_IDENTIFIERS = new Set([
-  'agent-dev-pipeline', 'ai-dev-pipeline', 'rgr-software', 'rgr-software-v2',
+  'forge', 'agent-dev-pipeline', 'ai-dev-pipeline', 'rgr-software', 'rgr-software-v2',
   'ai-pipeline-rgr-orchestrator', 'ai-pipeline-intake', 'ai-pipeline-prepare',
   'ai-pipeline-brainstorm', 'ai-pipeline-analyze', 'ai-pipeline-red-test',
   'ai-pipeline-green-code', 'ai-pipeline-refactor', 'ai-pipeline-quality-gate', 'ai-pipeline-converge'
 ]);
 
-export const RGR_CONFIGURATION_MESSAGE = 'AI Dev Pipeline is configuration-only in this workbench. Use Pipeline configuration to export project facts, then run the pipeline in its own coding environment.';
+export const RGR_CONFIGURATION_MESSAGE = 'Forge is configuration-only in this workbench. Use Pipeline configuration to export project facts, then run the pipeline in its own coding environment.';
 
 export function isConfigurationOnlyPipeline(...identities: string[]): boolean {
   return identities.some((value) => RGR_IDENTIFIERS.has(
