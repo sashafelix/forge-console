@@ -194,6 +194,10 @@ export function ForgeCockpit({ onBack }: { onBack: () => void }) {
     && (e.event_type + ' ' + e.actor_role + ' ' + (e.safe_summary ?? '')).toLowerCase().includes(eventQuery.toLowerCase()));
   const live = run?.host && ['running','ready'].includes(run.host.status);
   const activeTheme = theme === 'system' ? undefined : theme;
+  const verificationDone = run?.host?.completed_stages.includes('quality_gate') ?? run?.stages.includes('quality_gate');
+  const verdict = run?.source === 'managed' && !verificationDone
+    ? run.host?.status === 'failed' && run.host.stage === 'quality_gate' ? 'Blocked' : 'Pending'
+    : run?.verdict;
 
   return <div className="forge-cockpit" data-theme={activeTheme}>
     <header className="forge-header">
@@ -264,7 +268,7 @@ export function ForgeCockpit({ onBack }: { onBack: () => void }) {
             }}>{pretty(name)}</button>)}</nav>
           <section id={'forge-panel-' + tab} role="tabpanel" aria-labelledby={'forge-tab-' + tab} className="forge-tab-panel">
             {tab === 'overview' && <>
-              <div className="forge-metrics"><div><span>Stages</span><strong>{run.stages.length}<small>/ 9</small></strong></div><div><span>Criteria</span><strong>{run.criteria.length}</strong></div><div><span>Commands</span><strong>{run.commands.length}</strong></div><div><span>Verdict {run.source === 'imported' ? '(reported)' : ''}</span><strong>{run.verdict}</strong></div></div>
+              <div className="forge-metrics"><div><span>Stages</span><strong>{run.stages.length}<small>/ 9</small></strong></div><div><span>Criteria</span><strong>{run.criteria.length}</strong></div><div><span>Commands</span><strong>{run.commands.length}</strong></div><div><span>Verification verdict {run.source === 'imported' ? '(reported)' : ''}</span><strong>{verdict}</strong></div></div>
               <section className="forge-panel"><div className="forge-section-heading"><h2>Stage progress</h2><span>{run.host?.stage ? pretty(run.host.stage) : 'Evidence history'}</span></div>
                 <ol className="forge-stage-grid">{FORGE_STAGES.map((stage,index) => <li key={stage} className={run.stages.includes(stage) ? 'complete' : run.host?.stage === stage ? 'current' : ''}>
                   <span>{run.stages.includes(stage) ? '✓' : index+1}</span><div><strong>{pretty(stage)}</strong><small>{run.stages.includes(stage) ? 'Completed' : run.host?.stage === stage ? run.host.status === 'failed' ? 'Blocked' : 'Current stage' : 'Pending'}</small></div>

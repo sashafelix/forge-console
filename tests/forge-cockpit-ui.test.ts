@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { after, afterEach, test } from 'node:test';
 import { createElement } from 'react';
 import type { DesktopApi, AgentExecutionRun } from '../src/shared/contracts';
-import type { ForgeRunSnapshot } from '../src/shared/forge';
+import type { ForgeRunSnapshot, HostView } from '../src/shared/forge';
 import { emptyProjectProfileDraft } from '../src/shared/project-profile';
 const require = createRequire(import.meta.url);
 require.extensions['.css'] = () => undefined;
@@ -124,4 +124,25 @@ test('command palette traps focus and Escape restores the opener',async () => {
   assert.equal(document.activeElement,buttons[0]);
   fireEvent.keyDown(dialog,{ key:'Escape' });
   assert.equal(screen.queryByRole('dialog'),null); assert.equal(document.activeElement,opener);
+});
+test('managed approval uses the visible exact binding and verification remains pending',async () => {
+  const host: HostView = { schema_version:'1.0',host_version:'1.0',id:'fixture-host',story_id:imported.storyId,
+    created_at:imported.updatedAt,updated_at:imported.updatedAt,status:'awaiting_approval',stage:'green_code',base_revision:'a'.repeat(40),
+    attempt:1,profile:'high-risk',tokens_estimated:12000,error:null,recoverable:false,sandbox:{ready:true,backend:'docker'},
+    policy_sha256:'c'.repeat(64),configuration_sha256:'d'.repeat(64),
+    completed_stages:['prepare','brainstorm','plan','analyze','red_test'],
+    approval:{ id:'checkpoint-id',reason:'before green_code',binding_sha256:'b'.repeat(64),expires_at:4102444800 },
+    available_actions:['approve','cancel'],permissions:{ source_paths:['src'],test_paths:['tests'],commands:{ tests:['python3','-m','unittest','-v'] },network:'none',publication:'manual' },
+    workspace_path:'/fixture/workspace',bundle_path:'/fixture/bundle' };
+  const managed: ForgeRunSnapshot = { ...imported,source:'managed',status:'awaiting_approval',host };
+  const calls:unknown[]=[];
+  window.agentPipeline = { ...cockpitApi(),listForgeRuns:async () => [managed],getForgeRun:async () => managed,
+    forgeAction:async (request:unknown) => { calls.push(request); return {...managed,host:{...host,status:'ready',approval:null,available_actions:[]}}; }
+  } as unknown as DesktopApi;
+  render(createElement(ForgeCockpit,{onBack:() => undefined}));
+  await screen.findByRole('heading',{name:'Before Green Code'});
+  assert.match(screen.getByText('Verification verdict').parentElement!.textContent! ,/Pending/);
+  fireEvent.click(screen.getByRole('button',{name:'Approve and continue'}));
+  await waitFor(() => assert.equal(calls.length,1));
+  assert.deepEqual(calls[0],{id:managed.id,action:'approve',approvalId:'checkpoint-id',binding:'b'.repeat(64),stage:undefined});
 });

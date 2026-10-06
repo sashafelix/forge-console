@@ -27,7 +27,8 @@ const run: ForgeRunSnapshot = {
   artifacts:[{ path:'quality-gates.json',bytes:1200 },{ path:'changes.patch',bytes:320 },{ path:'evidence/verify.log',bytes:200 }],eventCount:2
 };
 const managed: ForgeRunSnapshot = { ...run,id:'22222222-2222-4222-8222-222222222222',storyId:'EXAMPLE-102',source:'managed',
-  status:'awaiting_approval',profile:'high-risk',stages:[...host.completed_stages],evidenceLevel:'imported_claims',host };
+  status:'awaiting_approval',profile:'high-risk',stages:[...host.completed_stages],evidenceLevel:'imported_claims',host,
+  verdict:'UNKNOWN',criteria:run.criteria.map((c) => ({...c,status:'MISSING',evidence:[]})),commands:run.commands.slice(0,1) };
 const events = [
   { sequence:1,timestamp:'2026-10-06T12:00:00Z',attempt:1,stage:'quality_gate',event_type:'stage.completed',actor_role:'independent_verifier',artifact_refs:['quality-gates.json'],safe_summary:'Both criteria passed in a fresh verification workspace.' },
   { sequence:2,timestamp:'2026-10-06T12:00:01Z',attempt:1,stage:'close',event_type:'run.completed',actor_role:'orchestrator',artifact_refs:[],safe_summary:'Review the patch before publication.' }

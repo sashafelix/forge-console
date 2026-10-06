@@ -11,7 +11,7 @@ await server.listen();
 let browser;
 try {
   browser = await chromium.launch();
-  const page = await browser.newPage({ viewport:{ width:1440,height:1000 } });
+  const page = await browser.newPage({ viewport:{ width:1440,height:1000 },reducedMotion:'reduce' });
   const errors=[];
   page.on('pageerror',(error) => errors.push(error.message));
   await page.goto('http://127.0.0.1:5174/tests/visual/index.html');
