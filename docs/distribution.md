@@ -1,5 +1,12 @@
 # Distribution
 
+For a reviewable source pair and pilot evidence, use Forge's
+[evaluation handover](https://github.com/sashafelix/forge/blob/main/docs/evaluation.md).
+Record exact commits and passing CI, complete a live pilot, and resolve the owner
+licence decision before describing a build as a stable evaluation release. Neither
+repository currently includes a selected licence. Package generation does not
+grant publication or reuse permission.
+
 ## Supported development packages
 
 Forge Console is built from one Electron/React/TypeScript codebase and packaged independently on the target operating system.
@@ -37,7 +44,7 @@ Artifacts are retained for 14 days and are separated by operating system and arc
 Run on the target operating system:
 
 ```bash
-npm install
+npm ci
 npm run package
 ```
 

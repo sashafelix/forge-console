@@ -3,7 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { constants, promises as fs } from 'node:fs';
 import path from 'node:path';
 import { spawn, type ChildProcess } from 'node:child_process';
-import type { ForgeAction, ForgeDoctor, ForgeRunSnapshot, ForgeSetup, HostView, ForgeStage } from '../shared/forge';
+import type { ForgeAction, ForgeDoctor, ForgePilot, ForgeRunSnapshot, ForgeSetup, HostView, ForgeStage } from '../shared/forge';
 import type { ProjectSelection } from '../shared/contracts';
 import { validateConfiguration } from '../shared/providers';
 import { childEnvironment } from './child-environment';
@@ -51,7 +51,8 @@ async function fingerprint(root: string, python: string) {
   for (const folder of ['scripts','agents','docs/agent']) await walk(folder);
   // Older hosts may lack the canonical skill library; additions/removals also change the pin.
   for (const relative of ['skills', 'docs/conventions', 'packs', 'AGENTS.md', 'CLAUDE.md', 'README.md',
-    'CONTRIBUTING.md', 'docs/enforcement.md', 'docs/model-portability.md']) {
+    'CONTRIBUTING.md', 'docs/enforcement.md', 'docs/model-portability.md', 'VERSION',
+    'examples/first-change', 'examples/governed-host']) {
     assertSafeLibraryPath(root, path.join(root, relative));
     let info;
     try { info = await fs.lstat(path.join(root, relative)); }
@@ -127,6 +128,22 @@ export class ForgeBridge {
     };
     this.inputs = { paths, hashes, view };
     await this.save(); return this.setup();
+  }
+  async createPilot(configuration: string, output: string, image: string): Promise<ForgePilot> {
+    await this.load();
+    if (!this.host) throw new Error('Select a trusted Forge checkout and Python before creating a pilot.');
+    if (process.platform === 'win32') throw new Error('Create and run governed pilots inside WSL; inspect the evidence in Console.');
+    if (typeof image !== 'string' || !/^(?:[A-Za-z0-9._:/-]+@)?sha256:[a-f0-9]{64}$/.test(image)
+        || image.endsWith('sha256:' + '0'.repeat(64))) throw new Error('Enter the actual immutable Docker image ID, not a tag or placeholder.');
+    validateConfiguration(await jsonFile(configuration));
+    // Picker-owned paths only; the renderer never chooses a filesystem destination or executable.
+    const result = await this.invoke(this.host, ['pilot', '--configuration', configuration, '--image', image, '--output', output]);
+    if (result.kind !== 'forge-pilot' || result.schema_version !== '1.0' || result.ready !== false || result.execution_authority !== false
+        || typeof result.root !== 'string' || path.resolve(result.root) !== path.resolve(output)) {
+      throw new Error('Forge returned an unsupported pilot response. Update the selected Forge checkout.');
+    }
+    // Generated inputs remain drafts. Selection, capability review and readiness are separate steps.
+    return result;
   }
   private async checkedHost(host: HostRegistration) {
     if (await fingerprint(host.root, host.python) !== host.sha256) throw new Error('Registered Forge code or Python changed. Review and select the host again.');

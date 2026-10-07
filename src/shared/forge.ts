@@ -40,9 +40,16 @@ export interface ForgeDoctor {
   execution_authority: false;
   profile?: string; manual_checkpoints?: string[]; specialist_roles?: string[];
 }
+export interface ForgePilot {
+  schema_version: '1.0'; kind: 'forge-pilot'; ready: false; execution_authority: false;
+  root: string; target_repo: string; run_dir: string; task_file: string;
+  inputs: Record<'configuration' | 'policy' | 'inventory' | 'facts', string>;
+  review_file: string; notes_file: string; next_step: string;
+}
 export interface ForgeApi {
   getForgeSetup(): Promise<ForgeSetup>;
   configureForgeHost(): Promise<ForgeSetup>;
+  createForgePilot(image: string): Promise<ForgePilot | null>;
   selectForgeInputs(): Promise<ForgeSetup>;
   doctorForgeHost(): Promise<ForgeDoctor>;
   prepareForgeRun(request: { project: import('./contracts').ProjectSelection; task: string }): Promise<ForgeRunSnapshot>;

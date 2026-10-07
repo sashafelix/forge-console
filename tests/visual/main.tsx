@@ -81,6 +81,13 @@ window.agentPipeline = {
     { id:'claude-code',name:'Claude Code',kind:'process',status:'unavailable',capabilities:[],description:'Fixture runtime',configurationHint:'Select the installed Claude Code executable.' }],
   testRuntimeConnection:async () => ({ runtimeId:'github-copilot',ok:true,testedAt:'2026-10-07T00:00:00Z',message:'Synthetic connection succeeded.' }),
   getForgeSetup:async () => ({ host:null,inputs:null }),listForgeRuns:async () => runs,
+  configureForgeHost:async () => ({ host:{ root:'/fixture/forge',python:'/usr/bin/python3',sha256:'a'.repeat(64) },inputs:null }),
+  createForgePilot:async (image:string) => {
+    if (image.endsWith('b'.repeat(64))) throw new Error('Pilot destination already exists. Choose a new folder.');
+    return { schema_version:'1.0',kind:'forge-pilot',ready:false,execution_authority:false,
+      root:'/fixture/forge-pilot',target_repo:'/fixture/forge-pilot/target',task_file:'/fixture/forge-pilot/inputs/plan-input.md',
+      review_file:'/fixture/forge-pilot/inputs/registration-review.json',notes_file:'/fixture/forge-pilot/inputs/evaluation-notes.json' };
+  },
   getForgeRun:async (selected:string) => runs.find((r) => r.id===selected)!,
   getForgeEvents:async ({after}:{after:number}) => ({ events:events.filter((e) => e.sequence>after),nextCursor:2 }),
   getForgeArtifact:async ({path}:{path:string}) => ({ path,text:path==='changes.patch'?patch:'test_valid ... ok\ntest_invalid ... ok\nRan 2 tests in 0.280s\nOK\n',redactions:0,truncated:false }),
