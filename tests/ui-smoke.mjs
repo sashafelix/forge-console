@@ -58,11 +58,13 @@ try {
   await page.getByRole('button',{ name:/Back to guided workbench/ }).click();
   assert.equal(await theme().inputValue(),'light');
   assert.equal(await colour('.task-step'),'rgb(255, 255, 255)');
-  assert.equal(await colour('.task-card'),'rgb(255, 255, 255)');
   await page.screenshot({ path:directory+'/workflows-light.png',fullPage:true });
   await page.reload();
   await page.getByRole('heading',{ name:'What would you like help with?' }).waitFor();
   assert.equal(await theme().inputValue(),'light');
+  await page.getByRole('button',{ name:/Choose workflow folder/ }).click();
+  await page.getByText('Run a specialist step instead',{ exact:true }).click();
+  await page.getByRole('button',{ name:/README review/i }).waitFor();
   await theme().selectOption('system');
   assert.equal(await colour('body'),'rgb(246, 247, 251)');
   await page.emulateMedia({ colorScheme:'dark' });
@@ -71,9 +73,11 @@ try {
   assert.equal(await colour('body'),'rgb(246, 247, 251)');
   assert.equal(await colour('.task-card'),'rgb(255, 255, 255)');
   assert.equal(await colour('.task-card','color'),'rgb(24, 37, 53)');
+  await page.screenshot({ path:directory+'/workflows-populated-light.png',fullPage:true });
   await theme().selectOption('dark');
   assert.equal(await colour('.task-card'),'rgb(23, 35, 51)');
   assert.equal(await colour('.task-card','color'),'rgb(237, 243, 250)');
+  await page.screenshot({ path:directory+'/workflows-populated-dark.png',fullPage:true });
   await page.setViewportSize({ width:390,height:844 });
   await page.screenshot({ path:directory+'/workflows-mobile-dark.png',fullPage:true });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),true);
