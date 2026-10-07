@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useConsoleTheme } from './useConsoleTheme';
+import './forge-cockpit.css';
+import './connections.css';
 import type {
   ConnectionId,
   ConnectionSummary,
@@ -59,14 +62,8 @@ function providerName(runtimeId: ProcessRuntimeId): string {
   return runtimeId === 'claude-code' ? 'Claude Code' : 'GitHub Copilot';
 }
 
-function returnToWorkbench(): void {
-  window.close();
-  window.setTimeout(() => {
-    window.location.href = './index.html';
-  }, 150);
-}
-
-export function ConnectionsWorkbench() {
+export function ConnectionsWorkbench({ onBack }: { onBack: () => void }) {
+  const [theme, setTheme] = useConsoleTheme();
   const [system, setSystem] = useState<SystemInfo | null>(null);
   const [connections, setConnections] = useState<ConnectionSummary[]>([]);
   const [drafts, setDrafts] = useState<Partial<Record<ConnectionId, ConnectionDraft>>>({});
@@ -228,21 +225,20 @@ export function ConnectionsWorkbench() {
   }
 
   return (
-    <div className="app-shell connections-shell">
-      <header className="topbar">
-        <div>
-          <button className="connections-back-button" type="button" onClick={returnToWorkbench}>← Back to workbench</button>
-          <span className="eyebrow">LOCAL AGENT WORKBENCH</span>
-          <h1>Connections</h1>
-          <p>Configure service credentials and the network route used by local AI providers.</p>
+    <div className="forge-cockpit connections-shell" data-theme={theme}>
+      <header className="forge-header">
+        <div className="forge-brand"><span aria-hidden="true">F</span><div><strong>Forge Console</strong><small>Connections & network</small></div></div>
+        <div className="forge-header-actions">
+          <label className="forge-theme"><span className="forge-sr">Colour theme</span><select value={theme} onChange={(event) => setTheme(event.target.value)}><option value="system">System theme</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+          <button type="button" onClick={onBack}>← Back to previous page</button>
         </div>
-        <div className="system-pill"><span className="status-dot" />{system ? `${system.platform} · ${system.arch} · v${system.appVersion}` : 'Loading system…'}</div>
       </header>
 
-      {error && <div className="error-banner" role="alert">{error}</div>}
-      {message && <div className="success-banner" role="status">{message}</div>}
-
       <main className="connections-content">
+        <div className="forge-page-title"><div><span className="forge-eyebrow">WORKSPACE SETTINGS</span><h1 tabIndex={-1}>Connections</h1><p>Configure service credentials and the network route used by local AI providers.</p></div>
+          {system && <small>{system.platform} · {system.arch} · v{system.appVersion}</small>}</div>
+        {error && <div className="forge-alert error" role="alert">{error}</div>}
+        {message && <div className="forge-alert success" role="status">{message}</div>}
         <div className="security-note">
           <strong>Secure storage</strong>
           <span>Tokens are encrypted by Electron safeStorage using the operating system credential service. Proxy URLs must not contain credentials. Saved secrets are never returned to this screen, written into repositories, or persisted in run records.</span>
@@ -251,16 +247,16 @@ export function ConnectionsWorkbench() {
         <section className="connection-card network-card">
           <div className="connection-heading">
             <div>
-              <span className="eyebrow">NETWORK &amp; PROXY</span>
+              <span className="forge-eyebrow">NETWORK &amp; PROXY</span>
               <h2>Provider network route</h2>
-              <p>Used by Claude Code, GitHub Copilot, Jira, Confluence, and future HTTP providers launched by this desktop app.</p>
+              <p>Set the network route for coding assistants, service connections and model-provider probes.</p>
             </div>
             <span className={`connection-status ${network.proxyMode === 'inherit' ? 'missing' : 'configured'}`}>{proxyModeLabel(network.proxyMode)}</span>
           </div>
 
           <label className="field network-mode-field">
             <span>Proxy mode</span>
-            <select disabled={networkBusy} value={network.proxyMode} onChange={(event) => setNetwork((current) => ({ ...current, proxyMode: event.target.value as NetworkProxyMode }))}>
+            <select aria-label="Proxy mode" disabled={networkBusy} value={network.proxyMode} onChange={(event) => setNetwork((current) => ({ ...current, proxyMode: event.target.value as NetworkProxyMode }))}>
               <option value="inherit">Inherit proxy variables from the shell that launched the app</option>
               <option value="system">Use the operating-system proxy / PAC configuration</option>
               <option value="manual">Use manually configured proxy URLs</option>
@@ -313,7 +309,7 @@ export function ConnectionsWorkbench() {
           </div>
 
           <div className="network-actions">
-            <button className="primary" type="button" disabled={networkBusy} onClick={saveNetwork}>{networkBusy ? 'Applying…' : 'Save network settings'}</button>
+            <button className="forge-primary" type="button" disabled={networkBusy} onClick={saveNetwork}>{networkBusy ? 'Applying…' : 'Save network settings'}</button>
           </div>
         </section>
 
@@ -325,10 +321,10 @@ export function ConnectionsWorkbench() {
             const busy = busyId === id;
             const hasTestableSecret = summary.configured || draft.secret.trim().length > 0;
             return (
-              <section className="connection-card" key={id}>
+              <section className="connection-card" key={id} aria-label={summary.name}>
                 <div className="connection-heading">
                   <div>
-                    <span className="eyebrow">{id === 'self-hosted-llm' ? 'MODEL PROVIDER' : 'SERVICE CONNECTION'}</span>
+                    <span className="forge-eyebrow">{id === 'self-hosted-llm' ? 'MODEL PROVIDER' : 'SERVICE CONNECTION'}</span>
                     <h2>{summary.name}</h2>
                     <p>{description(id)}</p>
                   </div>
@@ -381,7 +377,7 @@ export function ConnectionsWorkbench() {
                 <div className="connection-actions">
                   <button className="secondary" type="button" disabled={busy || !hasTestableSecret} onClick={() => test(id)}>Test current values</button>
                   <button className="secondary danger" type="button" disabled={busy || !summary.configured} onClick={() => remove(id)}>Remove</button>
-                  <button className="primary" type="button" disabled={busy} onClick={() => save(id)}>{busy ? 'Working…' : 'Save securely'}</button>
+                  <button className="forge-primary" type="button" disabled={busy} onClick={() => save(id)}>{busy ? 'Working…' : 'Save securely'}</button>
                 </div>
               </section>
             );

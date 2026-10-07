@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ProcessRuntimeId, RuntimeAdapterDescriptor, RuntimeConnectionTestResult } from '../shared/contracts';
 import { ModelConfiguration } from './ModelConfiguration';
 import { PipelineConfiguration } from './PipelineConfiguration';
+import { useConsoleTheme } from './useConsoleTheme';
 import './forge-cockpit.css';
 import './configuration-workbench.css';
 
@@ -74,8 +75,7 @@ function QuickstartGuides({ navigate, onBack, onOpenCockpit }: { navigate: (sect
 
 export function ConfigurationWorkbench({ onBack, onOpenCockpit, onUseRuntime, onOpenConnections, initialSection = 'overview' }: Props) {
   const [section, setSection] = useState<ConfigurationSection>(initialSection);
-  const [theme, setTheme] = useState(() => { try { return localStorage.getItem('forge-console.cockpit-theme') ?? 'system'; } catch { return 'system'; } });
-  useEffect(() => { try { localStorage.setItem('forge-console.cockpit-theme', theme); } catch { /* Usable in memory. */ } }, [theme]);
+  const [theme, setTheme] = useConsoleTheme();
   return <div className="forge-cockpit configuration-workbench" data-theme={theme}>
     <header className="forge-header"><div className="forge-brand"><span>F</span><div><strong>Forge Console</strong><small>Configure your workspace</small></div></div><div className="forge-header-actions">
       <label className="forge-theme"><span className="forge-sr">Colour theme</span><select value={theme} onChange={(event) => setTheme(event.target.value)}><option value="system">System theme</option><option value="light">Light</option><option value="dark">Dark</option></select></label>

@@ -77,8 +77,32 @@ try {
   assert.equal(await page.getByLabel('Configuration page',{ exact:true }).inputValue(),'runtimes');
   await page.screenshot({ path:directory+'/runtimes-mobile.png',fullPage:true });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),true);
+  const previousUrl = page.url();
+  await page.getByRole('button',{ name:'Open Connections' }).click();
+  await page.getByRole('heading',{ name:'Connections',exact:true }).waitFor();
+  assert.equal(page.url(),previousUrl);
+  assert.equal(page.context().pages().length,1);
+  assert.equal(await page.getByRole('heading',{ name:'Connect your coding assistant' }).isVisible(),false);
+  await page.getByLabel('Proxy mode',{ exact:true }).selectOption('manual');
+  await page.getByLabel('HTTP proxy',{ exact:true }).fill('http://proxy.example:8080');
+  await page.getByRole('button',{ name:'Save network settings' }).click();
+  await page.getByRole('status').filter({ hasText:'Network and proxy settings saved.' }).waitFor();
+  await page.screenshot({ path:directory+'/connections-mobile-light.png',fullPage:true });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),true);
+  await page.setViewportSize({ width:1440,height:1000 });
+  await page.getByRole('combobox',{ name:'Colour theme' }).selectOption('dark');
+  await page.screenshot({ path:directory+'/connections-dark.png',fullPage:true });
+  await page.getByRole('button',{ name:/Back to previous page/ }).click();
+  await page.getByRole('heading',{ name:'Connect your coding assistant' }).waitFor();
+  assert.equal(await page.getByRole('combobox',{ name:'Colour theme' }).inputValue(),'dark');
+  await page.getByRole('button',{ name:'Open Connections' }).click();
+  assert.equal(await page.getByLabel('HTTP proxy',{ exact:true }).inputValue(),'http://proxy.example:8080');
+  await page.getByRole('combobox',{ name:'Colour theme' }).selectOption('light');
+  await page.screenshot({ path:directory+'/connections-light.png',fullPage:true });
+  await page.getByRole('button',{ name:/Back to previous page/ }).click();
+  assert.equal(await page.getByRole('combobox',{ name:'Colour theme' }).inputValue(),'light');
   assert.deepEqual(errors,[]);
-  console.log('Chromium cockpit and configuration checks passed; screenshots saved.');
+  console.log('Chromium cockpit, configuration and in-app Connections checks passed; screenshots saved.');
 } finally {
   await browser?.close();await server.close();
 }

@@ -38,6 +38,8 @@ Process-runtime executable discovery combines the inherited environment with sta
 
 ## Connections
 
+Connections is a page in the main window. Menu shortcuts and in-app buttons use the same typed navigation event. The preload retains navigation received before React mounts, and the workspace shell keeps the underlying page mounted so drafts and active run subscriptions survive the visit. Connection forms unmount on return, clearing unsaved token input from UI state. Credential storage stays in the main process.
+
 Jira, Confluence and Self hosted LLM connection profiles are stored by the main process.
 
 - non-secret metadata is persisted as versioned JSON;

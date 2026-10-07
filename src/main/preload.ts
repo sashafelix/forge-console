@@ -9,7 +9,8 @@ import type {
   RunEvent,
   RunEventListener,
   SaveConnectionRequest,
-  SaveNetworkSettingsRequest
+  SaveNetworkSettingsRequest,
+  WorkspacePage
 } from '../shared/contracts';
 
 // Sandboxed Electron preload scripts only receive a restricted require() implementation.
@@ -70,10 +71,21 @@ const IPC_CHANNELS = {
   getLatestAgentExecutionRun: 'agents:get-latest-execution',
   getAgentExecutionEvents: 'agents:get-execution-events',
   cancelAgentExecution: 'agents:cancel-execution',
-  openAgentWorkbench: 'windows:open-agent-workbench',
+  openConnections: 'navigation:open-connections',
+  workspaceNavigate: 'navigation:workspace',
   runEvent: 'runs:event',
   openPath: 'shell:open-path'
 } as const;
+
+// The menu can navigate while React is still mounting, including after reopening
+// the last window on macOS. Retain the latest destination until the shell listens.
+let pendingWorkspacePage: WorkspacePage | undefined;
+const navigationListeners = new Set<(page: WorkspacePage) => void>();
+ipcRenderer.on(IPC_CHANNELS.workspaceNavigate, (_event, page: unknown) => {
+  if (page !== 'workbench' && page !== 'connections') return;
+  pendingWorkspacePage = page;
+  for (const listener of navigationListeners) listener(page);
+});
 
 const api: DesktopApi = {
   selectProjectProfile: () => ipcRenderer.invoke(IPC_CHANNELS.selectProjectProfile),
@@ -130,7 +142,12 @@ const api: DesktopApi = {
   getLatestAgentExecutionRun: () => ipcRenderer.invoke(IPC_CHANNELS.getLatestAgentExecutionRun),
   getAgentExecutionEvents: (runId: string) => ipcRenderer.invoke(IPC_CHANNELS.getAgentExecutionEvents, runId),
   cancelAgentExecution: (runId: string) => ipcRenderer.invoke(IPC_CHANNELS.cancelAgentExecution, runId),
-  openAgentWorkbench: () => ipcRenderer.invoke(IPC_CHANNELS.openAgentWorkbench),
+  openConnections: () => ipcRenderer.invoke(IPC_CHANNELS.openConnections),
+  onWorkspaceNavigate: (listener) => {
+    navigationListeners.add(listener);
+    if (pendingWorkspacePage) listener(pendingWorkspacePage);
+    return () => { navigationListeners.delete(listener); };
+  },
   onRunEvent: (listener: RunEventListener) => {
     const handler = (_event: Electron.IpcRendererEvent, runEvent: RunEvent) => listener(runEvent);
     ipcRenderer.on(IPC_CHANNELS.runEvent, handler);

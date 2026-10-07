@@ -67,6 +67,7 @@ Agent definitions that request shell access are treated as trusted local instruc
 ## Connections
 
 Open **Workspaces → Connections**, press `Cmd/Ctrl+,`, or use the Connections control in the workbench.
+Connections opens inside the main app and follows the cockpit/configuration theme. **Back to previous page** restores the screen you left, including its draft inputs and run state. Save any connection or network edits before leaving Connections.
 
 Available connection profiles:
 

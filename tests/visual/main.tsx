@@ -3,12 +3,14 @@ import { createRoot } from 'react-dom/client';
 import { useState } from 'react';
 import { ForgeCockpit } from '../../src/renderer/ForgeCockpit';
 import { ConfigurationWorkbench } from '../../src/renderer/ConfigurationWorkbench';
+import { WorkspaceShell } from '../../src/renderer/WorkspaceShell';
+import { defaultSettings } from '../../src/shared/settings';
 import '../../src/renderer/styles.css';
 import '../../src/renderer/task-light.css';
 import '../../src/renderer/state-navigation.css';
 import '../../src/renderer/advanced-light.css';
 import '../../src/renderer/interactive-runs.css';
-import type { DesktopApi } from '../../src/shared/contracts';
+import type { DesktopApi, NetworkSettings, WorkspacePage } from '../../src/shared/contracts';
 import { FORGE_STAGES, type ForgeRunSnapshot, type HostView } from '../../src/shared/forge';
 
 const base = 'a'.repeat(40);
@@ -42,7 +44,19 @@ const events = [
 ];
 const patch = '--- a/src/api.py\n+++ b/src/api.py\n@@ -1,2 +1,4 @@\n def result(value):\n-    return None\n+    if not isinstance(value, int):\n+        raise ValueError("Expected an integer")\n+    return value * 2\n';
 const runs = new URLSearchParams(location.search).get('screen') === 'empty' ? [] : [run,managed];
+const navigationListeners = new Set<(page: WorkspacePage) => void>();
+let network = defaultSettings().network;
 window.agentPipeline = {
+  onWorkspaceNavigate: (listener: (page: WorkspacePage) => void) => { navigationListeners.add(listener); return () => { navigationListeners.delete(listener); }; },
+  openConnections: async () => { for (const listener of navigationListeners) listener('connections'); },
+  getSystemInfo: async () => ({ platform: 'linux', arch: 'x64', appVersion: 'fixture' }),
+  getSettings: async () => ({ ...defaultSettings(), network }),
+  saveNetworkSettings: async (next: NetworkSettings) => { network = next; return { ...defaultSettings(), network }; },
+  listConnections: async () => [
+    { id: 'jira', name: 'Jira', serviceUrl: 'https://jira.example', authHeader: 'Authorization', authScheme: 'bearer', configured: false },
+    { id: 'confluence', name: 'Confluence', serviceUrl: 'https://docs.example', authHeader: 'Authorization', authScheme: 'bearer', configured: false },
+    { id: 'self-hosted-llm', name: 'Self hosted LLM', serviceUrl: 'http://localhost:11434/v1', model: 'example-model', authHeader: 'Authorization', authScheme: 'bearer', configured: false }
+  ],
   listModelConfiguration:async () => ({ schemaVersion:'1.0',revision:0,providers:[],profiles:[],diagnostics:[],credentials:{} }),
   listRuntimes:async () => [{ id:'github-copilot',name:'GitHub Copilot',kind:'process',status:'available',capabilities:[],description:'Fixture runtime',executablePath:'/fixture/bin/copilot',version:'Fixture version' },
     { id:'claude-code',name:'Claude Code',kind:'process',status:'unavailable',capabilities:[],description:'Fixture runtime',configurationHint:'Select the installed Claude Code executable.' }],
@@ -56,7 +70,7 @@ window.agentPipeline = {
 } as unknown as DesktopApi;
 function VisualApp() {
   const [configuration,setConfiguration] = useState(new URLSearchParams(location.search).get('screen') === 'configuration');
-  return configuration ? <ConfigurationWorkbench onBack={() => setConfiguration(false)} onOpenCockpit={() => setConfiguration(false)} onUseRuntime={() => undefined} />
+  return configuration ? <ConfigurationWorkbench onBack={() => setConfiguration(false)} onOpenCockpit={() => setConfiguration(false)} onUseRuntime={() => undefined} onOpenConnections={() => { void window.agentPipeline.openConnections(); }} />
     : <ForgeCockpit onBack={() => setConfiguration(true)} onConfigure={() => setConfiguration(true)} />;
 }
-createRoot(document.getElementById('root')!).render(<VisualApp />);
+createRoot(document.getElementById('root')!).render(<WorkspaceShell><VisualApp /></WorkspaceShell>);

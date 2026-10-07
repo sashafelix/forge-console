@@ -29,7 +29,7 @@ test('the task workbench preserves and recovers active runs', async () => {
   assert.match(taskWorkbench, /getLatestAgentExecutionRun/);
   assert.match(taskWorkbench, /getAgentExecutionEvents/);
   assert.match(taskWorkbench, /Previous run restored/);
-  assert.match(taskWorkbench, /openAgentWorkbench/);
+  assert.match(taskWorkbench, /openConnections/);
   assert.doesNotMatch(taskWorkbench, /window\.location\.href = '\.\/connections\.html'/);
 
   for (const method of ['getLatestAgentExecutionRun', 'getAgentExecutionEvents']) {
@@ -62,15 +62,6 @@ test('connection secrets use password inputs and are never rendered from connect
   assert.match(workbench, /type="password"/);
   assert.match(workbench, /secret: ''/);
   assert.doesNotMatch(workbench, /summary\.secret/);
-});
-
-test('Connections closes its separate window when returning to the workbench', async () => {
-  const workbench = await source('src/renderer/ConnectionsWorkbench.tsx');
-
-  assert.match(workbench, /Back to workbench/);
-  assert.match(workbench, /window\.close\(\)/);
-  assert.match(workbench, /\.\/index\.html/);
-  assert.doesNotMatch(workbench, /window\.history\.back\(\)/);
 });
 
 test('Self hosted LLM remains non-executable after configuration', async () => {

@@ -363,6 +363,7 @@ export interface ReplyToAgentExecutionRequest {
 }
 
 export type RunEventListener = (event: RunEvent) => void;
+export type WorkspacePage = 'workbench' | 'connections';
 
 export interface DesktopApi extends ForgeApi {
   listModelConfiguration(): Promise<import('./providers').ProviderLibraryView>;
@@ -408,7 +409,8 @@ export interface DesktopApi extends ForgeApi {
   getLatestAgentExecutionRun(): Promise<AgentExecutionRun | null>;
   getAgentExecutionEvents(runId: string): Promise<RunEvent[]>;
   cancelAgentExecution(runId: string): Promise<boolean>;
-  openAgentWorkbench(): Promise<void>;
+  openConnections(): Promise<void>;
+  onWorkspaceNavigate(listener: (page: WorkspacePage) => void): () => void;
   onRunEvent(listener: RunEventListener): () => void;
   openPath(path: string): Promise<string>;
 }

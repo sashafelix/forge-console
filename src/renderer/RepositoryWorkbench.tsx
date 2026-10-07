@@ -8,7 +8,7 @@ export function RepositoryWorkbench() {
           <strong>Repository workflows</strong>
           <span>Agents are discovered only after selecting their repository.</span>
         </div>
-        <button type="button" onClick={() => { void window.agentPipeline.openAgentWorkbench(); }}>
+        <button type="button" onClick={() => { void window.agentPipeline.openConnections(); }}>
           Connections
         </button>
       </nav>
