@@ -28,6 +28,16 @@ export function registerForgeIpc(approvedProjects: Set<string>): void {
     }
     return bridge.selectInputs(paths);
   });
+  ipcMain.handle(IPC_CHANNELS.createForgePilot, async (_event, image: string) => {
+    if (typeof image !== 'string' || image.length > 512) throw new Error('Supply a bounded immutable image ID.');
+    const configuration = await dialog.showOpenDialog({ title: 'Select your exported model runtime configuration',
+      properties: ['openFile'], filters: [{ name: 'Model configuration', extensions: ['json'] }] });
+    if (configuration.canceled || !configuration.filePaths[0]) return null;
+    const destination = await dialog.showSaveDialog({ title: 'Create a new disposable pilot directory outside Forge',
+      defaultPath: 'forge-pilot', buttonLabel: 'Create pilot directory' });
+    if (destination.canceled || !destination.filePath) return null;
+    return bridge.createPilot(configuration.filePaths[0], destination.filePath, image);
+  });
   ipcMain.handle(IPC_CHANNELS.doctorForgeHost, () => bridge.doctor());
   ipcMain.handle(IPC_CHANNELS.prepareForgeRun, (_event, request: { project: ProjectSelection; task: string }) => {
     if (!request?.project || !approvedProjects.has(request.project.path)) throw new Error('Select the target repository through the native project picker.');

@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ForgeAction, ForgeDoctor, ForgeEvent, ForgeRunSnapshot, ForgeSetup, ForgeStage, HostView } from '../shared/forge';
+import type { ForgeAction, ForgeDoctor, ForgeEvent, ForgePilot, ForgeRunSnapshot, ForgeSetup, ForgeStage, HostView } from '../shared/forge';
 import { FORGE_STAGES } from '../shared/forge';
 import type { ProjectSelection } from '../shared/contracts';
 import { AccessibleDialog } from './AccessibleDialog';
 import { useConsoleTheme } from './useConsoleTheme';
 import { ThemePicker } from './ThemePicker';
 import { DiffViewer } from './DiffViewer';
+import { ForgePilotSetup } from './ForgePilotSetup';
 import './forge-cockpit.css';
 
 const TABS = ['overview','evidence','diff','events','compare'] as const;
@@ -48,6 +49,8 @@ export function ForgeCockpit({ onBack, onConfigure }: { onBack: () => void; onCo
   const [busy, setBusy] = useState(false);
   const actionCount = useRef(0);
   const [doctor, setDoctor] = useState<ForgeDoctor | null>(null);
+  const [pilot, setPilot] = useState<ForgePilot | null>(null);
+  const [platform, setPlatform] = useState('');
   const [project, setProject] = useState<ProjectSelection | null>(null);
   const [task, setTask] = useState('');
   const [reviewed, setReviewed] = useState(false);
@@ -71,6 +74,7 @@ export function ForgeCockpit({ onBack, onConfigure }: { onBack: () => void; onCo
 
   useEffect(() => {
     let alive = true;
+    void window.agentPipeline.getSystemInfo().then((info) => { if (alive) setPlatform(info.platform); }).catch(() => {});
     void Promise.all([window.agentPipeline.getForgeSetup(), window.agentPipeline.listForgeRuns()]).then(([nextSetup, history]) => {
       if (!alive) return;
       setSetup(nextSetup); setRuns(history);
@@ -158,6 +162,13 @@ export function ForgeCockpit({ onBack, onConfigure }: { onBack: () => void; onCo
       if (snapshot) { setRuns((current) => [snapshot,...current]); selectedId.current = snapshot.id; installSnapshot(snapshot); setMode('review'); void eventPage(snapshot.id,0,true); }
     } catch (reason) { setError(errorText(reason)); } finally { setBusy(false); setPalette(false); }
   }
+  async function createPilot(image: string) {
+    setBusy(true); setError('');
+    try {
+      const created = await window.agentPipeline.createForgePilot(image);
+      if (created) { setPilot(created); setDoctor(null); setReviewed(false); }
+    } catch (reason) { setError(errorText(reason)); } finally { setBusy(false); }
+  }
   async function prepare() {
     if (!project) return;
     setBusy(true); setError('');
@@ -233,8 +244,10 @@ export function ForgeCockpit({ onBack, onConfigure }: { onBack: () => void; onCo
           <section className="forge-panel">
             <div className="forge-section-heading"><h2>Host and operator inputs</h2><span className="forge-badge">{doctor?.ready ? 'Preflight ready' : 'Preflight required'}</span></div>
             <p>Select a Forge checkout with the governed host and Python 3.11+. Commands require an installed Linux Docker engine and an immutable image.</p>
+            {platform === 'win32' && <p className="forge-alert warning">Run the governed host inside WSL on Windows. This native Console can inspect its evidence; host execution requires macOS or Linux.</p>}
             <div className="forge-setup-grid"><div><strong>Trusted host</strong><code>{setup.host?.root ?? 'No host registered'}</code><small>{setup.host?.python}</small><button type="button" disabled={busy} onClick={() => configure('host')}>Select trusted host</button></div>
               <div><strong>Reviewed operator files</strong><code>{setup.inputs?.configuration ?? 'No inputs selected'}</code><small>Runtime configuration, execution policy, adapter registrations and task risk facts.</small><button type="button" disabled={busy || !setup.host} onClick={() => configure('inputs')}>Select operator inputs</button></div></div>
+            <ForgePilotSetup enabled={Boolean(setup.host) && platform !== 'win32'} busy={busy} onCreate={createPilot} pilot={pilot} />
             <button type="button" disabled={busy || !setup.host || !setup.inputs} onClick={() => configure('doctor')}>{busy ? 'Checking…' : 'Check host readiness'}</button>
             {doctor && <div role="status" className={'forge-alert ' + (doctor.ready ? 'success' : 'warning')}><strong>{doctor.ready ? 'Host preflight passed' : 'Host is blocked'}</strong><span>{doctor.sandbox.reason ?? 'Docker is available. Provider registration remains operator reviewed.'}</span></div>}
             {doctor?.routes.length ? <details><summary>Resolved role routes · {doctor.profile ?? 'task profile'}</summary><table><thead><tr><th>Stage</th><th>Model binding</th><th>Protocol</th></tr></thead><tbody>{doctor.routes.map((route,i) => <tr key={i}><td>{pretty(route.stage)}</td><td>{route.model_id}{route.fallback ? ' · fallback' : ''}</td><td>{route.protocol}</td></tr>)}</tbody></table></details> : null}

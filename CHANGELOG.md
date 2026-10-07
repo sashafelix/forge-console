@@ -2,6 +2,10 @@
 
 ## 0.9.0 (unreleased)
 
+- Added guided disposable-pilot creation in the cockpit using the selected Forge host, with native configuration/destination pickers, an immutable image ID and explicit capability review. Draft inputs are never automatically activated or approved.
+- Pinned pilot templates alongside host code, added platform/runtime guidance at the entry point, and documented evaluation source pairs, remaining qualification work and the owner licence/release decision.
+- Removed repeated introductory copy and updated the in-app quickstart to use the pilot generator.
+
 - Rebuilt Pipeline configuration around the cockpit theme, a setup hub, visible Copilot/Claude runtime installation/connection controls and in-app quickstarts. Added a standalone README review example and a complete first-use guide.
 - Canonical agent discovery prefers `agents/`; Claude session definitions and temporary Copilot adapters consume the same library and relevant root skills. Removed the requirement for committed runtime mirrors, with duplicate/symlink checks and worktree restoration tests.
 - Host registration now pins canonical skills, entry instructions and conventions as well as agent/host code.

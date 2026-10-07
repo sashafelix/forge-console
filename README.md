@@ -8,6 +8,30 @@ Console starts in **Dark** mode. Use the **Theme** picker in any screen header t
 
 Open **Pipeline configuration** for the setup hub, or **Quickstart guides** for guided instructions. The [quickstart](docs/quickstart.md) covers a first Copilot/Claude agent run, a governed Forge run, and read-only evidence review. A small [README review agent](examples/agents/readme-review.md) is included.
 
+| Your goal | Choose | Requirements |
+| --- | --- | --- |
+| Run an ordinary agent with Copilot or Claude Code | CLI runtimes → Workflows | macOS/Linux/Windows, Git and an installed/authenticated CLI |
+| Run Forge's governed pipeline | Models & providers → Forge cockpit | macOS/Linux, Forge, Python 3.11+, Git, Linux Docker, a reviewed image and compatible HTTP model access |
+| Run governed Forge on Windows | Forge CLI inside WSL; Console for evidence inspection | WSL with Linux Docker and the same host inputs |
+| Inspect someone else's evidence | Forge cockpit → Inspect evidence bundle | An extracted evidence directory; no model account |
+
+Copilot and Claude Code subscriptions do not provide governed HTTP model access.
+For your first governed run, the cockpit's **Create a disposable pilot** helper
+creates the sample target and draft operator files; see the [quickstart](docs/quickstart.md#2-prepare-a-governed-forge-run).
+
+For a source installation, install Node 22.12+ and Git, clone this repository, then run:
+
+```bash
+npm ci
+npm run build
+npm run dev
+```
+
+Stop any older development process before restarting. Pulling code does not update
+an installed desktop package. For a team evaluation, pin both source commits using
+Forge's [evaluation snapshot](https://github.com/sashafelix/forge/blob/main/docs/evaluation.md).
+Source version `0.9.0` is unreleased; no licence has been selected. See [distribution](docs/distribution.md).
+
 ## Forge configuration
 
 Use **Pipeline configuration** to manage providers, model profiles and role routing, or prepare a Local RGR `project-profile.json`. Models can be discovered or entered manually using OpenAI Responses, OpenAI-compatible Chat Completions, Anthropic Messages or Gemini protocols. The UI provides explicit synthetic capability tests, encrypted credentials, reusable profiles and reviewed secret-free exports.
@@ -15,10 +39,6 @@ Use **Pipeline configuration** to manage providers, model profiles and role rout
 Validate and explicitly supply exported files to [Forge](https://github.com/sashafelix/forge). The separate **Forge cockpit** can inspect evidence or control runs through an independently registered governed Forge host. The host owns execution, stages, policy, approvals and receipts. Configuration/probes alone grant no authority. Start with [the cockpit guide](docs/cockpit.md), [model configuration](docs/model-configuration.md) and [the integration boundary](docs/pipeline-configuration.md).
 
 Known Local RGR packs and agents remain blocked in generic workbench controllers: the main process rejects prepare, start and reply/resume for recognised identifiers and filenames. The new cockpit uses the separately selected governed host. Standalone execution below applies to other definitions.
-
-A cross-platform, repository-first desktop workbench for discovering, configuring, running and monitoring standalone agents and multi-agent workflows with interchangeable AI runtimes.
-
-The application is deliberately independent of any one pipeline, agent library, model provider or IDE. Workflows are discovered from the repository selected by the operator, target code repositories remain separate when required, and privileged actions are surfaced for explicit approval.
 
 ## Current capabilities
 

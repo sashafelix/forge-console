@@ -2,6 +2,7 @@ export const IPC_CHANNELS = {
   selectProjectProfile: 'configuration:select-project-profile',
   getForgeSetup: 'forge:setup',
   configureForgeHost: 'forge:configure-host',
+  createForgePilot: 'forge:create-pilot',
   selectForgeInputs: 'forge:select-inputs',
   doctorForgeHost: 'forge:doctor',
   prepareForgeRun: 'forge:prepare',

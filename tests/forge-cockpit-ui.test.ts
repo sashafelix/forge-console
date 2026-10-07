@@ -95,7 +95,8 @@ const imported: ForgeRunSnapshot = {
   artifacts:[{ path:'evidence/verify.log',bytes:20 },{ path:'changes.patch',bytes:60 }],eventCount:1
 };
 function cockpitApi() {
-  return { getForgeSetup:async () => ({ host:null,inputs:null }),listForgeRuns:async () => [imported],
+  return { getSystemInfo:async () => ({ platform:'linux',arch:'x64',appVersion:'fixture' }),
+    getForgeSetup:async () => ({ host:null,inputs:null }),listForgeRuns:async () => [imported],
     getForgeRun:async () => imported,getForgeEvents:async () => ({ events:[],nextCursor:0 }),
     getForgeArtifact:async (request: { path:string }) => ({ path:request.path,text:'One executed test passed',redactions:0,truncated:false }),
     forgeAction:async () => { throw new Error('Imported evidence must never invoke execution'); } };

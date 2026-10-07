@@ -75,7 +75,21 @@ Use this path for Forge's PREPARE → BRAINSTORM → PLAN → ANALYZE → RED �
 
 ### Register the host and inputs
 
-Follow [Forge's governed-host walkthrough](https://github.com/sashafelix/forge/blob/main/docs/governed-host.md) for the exact input schemas and reviewed image setup. Console does not invent a trusted policy or capability inventory from probe results.
+For your first run, use [Forge's guided pilot](https://github.com/sashafelix/forge/blob/main/docs/getting-started/governed-pilot.md).
+After selecting the trusted Forge checkout and Python, open **First run? Create a
+disposable pilot**. Enter the actual immutable ID of your reviewed Python 3.12 Linux
+image, choose the exported model configuration, and choose a new folder outside Forge.
+The helper creates a separate greeting-function Git repository, a task and all four
+draft operator files. It does not call a model or register capabilities.
+
+Follow the generated `SETUP.md`. Record independently observed capability evidence
+in `inputs/registration-review.json`, and mark only qualified bindings ready in
+`runtime-inventory.json`. The listed requirements are not preapproved capabilities.
+Readiness will block until this review is complete. Leave unqualified fallbacks
+unavailable. Re-select input files after edits so Console pins the reviewed bytes.
+
+For an existing project, adapt the [host reference](https://github.com/sashafelix/forge/blob/main/docs/governed-host.md).
+The sample greeting policy is only suitable for the disposable pilot.
 
 | File | What it establishes |
 | --- | --- |
@@ -85,12 +99,12 @@ Follow [Forge's governed-host walkthrough](https://github.com/sashafelix/forge/b
 | Story risk facts | Scope and risk facts used to resolve the run profile |
 
 1. Install a compatible Forge checkout and Python 3.11+. Make a Linux Docker engine and the reviewed immutable test image available. The host does not pull images or silently use a host shell.
-2. Open **Forge cockpit → New governed run**. Select the trusted Forge checkout and Python executable, then the four input files. Console pins their contents. Changes to agent instructions, skills, contracts or host code require renewed host review/selection.
+2. Open **Forge cockpit → New governed run**. Select the trusted Forge checkout and Python executable. Create the pilot as described above, then select `runtime-configuration.json`, `execution-policy.json`, `runtime-inventory.json` and `facts.json` from its `inputs` folder, in that order. Console pins their contents. Changes to templates, instructions, skills, contracts or host code require renewed host review/selection.
 3. Click **Check host readiness**. Resolve every reported issue before preparing a run. This check does not call a model or approve execution.
-4. Select a clean target Git repository and a small, concrete task with observable acceptance criteria. Prepare the run.
+4. Select the generated `target` repository and paste `inputs/plan-input.md` into Task. Prepare the run.
 5. Review the start checkpoint: base revision, allowed source/test roots, command arguments, image, providers and limits. Click **Approve and continue** when those match your intent.
 6. Follow the stage trace. Open Evidence to inspect tests and logs. Review any later checkpoint before continuing.
-7. After completion, inspect the final diff and independent verification evidence. Applying, committing, pushing, merging and deploying remain separate actions.
+7. After completion, inspect the final diff and independent verification evidence. Record real runtime versions, human corrections and failures in `inputs/evaluation-notes.json`. Use Forge's `report` command with the actual managed host path (the parent of the evidence folder) to capture the run evidence. Applying, committing, pushing, merging and deploying remain separate actions.
 
 The native governed bridge supports macOS/Linux with Linux Docker. On Windows, run the Forge host in WSL and import its evidence into Console. Standalone CLI workflows remain available on Windows.
 
