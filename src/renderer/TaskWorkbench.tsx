@@ -350,7 +350,8 @@ export function TaskWorkbench() {
     if (refreshed) setRun(refreshed);
   }
 
-  if (cockpitMode) return <ForgeCockpit onBack={() => setCockpitMode(false)} />;
+  if (cockpitMode) return <ForgeCockpit onBack={() => setCockpitMode(false)}
+    onConfigure={() => { setCockpitMode(false); setConfigurationSection('overview'); setConfigurationMode(true); }} />;
   if (configurationMode) return <ConfigurationWorkbench initialSection={configurationSection} onBack={() => setConfigurationMode(false)}
     onOpenCockpit={() => { setConfigurationMode(false); setCockpitMode(true); }} onOpenConnections={() => { void openConnections(); }}
     onUseRuntime={(id) => { setRuntimeId(id); setConfigurationMode(false); void window.agentPipeline.listRuntimes().then(setRuntimes).catch((reason) => setError(String(reason))); }} />;

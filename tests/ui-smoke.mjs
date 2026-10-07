@@ -42,7 +42,10 @@ try {
   await page.setViewportSize({ width:760,height:1000 });
   await page.screenshot({ path:directory+'/checkpoint-narrow.png',fullPage:true });
   await page.setViewportSize({ width:1440,height:1000 });
-  await page.goto('http://127.0.0.1:5174/tests/visual/index.html?screen=configuration');
+  await page.goto('http://127.0.0.1:5174/tests/visual/index.html?screen=empty');
+  await page.getByRole('heading',{ name:'Every change has a trace.' }).waitFor();
+  await page.screenshot({ path:directory+'/cockpit-empty-dark.png',fullPage:true });
+  await page.getByRole('button',{ name:'Setup & guides',exact:true }).click();
   await page.getByRole('heading',{ name:'Your tools. Your workflow.' }).waitFor();
   await page.getByLabel('Colour theme').selectOption('light');
   await page.screenshot({ path:directory+'/configuration-light.png',fullPage:true });
@@ -66,12 +69,12 @@ try {
   await page.screenshot({ path:directory+'/project-facts-light.png',fullPage:true });
   await page.getByRole('button',{ name:/Quickstart guides From setup to first result/ }).click();
   await page.setViewportSize({ width:390,height:844 });
-  assert.equal(await page.getByLabel('Configuration page').inputValue(),'guides');
+  assert.equal(await page.getByLabel('Configuration page',{ exact:true }).inputValue(),'guides');
   assert.equal(await page.getByRole('navigation',{ name:'Configuration pages' }).count(),0);
   await page.screenshot({ path:directory+'/quickstart-mobile.png',fullPage:true });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),true);
-  await page.getByLabel('Configuration page').selectOption('runtimes');
-  assert.equal(await page.getByLabel('Configuration page').inputValue(),'runtimes');
+  await page.getByLabel('Configuration page',{ exact:true }).selectOption('runtimes');
+  assert.equal(await page.getByLabel('Configuration page',{ exact:true }).inputValue(),'runtimes');
   await page.screenshot({ path:directory+'/runtimes-mobile.png',fullPage:true });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),true);
   assert.deepEqual(errors,[]);

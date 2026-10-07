@@ -41,7 +41,7 @@ const events = [
   { sequence:2,timestamp:'2026-10-06T12:00:01Z',attempt:1,stage:'close',event_type:'run.completed',actor_role:'orchestrator',artifact_refs:[],safe_summary:'Review the patch before publication.' }
 ];
 const patch = '--- a/src/api.py\n+++ b/src/api.py\n@@ -1,2 +1,4 @@\n def result(value):\n-    return None\n+    if not isinstance(value, int):\n+        raise ValueError("Expected an integer")\n+    return value * 2\n';
-const runs = [run,managed];
+const runs = new URLSearchParams(location.search).get('screen') === 'empty' ? [] : [run,managed];
 window.agentPipeline = {
   listModelConfiguration:async () => ({ schemaVersion:'1.0',revision:0,providers:[],profiles:[],diagnostics:[],credentials:{} }),
   listRuntimes:async () => [{ id:'github-copilot',name:'GitHub Copilot',kind:'process',status:'available',capabilities:[],description:'Fixture runtime',executablePath:'/fixture/bin/copilot',version:'Fixture version' },
@@ -57,6 +57,6 @@ window.agentPipeline = {
 function VisualApp() {
   const [configuration,setConfiguration] = useState(new URLSearchParams(location.search).get('screen') === 'configuration');
   return configuration ? <ConfigurationWorkbench onBack={() => setConfiguration(false)} onOpenCockpit={() => setConfiguration(false)} onUseRuntime={() => undefined} />
-    : <ForgeCockpit onBack={() => setConfiguration(true)} />;
+    : <ForgeCockpit onBack={() => setConfiguration(true)} onConfigure={() => setConfiguration(true)} />;
 }
 createRoot(document.getElementById('root')!).render(<VisualApp />);
