@@ -116,6 +116,8 @@ python3 scripts/validate-project-profile.py /path/to/project-profile.json
 
 Supply that reviewed profile to your orchestrator as project context. It is not one of the four governed host inputs and does not authorize command execution. Non-secret drafts persist; review acknowledgements and entered secrets do not.
 
+Describe the target repository you want Forge to work on. For a minimal profile, enter its ID, your name or team under **Prepared by**, and its languages/stack; review the default version and root. Every field has help and examples. Open **See a complete example profile** for a read-only sample, or use the [field-by-field guide](pipeline-configuration.md#project-facts-handoff). Unknown optional text can stay blank; keep `[]` for modules and `{}` for decisions.
+
 When updating a source installation, pull the reviewed changes, run `npm ci`, stop the previous development process and run `npm run dev` again. Packaged installations require an updated build; merging a PR does not update an already installed app.
 
 For more detail: [models and routing](model-configuration.md), [cockpit](cockpit.md), [troubleshooting](troubleshooting.md), [security](security.md), and [distribution](distribution.md).

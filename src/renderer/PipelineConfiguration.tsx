@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { buildProjectProfile, emptyProjectProfileDraft, PROFILE_FIELDS, validateProjectProfileDraft } from '../shared/project-profile';
 import type { ProjectProfileDraft } from '../shared/project-profile';
+import { EXAMPLE_PROJECT_PROFILE, PROJECT_PROFILE_GUIDANCE } from './project-profile-guidance';
 import './pipeline-configuration.css';
 
 const MULTILINE = new Set(['stack', 'frameworks', 'build', 'test', 'lint', 'environment', 'constraints', 'modules', 'decisions']);
@@ -56,23 +57,36 @@ export function PipelineConfiguration({ onBack, embedded = false }: { onBack: ()
     <header className="task-header">
       <div><span className="task-kicker">FORGE · CONFIGURATION</span>
         <h1>Prepare your project profile</h1>
-        <p>Describe your project, review the file, then supply it to the pipeline in your usual coding environment.</p>
+        <p>Give Forge reusable context about the repository you want it to work on: its stack, commands, structure and established constraints.</p>
       </div>
       <div><button type="button" disabled={busy} onClick={importProfile}>Import project profile</button>{!embedded && <button type="button" disabled={busy} onClick={onBack}>Back to workbench</button>}</div>
     </header>
     <main>
+      <section className="configuration-facts-help" aria-labelledby="project-facts-help-title">
+        <h2 id="project-facts-help-title">What should I enter?</h2>
+        <p>This profile is optional. Start with the target repository's README, package or build files, CI configuration and architecture notes. Enter facts you can verify; add the current task when you start a run.</p>
+        <p>To export a minimal profile, fill in <strong>Project ID</strong>, <strong>Prepared by</strong> and <strong>Languages / stack</strong>, then check the default <strong>Profile version</strong> and <strong>Project root</strong>.</p>
+        <details className="configuration-example"><summary>See a complete example profile</summary>
+          <p>This fictional TypeScript web app shows the expected format. Use your own project's values. Viewing examples leaves your draft unchanged.</p>
+          <pre><code>{JSON.stringify(EXAMPLE_PROJECT_PROFILE, null, 2)}</code></pre>
+        </details>
+      </section>
       <p className="configuration-boundary">Execution, stage transitions, risk selection and approvals stay with Forge. Exporting a profile saves project facts only. Your draft is saved on this device.</p>
       <form onSubmit={(event) => { event.preventDefault(); if (!errors.length && reviewed && !busy) void exportProfile(); }}>
         <fieldset disabled={busy}><legend>Project facts</legend>
-          <p>Use one entry per line where indicated. Leave optional unknowns blank. Commands are saved as text. Keep credentials out of this file.</p>
+          <p>Use one entry per line where indicated. Leave unknown optional text blank; keep <code>[]</code> for modules and <code>{'{}'}</code> for decisions. Commands are saved as text. Keep credentials out of this file.</p>
           <div className="configuration-fields">{Object.entries(PROFILE_FIELDS).map(([name, label]) => {
             const key = name as keyof ProjectProfileDraft;
             const required = ['projectId', 'profileVersion', 'issuedBy', 'root', 'stack'].includes(key);
-            return <label key={key} htmlFor={`profile-${key}`}><span>{label}{required ? ' *' : ''}</span>
+            const guidance = PROJECT_PROFILE_GUIDANCE[key];
+            return <div key={key} className="configuration-field">
+              <label htmlFor={`profile-${key}`}>{label}{required ? ' *' : ''}</label>
               {MULTILINE.has(key)
-                ? <textarea id={`profile-${key}`} rows={3} maxLength={8000} required={required} value={draft[key]} onChange={(event) => update(key, event.target.value)} />
-                : <input id={`profile-${key}`} maxLength={8000} required={required} value={draft[key]} onChange={(event) => update(key, event.target.value)} />}
-            </label>;
+                ? <textarea id={`profile-${key}`} aria-describedby={`profile-${key}-help`} placeholder={guidance.placeholder} rows={3} maxLength={8000} required={required} value={draft[key]} onChange={(event) => update(key, event.target.value)} />
+                : <input id={`profile-${key}`} aria-describedby={`profile-${key}-help`} placeholder={guidance.placeholder} maxLength={8000} required={required} value={draft[key]} onChange={(event) => update(key, event.target.value)} />}
+              <small id={`profile-${key}-help`}>{guidance.help}</small>
+              {(key === 'modules' || key === 'decisions') && <details className="configuration-example"><summary>{key === 'modules' ? 'Show module example' : 'Show decisions example'}</summary><pre><code>{guidance.example}</code></pre></details>}
+            </div>;
           })}</div>
         </fieldset>
         <section className="configuration-review" aria-labelledby="profile-review-title">
