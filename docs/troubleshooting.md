@@ -44,6 +44,6 @@ Restarting the app recovers records and preserves the worktree. Runs left prepar
 
 ## Blank Electron window during development
 
-Use Node.js 22.12 or newer. Run `npm install`, then `npm run dev` from the repository root and open the Electron window. The renderer URL (`http://127.0.0.1:5173`) is an internal Vite development server, not a standalone browser app.
+Use Node.js 22.12 or newer. Run `npm ci`, then `npm run dev` from the repository root and open the Electron window. The renderer URL (`http://127.0.0.1:5173`) is an internal Vite development server, not a standalone browser app.
 
 If Electron reports an unavailable preload script or module, stop the development process with Ctrl+C, close its Electron window, and run `npm run dev` again. The launcher waits for the Vite endpoint and compiled Electron entry files. Use `npm run typecheck` and `npm run build` to distinguish compilation errors from launch problems. Sandboxed preload scripts must be self-contained or bundled.

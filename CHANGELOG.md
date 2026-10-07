@@ -2,6 +2,7 @@
 
 ## 0.9.0 (unreleased)
 
+- Added a committed dependency lockfile and aligned source setup, CI and desktop packaging on `npm ci` for reproducible installs.
 - Simplified setup and distribution documentation to focus on usage, validation and release preparation.
 - Added guided disposable-pilot creation in the cockpit using the selected Forge host, with native configuration/destination pickers, an immutable image ID and explicit capability review. Draft inputs are never automatically activated or approved.
 - Pinned pilot templates alongside host code, added platform/runtime guidance at the entry point, and documented evaluation source pairs and remaining qualification work.
