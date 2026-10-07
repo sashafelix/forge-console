@@ -2,8 +2,9 @@
 
 ## 0.9.0 (unreleased)
 
+- Simplified setup and distribution documentation to focus on usage, validation and release preparation.
 - Added guided disposable-pilot creation in the cockpit using the selected Forge host, with native configuration/destination pickers, an immutable image ID and explicit capability review. Draft inputs are never automatically activated or approved.
-- Pinned pilot templates alongside host code, added platform/runtime guidance at the entry point, and documented evaluation source pairs, remaining qualification work and the owner licence/release decision.
+- Pinned pilot templates alongside host code, added platform/runtime guidance at the entry point, and documented evaluation source pairs and remaining qualification work.
 - Removed repeated introductory copy and updated the in-app quickstart to use the pilot generator.
 
 - Rebuilt Pipeline configuration around the cockpit theme, a setup hub, visible Copilot/Claude runtime installation/connection controls and in-app quickstarts. Added a standalone README review example and a complete first-use guide.

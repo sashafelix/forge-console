@@ -2,10 +2,8 @@
 
 For a reviewable source pair and pilot evidence, use Forge's
 [evaluation handover](https://github.com/sashafelix/forge/blob/main/docs/evaluation.md).
-Record exact commits and passing CI, complete a live pilot, and resolve the owner
-licence decision before describing a build as a stable evaluation release. Neither
-repository currently includes a selected licence. Package generation does not
-grant publication or reuse permission.
+Record exact commits and passing CI, complete a live pilot, and document platform
+validation before describing a build as a stable evaluation release.
 
 ## Supported development packages
 
