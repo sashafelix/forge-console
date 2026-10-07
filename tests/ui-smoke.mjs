@@ -66,9 +66,12 @@ try {
   await page.screenshot({ path:directory+'/project-facts-light.png',fullPage:true });
   await page.getByRole('button',{ name:/Quickstart guides From setup to first result/ }).click();
   await page.setViewportSize({ width:390,height:844 });
+  assert.equal(await page.getByLabel('Configuration page').inputValue(),'guides');
+  assert.equal(await page.getByRole('navigation',{ name:'Configuration pages' }).count(),0);
   await page.screenshot({ path:directory+'/quickstart-mobile.png',fullPage:true });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),true);
-  await page.getByRole('button',{ name:'Set up a CLI runtime' }).click();
+  await page.getByLabel('Configuration page').selectOption('runtimes');
+  assert.equal(await page.getByLabel('Configuration page').inputValue(),'runtimes');
   await page.screenshot({ path:directory+'/runtimes-mobile.png',fullPage:true });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),true);
   assert.deepEqual(errors,[]);
