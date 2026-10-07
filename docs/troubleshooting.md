@@ -10,9 +10,19 @@ Discovery/probes are diagnostics. The cockpit needs reviewed Forge code, Python,
 
 ## Claude Code or Copilot is unavailable
 
-Install and authenticate the selected CLI separately, and confirm Git and that CLI work against the target repository. GUI applications may inherit a smaller `PATH`; select an executable explicitly in the UI if discovery misses it. Copilot must support the required programmatic/custom-agent permission flags. Its custom-agent source must be under `.github/agents/` or `.claude/agents/`.
+Install and authenticate the selected CLI separately, and confirm Git and that CLI work against the target repository. GUI applications may inherit a smaller `PATH`; select an executable explicitly in the UI if discovery misses it. Copilot must support the required programmatic/custom-agent permission flags. The CLI must also support `--add-dir` to read the selected library. Canonical `agents/` files are staged automatically for the run; legacy `.github/agents/` and `.claude/agents/` sources remain supported. Use **Pipeline configuration → CLI runtimes** to choose an executable and test its connection.
 
 The Connections vault supplies declared service variables; it does not replace provider CLI login. Review inherited environment variables as well as the approved connection requirements.
+
+On Windows, select the runtime's native `.exe` for standalone agent runs. Console rejects `.cmd`/`.bat` wrappers so task text and generated agent JSON cannot be interpreted as shell commands. A wrapper may pass executable discovery or a connection check while still being unsuitable for an agent run. Install the native CLI or use the CLI directly in WSL.
+
+## Where is Copilot in the configurator?
+
+Choose **CLI runtimes** or **Set up Copilot or Claude**. Copilot uses its CLI login and runs standalone workflows. **Models & providers** configures HTTP models for the governed Forge host; a Copilot subscription is not a provider API key. The [quickstart](quickstart.md) explains both paths.
+
+## Configuration still shows old controls
+
+Restart an updated build. For source installs, pull the reviewed changes, run `npm ci`, stop the old development process and restart with `npm run dev`. A merged change does not replace a running or packaged installation. Configuration uses the same theme selector as the cockpit.
 
 ## Model discovery, credentials or connectivity fail
 

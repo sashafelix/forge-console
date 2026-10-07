@@ -1,6 +1,6 @@
 # Forge run cockpit
 
-Open **Forge cockpit** from the guided workbench. This is the opt-in integration with Forge's governed Python host. The existing standalone agent workbench remains available separately.
+Open **Forge cockpit** from the guided workbench or configuration header. The [quickstart](quickstart.md) walks through first-use setup and evidence inspection. This is the opt-in integration with Forge's governed Python host. The existing standalone agent workbench remains available separately.
 
 ## Choose a mode
 
@@ -29,7 +29,7 @@ Diff shows changed text files and a unified patch. Events support stage/text fil
 ## Prepare a governed run
 
 1. Install the Forge revision containing `scripts/forge-host.py`, Python 3.11+ and a reachable Linux Docker engine. Provision the target's test dependencies in a reviewed immutable image. The host never pulls/builds an image or falls back to a host shell. On Windows, run the CLI host in WSL; launching it through this native bridge is not yet supported.
-2. In **New governed run**, select the trusted Forge checkout and Python executable through native dialogs. Console fingerprints host source/contracts and Python; changed code requires renewed selection/review. Checkout bytecode is excluded from execution via a fresh Python cache prefix.
+2. In **New governed run**, select the trusted Forge checkout and Python executable through native dialogs. Console fingerprints host source/contracts, canonical agents/skills, entry instructions, conventions and Python; changed code requires renewed selection/review. Checkout bytecode is excluded from execution via a fresh Python cache prefix.
 3. Select four independently reviewed JSON files: runtime configuration, execution policy, capability inventory and story risk facts. Their bytes are pinned. Configuration can come from **Pipeline configuration → Models & providers**, but synthetic probe results cannot register trusted capabilities. Follow [Forge's host walkthrough](https://github.com/sashafelix/forge/blob/main/docs/governed-host.md) for the exact contracts.
 4. Click **Check host readiness**. Doctor checks Docker/image, risk, all core and required specialist routes. It does not contact a model or approve anything.
 5. Select a clean target Git repository, enter the task and review the selected providers and policy. Preparation creates a disposable tracked-HEAD snapshot and private host directory without running a model.

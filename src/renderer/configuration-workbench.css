@@ -1,0 +1,85 @@
+/* Shared cockpit tokens keep configuration readable in light, dark and system themes. */
+body:has(.forge-cockpit) { min-width: 360px; margin: 0; }
+.configuration-workbench[data-theme="dark"] { color-scheme: dark; }
+.configuration-workbench[data-theme="light"] { color-scheme: light; }
+@media (prefers-color-scheme: dark) { .configuration-workbench[data-theme="system"] { color-scheme: dark; } }
+.configuration-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: calc(100vh - 76px); }
+.configuration-navigation { padding: 30px 16px; background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: 24px; }
+.configuration-navigation > .forge-eyebrow { padding: 0 12px; font-size: 9px; }
+.configuration-navigation nav { display: grid; gap: 7px; }
+.configuration-workbench .configuration-mobile-navigation { display: none; margin: 0; }
+.configuration-navigation button { display: grid; gap: 4px; text-align: left; padding: 13px 14px; border-color: transparent; }
+.configuration-navigation button[aria-current="page"] { background: var(--accent-soft); border-color: var(--line); color: var(--accent); }
+.configuration-navigation button small { font-size: 11px; font-weight: 400; }
+.configuration-navigation > p { margin: auto 12px 0; padding-top: 24px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+.configuration-content { min-width: 0; }
+.configuration-page, .configuration-workbench .task-shell { padding: 36px; margin: 0 auto; max-width: 1440px; min-height: 0; color: var(--ink); background: transparent; }
+.configuration-workbench .task-header { gap: 18px; margin: 0 0 26px; max-width: none; }
+.configuration-workbench .task-header h1 { color: var(--ink); font-size: 30px; letter-spacing: -.8px; }
+.configuration-workbench .task-header p { font-size: 14px; color: var(--muted); }
+.configuration-workbench .task-kicker { color: var(--accent); font-size: 10px; letter-spacing: 1.4px; }
+.configuration-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+.configuration-card { display: flex; flex-direction: column; align-items: flex-start; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 28px; box-shadow: var(--shadow); min-width: 0; }
+.configuration-card-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; width: 100%; margin-bottom: 23px; justify-content: space-between; }
+.configuration-icon { display: inline-grid; place-items: center; width: 44px; height: 44px; flex-shrink: 0; border: 1px solid var(--line); border-radius: 11px; background: var(--accent-soft); color: var(--accent); font: 700 15px ui-monospace, monospace; }
+.configuration-card h2 { font-size: 21px; letter-spacing: -.5px; }
+.configuration-card p, .configuration-help p, .configuration-guide p { color: var(--muted); }
+.configuration-card > ul { padding-left: 19px; color: var(--muted); line-height: 1.9; margin: 0 0 26px; }
+.configuration-card > .forge-primary { margin-top: auto; }
+.configuration-status { display: inline-flex; border-radius: 5px; padding: 4px 8px; color: var(--muted); background: var(--bg); font-size: 11px; border: 1px solid var(--line); }
+.configuration-status.ready { color: var(--green); background: var(--green-soft); }
+.configuration-help { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-top: 26px; padding: 25px 28px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); }
+.configuration-help h2 { margin: 6px 0 8px; font-size: 18px; }
+.configuration-help p { margin: 0; max-width: 670px; }
+.configuration-help button { flex-shrink: 0; }
+.configuration-next { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 24px; }
+.configuration-next button { display: flex; flex-direction: column; gap: 7px; padding: 20px 24px; text-align: left; }
+.configuration-next span { color: var(--muted); font-size: 12px; }
+.configuration-note { padding: 15px 18px; border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; background: var(--accent-soft); color: var(--ink) !important; font-size: 13px; margin-bottom: 24px !important; }
+.configuration-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0; }
+.runtime-card ol { padding-left: 20px; margin: 4px 0 22px; }
+.runtime-card li { margin-bottom: 10px; padding-left: 3px; }
+.runtime-card > small { margin-bottom: 18px; font-size: 11px; }
+.runtime-location { display: grid; gap: 7px; width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 14px; background: var(--bg); }
+.runtime-location small { font-size: 11px; }
+.configuration-error, .configuration-success { border-radius: 8px; padding: 13px 16px; border: 1px solid var(--line); overflow-wrap: anywhere; }
+.configuration-error { background: var(--red-soft); color: var(--red) !important; }
+.configuration-success { background: var(--green-soft); color: var(--green) !important; }
+.configuration-guide { display: flex; align-items: flex-start; gap: 22px; padding: 28px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 20px; }
+.configuration-guide > div { min-width: 0; }
+.configuration-guide h2 { font-size: 21px; margin-top: 7px; }
+.configuration-guide ol { padding-left: 20px; margin: 18px 0 22px; }
+.configuration-guide li { padding-left: 6px; margin: 12px 0; color: var(--muted); }
+.configuration-step { color: var(--accent); background: var(--accent-soft); border-radius: 7px; padding: 6px 10px; font: 600 13px ui-monospace, monospace; }
+.configuration-workbench .primary { background: #315cd6; color: white; border-color: #315cd6; font-weight: 650; }
+.configuration-workbench .primary:hover { background: #244ab6; }
+.configuration-workbench .models-toolbar { padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.configuration-workbench .models-toolbar [role="tablist"] { flex-wrap: wrap; margin-right: auto; }
+.configuration-workbench .models-toolbar [role="tab"][aria-selected="true"] { color: var(--accent); background: var(--accent-soft); border-color: var(--accent); }
+.configuration-workbench .models-layout { grid-template-columns: 225px minmax(0, 1fr); gap: 20px; }
+.configuration-workbench .model-panel, .configuration-workbench .models-sidebar { padding: 22px; }
+.configuration-workbench .models-sidebar { padding: 18px; }
+.configuration-workbench .models-sidebar h3 { padding-top: 10px; border-top: 1px solid var(--line); margin-top: 20px; }
+.configuration-workbench .provider-presets button { text-align: left; padding: 10px 12px; }
+.configuration-workbench .model-boundary { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; border-radius: 0 8px 8px 0; color: var(--muted); font-size: 12px; }
+.configuration-workbench .model-boundary button { padding: 5px 9px; font-size: 11px; }
+.configuration-workbench .models-empty { padding: 14px 10px; max-width: 650px; }
+.configuration-workbench .models-empty .configuration-icon { margin-bottom: 24px; }
+.configuration-workbench .models-empty h2 { font-size: 22px; }
+.configuration-workbench .models-empty p { color: var(--muted); }
+.configuration-workbench .models-empty ol { padding: 0; list-style: none; counter-reset: setup; display: grid; gap: 14px; margin: 28px 0; }
+.configuration-workbench .models-empty li { display: flex; align-items: center; gap: 12px; counter-increment: setup; }
+.configuration-workbench .models-empty li::before { content: counter(setup); display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-size: 12px; }
+.configuration-workbench .configuration-confirm, .configuration-workbench .model-checkbox { display: flex; flex-direction: row; align-items: flex-start; gap: 10px; }
+.configuration-workbench .configuration-review p, .configuration-workbench fieldset > p { color: var(--muted); }
+.configuration-workbench .model-binding, .configuration-workbench .model-route { margin-top: 14px; }
+.configuration-workbench .model-panel label { margin-bottom: 0; font-size: 13px; }
+.configuration-workbench .model-panel small { font-size: 11px; }
+.configuration-workbench .task-alert { color: var(--ink); background: var(--accent-soft); border: 1px solid var(--line); }
+.configuration-workbench .task-alert.error { color: var(--red); background: var(--red-soft); }
+.configuration-workbench .configuration-fields label { font-size: 13px; }
+.configuration-workbench .configuration-fields { align-items: start; }
+@media (max-width: 650px) { .configuration-workbench .configuration-navigation nav { display: none; } .configuration-workbench .configuration-mobile-navigation { display: flex; } }
+@media (max-width: 1150px) { .configuration-layout { grid-template-columns: 205px minmax(0, 1fr); } .configuration-page, .configuration-workbench .task-shell { padding: 26px; } .configuration-workbench .models-layout { grid-template-columns: 195px minmax(0, 1fr); } .configuration-card { padding: 22px; } .configuration-card h2 { font-size: 18px; } .configuration-workbench .model-fields { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .configuration-layout { display: block; } .configuration-navigation { border-right: 0; border-bottom: 1px solid var(--line); padding: 12px 18px; } .configuration-navigation > span, .configuration-navigation > p, .configuration-navigation button small { display: none; } .configuration-navigation nav { display: flex; overflow-x: auto; } .configuration-navigation button { flex-shrink: 0; padding: 8px 11px; font-size: 12px; } .configuration-workbench .models-layout { grid-template-columns: 1fr; } .configuration-workbench .models-sidebar { display: block; } .configuration-workbench .provider-presets { grid-template-columns: repeat(3, minmax(0, 1fr)); } .configuration-workbench .model-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 650px) { .configuration-page, .configuration-workbench .task-shell { padding: 22px 18px; } .configuration-cards, .configuration-next { grid-template-columns: 1fr; } .configuration-help { align-items: flex-start; flex-direction: column; padding: 22px; } .configuration-workbench .task-header { flex-direction: column; } .configuration-workbench h1, .configuration-workbench .task-header h1 { font-size: 26px; } .configuration-guide { padding: 20px; gap: 13px; } .configuration-guide h2 { font-size: 18px; } .configuration-step { padding: 5px 7px; } .configuration-workbench .model-fields, .configuration-workbench .configuration-fields { grid-template-columns: 1fr; } .configuration-workbench .provider-presets { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

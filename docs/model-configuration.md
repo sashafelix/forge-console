@@ -1,6 +1,6 @@
 # Models, providers and routing
 
-Open **Pipeline configuration → Models & providers**. The registry stores multiple named provider connections and reusable model profiles. It prepares configuration for Local RGR; it does not start RGR runs or install an HTTP execution adapter.
+Open **Pipeline configuration → Models & providers**. The registry stores multiple named provider connections and reusable model profiles. It prepares configuration for the separately registered governed Forge host. For Copilot or Claude Code subscription workflows, choose **CLI runtimes** instead; those CLI runtimes cannot currently be assigned to governed HTTP stage routes. Start with the [Console quickstart](quickstart.md).
 
 ## Connect and configure
 

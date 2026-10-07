@@ -34,7 +34,7 @@ export function HostPermissions({ host }: { host: HostView }) {
   </div>;
 }
 
-export function ForgeCockpit({ onBack }: { onBack: () => void }) {
+export function ForgeCockpit({ onBack, onConfigure }: { onBack: () => void; onConfigure?: () => void }) {
   const [setup, setSetup] = useState<ForgeSetup>({ host: null, inputs: null });
   const [runs, setRuns] = useState<ForgeRunSnapshot[]>([]);
   const [run, setRun] = useState<ForgeRunSnapshot | null>(null);
@@ -205,6 +205,7 @@ export function ForgeCockpit({ onBack }: { onBack: () => void }) {
       <div className="forge-header-actions">
         <label className="forge-theme"><span className="forge-sr">Colour theme</span><select value={theme} onChange={(event) => setTheme(event.target.value)}><option value="system">System theme</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
         <button type="button" onClick={() => setPalette(true)}>Commands <kbd>⌘/Ctrl K</kbd></button>
+        {onConfigure && <button type="button" disabled={busy} onClick={onConfigure}>Setup & guides</button>}
         <button type="button" onClick={onBack}>Back to workflows</button>
       </div>
     </header>
@@ -251,6 +252,7 @@ export function ForgeCockpit({ onBack }: { onBack: () => void }) {
             <button className="forge-primary" type="button" disabled={busy || !reviewed || !doctor?.ready || !project?.isGitRepository || !task.trim()} onClick={prepare}>Prepare run checkpoint</button>
           </section>
         </> : !run ? <section className="forge-empty"><div className="forge-mark">F</div><span className="forge-eyebrow">FORGE COCKPIT</span><h1>Every change has a trace.</h1><p>Follow the nine stages, inspect the tests and review the exact patch before publication.</p>
+          {onConfigure && <p>New to Console? <button type="button" disabled={busy} onClick={onConfigure}>Choose your setup</button> for Copilot, Claude Code or a governed Forge run.</p>}
           <div><button className="forge-primary" type="button" disabled={busy} onClick={() => setMode('prepare')}>Prepare a governed run</button><button type="button" disabled={busy} onClick={importRun}>Inspect existing evidence</button></div></section> : <>
           <div className="forge-page-title"><div><span className="forge-eyebrow">{run.source === 'managed' ? 'GOVERNED HOST' : 'IMPORTED EVIDENCE'}</span><h1>{run.storyId}</h1><p>{run.profile} · attempt {run.attempt} · <code>{run.baseRevision.slice(0,12) || 'Revision unknown'}</code></p></div>
             <div className="forge-run-status"><span className={'forge-dot ' + (run.status === 'completed' ? 'success' : run.status === 'failed' ? 'danger' : '')} /><strong>{pretty(run.status)}</strong><small aria-live="polite">{evidenceLabel[run.evidenceLevel]}</small></div></div>

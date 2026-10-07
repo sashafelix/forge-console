@@ -1,5 +1,7 @@
 # Forge configuration boundary
 
+The configuration hub offers **Get started**, **CLI runtimes**, **Models & providers**, **Project facts**, and **Quickstart guides**. See the [first-use guide](quickstart.md) for complete paths through each setup.
+
 Configuration integrates with [Forge](https://github.com/sashafelix/forge) through explicit file handoffs. The separate [cockpit](cockpit.md) can also control a registered governed host. Both repositories remain independent; Forge owns execution/governance and the native bridge preserves that authority.
 
 | Concern | Owner |
