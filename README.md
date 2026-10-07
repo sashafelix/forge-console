@@ -30,7 +30,7 @@ npm run dev
 Stop any older development process before restarting. Pulling code does not update
 an installed desktop package. For a team evaluation, pin both source commits using
 Forge's [evaluation snapshot](https://github.com/sashafelix/forge/blob/main/docs/evaluation.md).
-Source version `0.9.0` is unreleased; no licence has been selected. See [distribution](docs/distribution.md).
+Source version `0.9.0` is unreleased. See [distribution](docs/distribution.md).
 
 ## Forge configuration
 
