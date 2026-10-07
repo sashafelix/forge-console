@@ -1,0 +1,86 @@
+/* One palette for every screen. A fresh installation always starts in dark mode. */
+:root {
+  color-scheme: dark;
+  --bg: #101822;
+  --panel: #172333;
+  --ink: #edf3fa;
+  --muted: #afbed0;
+  --line: #334457;
+  --accent: #a8bcff;
+  --accent-soft: #253859;
+  --green: #88dfbb;
+  --green-soft: #173d32;
+  --red: #ffadb8;
+  --red-soft: #472832;
+  --amber: #f0cf7a;
+  --amber-soft: #443924;
+  --button: #315cd6;
+  --button-hover: #244ab6;
+  --on-button: #fff;
+  --shadow: none;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f6f7fb;
+  --panel: #fff;
+  --ink: #182535;
+  --muted: #536578;
+  --line: #dce3eb;
+  --accent: #315cd6;
+  --accent-soft: #eaf0ff;
+  --green: #127354;
+  --green-soft: #e8f6ef;
+  --red: #ae3042;
+  --red-soft: #fff0f1;
+  --amber: #866008;
+  --amber-soft: #fff5d9;
+  --shadow: 0 5px 22px #20355108;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-theme="system"] {
+    color-scheme: light;
+    --bg: #f6f7fb;
+    --panel: #fff;
+    --ink: #182535;
+    --muted: #536578;
+    --line: #dce3eb;
+    --accent: #315cd6;
+    --accent-soft: #eaf0ff;
+    --green: #127354;
+    --green-soft: #e8f6ef;
+    --red: #ae3042;
+    --red-soft: #fff0f1;
+    --amber: #866008;
+    --amber-soft: #fff5d9;
+    --shadow: 0 5px 22px #20355108;
+  }
+}
+
+.console-theme-picker.console-theme-picker {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.console-theme-picker.console-theme-picker select {
+  width: auto;
+  min-width: 98px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.console-theme-picker select:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.console-header-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }

@@ -4,6 +4,7 @@ import { FORGE_STAGES } from '../shared/forge';
 import type { ProjectSelection } from '../shared/contracts';
 import { AccessibleDialog } from './AccessibleDialog';
 import { useConsoleTheme } from './useConsoleTheme';
+import { ThemePicker } from './ThemePicker';
 import { DiffViewer } from './DiffViewer';
 import './forge-cockpit.css';
 
@@ -62,7 +63,7 @@ export function ForgeCockpit({ onBack, onConfigure }: { onBack: () => void; onCo
   const [comparison, setComparison] = useState<ForgeRunSnapshot | null>(null);
   const [retryStage, setRetryStage] = useState<ForgeStage>('quality_gate');
   const [palette, setPalette] = useState(false);
-  const [theme, setTheme] = useConsoleTheme();
+  const [theme] = useConsoleTheme();
   const root = useRef<HTMLDivElement>(null);
   const selectedId = useRef('');
   const tabButtons = useRef<(HTMLButtonElement | null)[]>([]);
@@ -205,7 +206,7 @@ export function ForgeCockpit({ onBack, onConfigure }: { onBack: () => void; onCo
     <header className="forge-header">
       <div className="forge-brand"><span aria-hidden="true">F</span><div><strong>Forge Console</strong><small>Run and review Forge</small></div></div>
       <div className="forge-header-actions">
-        <label className="forge-theme"><span className="forge-sr">Colour theme</span><select value={theme} onChange={(event) => setTheme(event.target.value)}><option value="system">System theme</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+        <ThemePicker />
         <button type="button" onClick={() => setPalette(true)}>Commands <kbd>⌘/Ctrl K</kbd></button>
         {onConfigure && <button type="button" disabled={busy} onClick={onConfigure}>Setup & guides</button>}
         <button type="button" onClick={onBack}>Back to workflows</button>

@@ -1,10 +1,5 @@
 .connections-shell {
   min-height: 100vh;
-  color-scheme: light;
-}
-.connections-shell[data-theme="dark"] { color-scheme: dark; }
-@media (prefers-color-scheme: dark) {
-  .connections-shell[data-theme="system"] { color-scheme: dark; }
 }
 
 .connections-shell .connections-content {

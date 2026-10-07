@@ -1,12 +1,11 @@
 .advanced-workbench-shell {
-  color-scheme: light;
-  color: #172033;
+  color: var(--ink);
 }
 
 .advanced-workbench-shell .app-shell {
   min-height: calc(100vh - 58px);
   background: transparent;
-  color: #172033;
+  color: var(--ink);
   padding: 28px;
 }
 
@@ -16,280 +15,280 @@
 .advanced-workbench-shell .form-panel h3,
 .advanced-workbench-shell .approval-panel h3,
 .advanced-workbench-shell .execution-summary h3 {
-  color: #17233d;
+  color: var(--ink);
 }
 
 .advanced-workbench-shell p,
 .advanced-workbench-shell small {
-  color: #69778e;
+  color: var(--muted);
 }
 
 .advanced-workbench-shell .eyebrow {
-  color: #2f67b5;
+  color: var(--accent);
 }
 
 .advanced-workbench-shell .system-pill,
 .advanced-workbench-shell .version-chip,
 .advanced-workbench-shell .git-badge,
 .advanced-workbench-shell .mode-chip {
-  border-color: #cbd6e5;
-  background: #f7f9fc;
-  color: #506078;
+  border-color: var(--line);
+  background: var(--panel);
+  color: var(--muted);
 }
 
 .advanced-workbench-shell .mode-chip.execute {
-  border-color: #9cb9df;
-  background: #eff5fd;
-  color: #2f67b5;
+  border-color: var(--line);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .advanced-workbench-shell .error-banner {
-  border-color: #e2a7ad;
-  background: #fff1f2;
-  color: #8a2634;
+  border-color: var(--red);
+  background: var(--red-soft);
+  color: var(--red);
 }
 
 .advanced-workbench-shell .sidebar,
 .advanced-workbench-shell .content {
-  border-color: #d7e0eb;
-  background: #fff;
+  border-color: var(--line);
+  background: var(--panel);
   box-shadow: 0 10px 28px rgba(43, 61, 89, .07);
 }
 
 .advanced-workbench-shell .sidebar section + section {
-  border-top-color: #e3e8f0;
+  border-top-color: var(--line);
 }
 
 .advanced-workbench-shell .sidebar h2 {
-  color: #55657d;
+  color: var(--muted);
 }
 
 .advanced-workbench-shell .sidebar-title button,
 .advanced-workbench-shell .console-actions button {
-  color: #2f67b5;
+  color: var(--accent);
 }
 
 .advanced-workbench-shell .project-button,
 .advanced-workbench-shell .option {
-  border-color: #d6deea;
-  background: #f9fbfd;
-  color: #23314a;
+  border-color: var(--line);
+  background: var(--panel);
+  color: var(--ink);
 }
 
 .advanced-workbench-shell .project-button:hover,
 .advanced-workbench-shell .option:hover {
-  border-color: #8ba9d2;
-  background: #f3f7fc;
+  border-color: var(--line);
+  background: var(--panel);
 }
 
 .advanced-workbench-shell .project-icon {
-  background: #e4edfb;
-  color: #2f67b5;
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .advanced-workbench-shell .option.active {
-  border-color: #4f7fbe;
-  background: #eef5ff;
+  border-color: var(--accent);
+  background: var(--accent-soft);
   box-shadow: inset 3px 0 #4f7fbe;
 }
 
 .advanced-workbench-shell .option-row em.available,
 .advanced-workbench-shell .git-badge.ok {
-  color: #267552;
+  color: var(--green);
 }
 
 .advanced-workbench-shell .option-row em.unavailable {
-  color: #a63e50;
+  color: var(--red);
 }
 
 .advanced-workbench-shell .option-row em.unconfigured,
 .advanced-workbench-shell .git-badge.warn {
-  color: #8b691c;
+  color: var(--amber);
 }
 
 .advanced-workbench-shell .stage,
 .advanced-workbench-shell .agent-context-grid > div,
 .advanced-workbench-shell .agent-permission-preview > div,
 .advanced-workbench-shell .policy-grid > div {
-  border-color: #dbe3ee;
-  background: #f8fafc;
+  border-color: var(--line);
+  background: var(--panel);
 }
 
 .advanced-workbench-shell .stage > span {
-  background: #e4edfb;
-  color: #2f67b5;
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .advanced-workbench-shell .form-panel {
-  border-color: #d8e0eb;
-  background: #fbfcfe;
+  border-color: var(--line);
+  background: var(--panel);
 }
 
 .advanced-workbench-shell .section-title > span,
 .advanced-workbench-shell .agent-context-grid span,
 .advanced-workbench-shell .agent-permission-preview strong,
 .advanced-workbench-shell .policy-grid strong {
-  color: #718099;
+  color: var(--muted);
 }
 
 .advanced-workbench-shell .agent-context-grid strong,
 .advanced-workbench-shell .agent-permission-preview span,
 .advanced-workbench-shell .policy-grid span {
-  color: #263650;
+  color: var(--ink);
 }
 
 .advanced-workbench-shell .field,
 .advanced-workbench-shell .approval-check {
-  color: #384861;
+  color: var(--ink);
 }
 
 .advanced-workbench-shell .field input,
 .advanced-workbench-shell .field textarea,
 .advanced-workbench-shell .field select {
-  border-color: #cbd5e3;
-  background: #fff;
-  color: #172033;
+  border-color: var(--line);
+  background: var(--panel);
+  color: var(--ink);
 }
 
 .advanced-workbench-shell .field input:focus,
 .advanced-workbench-shell .field textarea:focus,
 .advanced-workbench-shell .field select:focus {
-  border-color: #4f7fbe;
+  border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(79, 127, 190, .12);
 }
 
 .advanced-workbench-shell .checkbox-field {
-  border-color: #d6deea;
-  background: #fff;
+  border-color: var(--line);
+  background: var(--panel);
 }
 
 .advanced-workbench-shell .runtime-configuration {
-  border-color: #d6deea;
-  background: #fff;
-  color: #263650;
+  border-color: var(--line);
+  background: var(--panel);
+  color: var(--ink);
 }
 
 .advanced-workbench-shell .runtime-configuration.available {
-  border-color: #9fc8b2;
-  background: #f7fffa;
+  border-color: var(--green);
+  background: var(--green-soft);
 }
 
 .advanced-workbench-shell .runtime-configuration.unavailable,
 .advanced-workbench-shell .runtime-configuration.unconfigured {
-  border-color: #e4c777;
-  background: #fff9e8;
+  border-color: var(--amber);
+  background: var(--amber-soft);
 }
 
 .advanced-workbench-shell .runtime-configuration button,
 .advanced-workbench-shell .secondary,
 .advanced-workbench-shell .approval-actions .secondary {
-  border-color: #c8d2e3;
-  background: #fff;
-  color: #24334f;
+  border-color: var(--line);
+  background: var(--panel);
+  color: var(--ink);
 }
 
 .advanced-workbench-shell .primary {
-  border-color: #235a9f;
-  background: #2f6fbd;
-  color: #fff;
+  border-color: var(--button);
+  background: var(--button);
+  color: var(--on-button);
 }
 
 .advanced-workbench-shell .danger {
-  border-color: #dda2ab;
-  background: #fff1f2;
-  color: #9d3344;
+  border-color: var(--red);
+  background: var(--red-soft);
+  color: var(--red);
 }
 
 .advanced-workbench-shell .runtime-hint,
 .advanced-workbench-shell .trust-warning {
-  border-color: #e4c777;
-  background: #fff9e8;
-  color: #775b13;
+  border-color: var(--amber);
+  background: var(--amber-soft);
+  color: var(--amber);
 }
 
 .advanced-workbench-shell .approval-panel {
-  border-color: #9cb9df;
-  background: linear-gradient(145deg, #f8fbff, #eef5fd);
+  border-color: var(--line);
+  background: linear-gradient(145deg, var(--panel), var(--accent-soft));
 }
 
 .advanced-workbench-shell .approval-status {
-  border-color: #e4c777;
-  background: #fff9e8;
-  color: #775b13;
+  border-color: var(--amber);
+  background: var(--amber-soft);
+  color: var(--amber);
 }
 
 .advanced-workbench-shell .execution-details > div {
-  border-color: #d8e0eb;
-  background: rgba(255, 255, 255, .75);
+  border-color: var(--line);
+  background: color-mix(in srgb, var(--panel) 75%, transparent);
 }
 
 .advanced-workbench-shell .execution-details dt {
-  color: #718099;
+  color: var(--muted);
 }
 
 .advanced-workbench-shell .execution-details dd {
-  color: #263650;
+  color: var(--ink);
 }
 
 .advanced-workbench-shell .environment-list > div {
-  border-top-color: #dde4ee;
+  border-top-color: var(--line);
 }
 
 .advanced-workbench-shell .environment-list .present {
-  color: #267552;
+  color: var(--green);
 }
 
 .advanced-workbench-shell .environment-list .missing {
-  color: #8b691c;
+  color: var(--amber);
 }
 
 .advanced-workbench-shell .execution-summary {
-  border-color: #d8e0eb;
-  background: #fff;
+  border-color: var(--line);
+  background: var(--panel);
 }
 
 .advanced-workbench-shell .run-console {
-  border-color: #d4deeb;
-  background: #fff;
+  border-color: var(--line);
+  background: var(--panel);
 }
 
 .advanced-workbench-shell .console-heading {
-  border-bottom-color: #dce4ee;
-  background: #f4f7fb;
-  color: #263650;
+  border-bottom-color: var(--line);
+  background: var(--panel);
+  color: var(--ink);
 }
 
 .advanced-workbench-shell .console-heading code,
 .advanced-workbench-shell .console-line time,
 .advanced-workbench-shell .console-output > span {
-  color: #7b899d;
+  color: var(--muted);
 }
 
 .advanced-workbench-shell .console-output {
-  background: #fbfcfe;
-  color: #34445d;
+  background: var(--panel);
+  color: var(--ink);
 }
 
 .advanced-workbench-shell .console-line {
-  color: #34445d;
+  color: var(--ink);
 }
 
 .advanced-workbench-shell .console-line.runtime-stderr,
 .advanced-workbench-shell .console-line.run-failed {
-  color: #a63e50;
+  color: var(--red);
 }
 
 .advanced-workbench-shell .console-line.run-completed {
-  color: #267552;
+  color: var(--green);
 }
 
 .advanced-workbench-shell .console-actions {
-  border-top-color: #dce4ee;
-  background: #f8fafc;
+  border-top-color: var(--line);
+  background: var(--panel);
 }
 
 .advanced-workbench-shell .empty {
-  color: #718099;
+  color: var(--muted);
 }
 
 @media (max-width: 1100px) {

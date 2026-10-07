@@ -1,8 +1,5 @@
 /* Shared cockpit tokens keep configuration readable in light, dark and system themes. */
 body:has(.forge-cockpit) { min-width: 360px; margin: 0; }
-.configuration-workbench[data-theme="dark"] { color-scheme: dark; }
-.configuration-workbench[data-theme="light"] { color-scheme: light; }
-@media (prefers-color-scheme: dark) { .configuration-workbench[data-theme="system"] { color-scheme: dark; } }
 .configuration-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: calc(100vh - 76px); }
 .configuration-navigation { padding: 30px 16px; background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: 24px; }
 .configuration-navigation > .forge-eyebrow { padding: 0 12px; font-size: 9px; }

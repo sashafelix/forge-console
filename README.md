@@ -4,6 +4,8 @@ The desktop companion for **[Forge](https://github.com/sashafelix/forge)** and a
 
 ## Start here
 
+Console starts in **Dark** mode. Use the **Theme** picker in any screen header to choose **Light** or follow your **System** preference. One saved choice applies to Workflows, Advanced, configuration, Connections and the cockpit, including after a restart.
+
 Open **Pipeline configuration** for the setup hub, or **Quickstart guides** for guided instructions. The [quickstart](docs/quickstart.md) covers a first Copilot/Claude agent run, a governed Forge run, and read-only evidence review. A small [README review agent](examples/agents/readme-review.md) is included.
 
 ## Forge configuration

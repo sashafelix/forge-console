@@ -1,3 +1,4 @@
+import { ThemePicker } from './ThemePicker';
 import { useEffect, useMemo, useState } from 'react';
 import { RunPermissions } from './RunPermissions';
 import type {
@@ -385,6 +386,7 @@ export function TaskWorkbench() {
           <p>Choose a workflow, provide the ticket or task, and let the workbench guide the rest.</p>
         </div>
         <div className="task-header-actions">
+          <ThemePicker />
           <button type="button" onClick={() => setCockpitMode(true)}>Forge cockpit</button>
           <button type="button" disabled={active} onClick={() => { setConfigurationSection('overview'); setConfigurationMode(true); }}>Pipeline configuration</button>
           <button type="button" disabled={active} onClick={() => { setConfigurationSection('guides'); setConfigurationMode(true); }}>Quickstart guides</button>

@@ -1,17 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
+import './console-theme.css';
 
 const KEY = 'forge-console.cockpit-theme';
 const CHANGE_EVENT = 'forge-console:theme-changed';
 type Theme = 'system' | 'light' | 'dark';
 function isTheme(value: unknown): value is Theme { return value === 'system' || value === 'light' || value === 'dark'; }
 function savedTheme(): Theme {
-  try { const value = localStorage.getItem(KEY); return isTheme(value) ? value : 'system'; }
-  catch { return 'system'; }
+  try { const value = localStorage.getItem(KEY); return isTheme(value) ? value : 'dark'; }
+  catch { return 'dark'; }
 }
+
+export function initializeConsoleTheme(): void { document.documentElement.dataset.theme = savedTheme(); }
 
 /** Sync mounted pages as well as remembering the theme between app launches. */
 export function useConsoleTheme(): [Theme, (theme: string) => void] {
   const [theme, updateTheme] = useState<Theme>(savedTheme);
+  useLayoutEffect(() => { document.documentElement.dataset.theme = theme; }, [theme]);
   useEffect(() => {
     const changed = (event: Event) => {
       const next = (event as CustomEvent<unknown>).detail;

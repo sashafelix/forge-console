@@ -70,15 +70,16 @@ test('provider readiness is checked before an agent worktree is prepared', async
   assert.match(runtime, /readiness check timed out/);
 });
 
-test('Advanced loads a complete light-theme override after legacy styles', async () => {
+test('Advanced loads shared theme colours after base layout styles', async () => {
   const main = await source('src/renderer/main.tsx');
-  const light = await source('src/renderer/advanced-light.css');
+  const light = await source('src/renderer/advanced-workbench.css');
 
-  assert.ok(main.indexOf("'./advanced-light.css'") > main.indexOf("'./styles.css'"));
+  assert.ok(main.indexOf("'./advanced-workbench.css'") > main.indexOf("'./styles.css'"));
   for (const selector of ['.sidebar', '.content', '.form-panel', '.approval-panel', '.run-console']) {
     assert.match(light, new RegExp(`advanced-workbench-shell \\${selector}`));
   }
-  assert.match(light, /color-scheme:\s*light/);
+  assert.match(light, /var\(--panel\)/);
+  assert.doesNotMatch(light, /color-scheme:\s*light/);
 });
 
 test('provider checks and active runs show accessible animated activity feedback', async () => {

@@ -4,13 +4,14 @@ import { useState } from 'react';
 import { ForgeCockpit } from '../../src/renderer/ForgeCockpit';
 import { ConfigurationWorkbench } from '../../src/renderer/ConfigurationWorkbench';
 import { WorkspaceShell } from '../../src/renderer/WorkspaceShell';
+import { TaskWorkbench } from '../../src/renderer/TaskWorkbench';
 import { defaultSettings } from '../../src/shared/settings';
 import '../../src/renderer/styles.css';
-import '../../src/renderer/task-light.css';
+import '../../src/renderer/task-workbench.css';
 import '../../src/renderer/state-navigation.css';
-import '../../src/renderer/advanced-light.css';
+import '../../src/renderer/advanced-workbench.css';
 import '../../src/renderer/interactive-runs.css';
-import type { DesktopApi, NetworkSettings, WorkspacePage } from '../../src/shared/contracts';
+import type { DesktopApi, NetworkSettings, WorkspacePage, AgentExecutionRun } from '../../src/shared/contracts';
 import { FORGE_STAGES, type ForgeRunSnapshot, type HostView } from '../../src/shared/forge';
 
 const base = 'a'.repeat(40);
@@ -46,7 +47,25 @@ const patch = '--- a/src/api.py\n+++ b/src/api.py\n@@ -1,2 +1,4 @@\n def result(
 const runs = new URLSearchParams(location.search).get('screen') === 'empty' ? [] : [run,managed];
 const navigationListeners = new Set<(page: WorkspacePage) => void>();
 let network = defaultSettings().network;
+const fixtureScreen = new URLSearchParams(location.search).get('screen');
+const fixtureAgent = { id: 'readme-review', name: 'README review', version: '1', description: 'Review setup instructions and identify missing steps.',
+  sourceRoot: '/fixture/library', relativePath: 'agents/readme-review.md', supportedRuntimes: ['github-copilot'], maxTurns: 8,
+  inputs: [{ name: 'task', title: 'Task', required: true }], tools: ['Read', 'Glob', 'Grep'], requiredEnvironment: [], writes: [], writeRequested: false };
+const fixtureProject = { name: 'Example project', path: '/fixture/project', isGitRepository: true };
+const conversationRun = {
+  id: 'fixture-conversation', agentName: 'README review', agentVersion: '1', runtimeId: 'github-copilot', status: 'waiting_for_input',
+  createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), targetProject: fixtureProject, inputs: {},
+  storagePath: '/fixture/run', worktreePath: '/fixture/worktree', repositoryRoot: fixtureProject.path, baseRevision: base,
+  conversation: [{ id: 'message-1', role: 'assistant', content: 'The setup guide covers installation. Which environment should the review focus on?', timestamp: '2026-10-07T06:00:00Z' }],
+  pendingQuestion: { id: 'question-1', question: 'Which environment should I check?', reason: 'This keeps the review relevant to your team.', choices: ['Local development', 'CI pipeline'], allowFreeText: true }
+} as unknown as AgentExecutionRun;
 window.agentPipeline = {
+  onRunEvent: () => () => undefined,
+  getLatestAgentExecutionRun: async () => fixtureScreen === 'conversation' ? conversationRun : null,
+  getAgentExecutionRun: async () => fixtureScreen === 'conversation' ? conversationRun : null,
+  getAgentExecutionEvents: async () => [],
+  selectAgentLibrary: async () => ({ source: { name: 'Starter library', path: '/fixture/library', isGitRepository: false }, agents: [fixtureAgent] }),
+  selectProjectDirectory: async () => fixtureProject,
   onWorkspaceNavigate: (listener: (page: WorkspacePage) => void) => { navigationListeners.add(listener); return () => { navigationListeners.delete(listener); }; },
   openConnections: async () => { for (const listener of navigationListeners) listener('connections'); },
   getSystemInfo: async () => ({ platform: 'linux', arch: 'x64', appVersion: 'fixture' }),
@@ -70,6 +89,7 @@ window.agentPipeline = {
 } as unknown as DesktopApi;
 function VisualApp() {
   const [configuration,setConfiguration] = useState(new URLSearchParams(location.search).get('screen') === 'configuration');
+  if (fixtureScreen === 'workflows' || fixtureScreen === 'conversation') return <TaskWorkbench />;
   return configuration ? <ConfigurationWorkbench onBack={() => setConfiguration(false)} onOpenCockpit={() => setConfiguration(false)} onUseRuntime={() => undefined} onOpenConnections={() => { void window.agentPipeline.openConnections(); }} />
     : <ForgeCockpit onBack={() => setConfiguration(true)} onConfigure={() => setConfiguration(true)} />;
 }
