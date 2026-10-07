@@ -19,7 +19,7 @@ See [Models, providers and routing](model-configuration.md) for the separate run
 
 Project facts describe the **target repository you want Forge to work on**. They are optional reusable context. Start with its README, package/build files, CI configuration and architecture notes; use facts you can verify. Enter the current change request when starting a run.
 
-The form provides example values and persistent help for every field. **See a complete example profile** shows a fictional TypeScript web app; **Show module example** and **Show decisions example** explain the JSON fields. These examples leave your draft untouched.
+The form provides generic placeholders and persistent help for every field, without assuming a particular language or framework. **See a complete example profile** shows a separate fictional TypeScript web app; **Show module example** and **Show decisions example** explain the JSON fields. Placeholders and examples leave your draft untouched.
 
 For a minimal profile, enter Project ID, Prepared by and Languages / stack, then review the default profile version (`1`) and project root (`.`). Add the remaining facts as you learn them.
 

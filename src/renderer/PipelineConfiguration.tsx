@@ -82,8 +82,8 @@ export function PipelineConfiguration({ onBack, embedded = false }: { onBack: ()
             return <div key={key} className="configuration-field">
               <label htmlFor={`profile-${key}`}>{label}{required ? ' *' : ''}</label>
               {MULTILINE.has(key)
-                ? <textarea id={`profile-${key}`} aria-describedby={`profile-${key}-help`} placeholder={guidance.example} rows={3} maxLength={8000} required={required} value={draft[key]} onChange={(event) => update(key, event.target.value)} />
-                : <input id={`profile-${key}`} aria-describedby={`profile-${key}-help`} placeholder={guidance.example} maxLength={8000} required={required} value={draft[key]} onChange={(event) => update(key, event.target.value)} />}
+                ? <textarea id={`profile-${key}`} aria-describedby={`profile-${key}-help`} placeholder={guidance.placeholder} rows={3} maxLength={8000} required={required} value={draft[key]} onChange={(event) => update(key, event.target.value)} />
+                : <input id={`profile-${key}`} aria-describedby={`profile-${key}-help`} placeholder={guidance.placeholder} maxLength={8000} required={required} value={draft[key]} onChange={(event) => update(key, event.target.value)} />}
               <small id={`profile-${key}-help`}>{guidance.help}</small>
               {(key === 'modules' || key === 'decisions') && <details className="configuration-example"><summary>{key === 'modules' ? 'Show module example' : 'Show decisions example'}</summary><pre><code>{guidance.example}</code></pre></details>}
             </div>;

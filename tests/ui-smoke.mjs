@@ -143,7 +143,7 @@ try {
   await page.getByRole('button',{ name:/Project facts Context for your team/ }).click();
   await page.getByLabel('Colour theme').selectOption('light');
   const projectId = page.getByLabel('Project ID *',{ exact:true });
-  assert.equal(await projectId.getAttribute('placeholder'),'example-webapp');
+  assert.equal(await projectId.getAttribute('placeholder'),'your-project');
   assert.equal(await projectId.inputValue(),'');
   await projectId.fill('my-project');
   await page.getByText('See a complete example profile',{ exact:true }).click();
