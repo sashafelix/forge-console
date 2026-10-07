@@ -1,6 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { constants as fsConstants, promises as fs } from 'node:fs';
 import os from 'node:os';
+import { childEnvironment } from './child-environment';
 import path from 'node:path';
 import type { ProcessRuntimeId, RuntimeAdapterDescriptor, RuntimeConnectionTestResult } from '../shared/contracts';
 import { PROCESS_RUNTIME_SPECS, buildExecutionArgs, getProcessRuntimeSpec } from '../shared/runtime-specs';
@@ -58,7 +59,7 @@ export function requiresCommandShell(executable: string): boolean {
 function probeVersion(executable: string, args: string[]): Promise<string | undefined> {
   return new Promise((resolve) => {
     const child = spawn(executable, args, {
-      env: { ...process.env, PATH: runtimeSearchPath(), NO_COLOR: '1' },
+      env: { ...childEnvironment(), PATH: runtimeSearchPath(), NO_COLOR: '1' },
       shell: requiresCommandShell(executable),
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe']
@@ -148,8 +149,7 @@ async function runtimeEnvironment(
   approvedEnvironment: Record<string, string>
 ): Promise<NodeJS.ProcessEnv> {
   let env: NodeJS.ProcessEnv = {
-    ...process.env,
-    ...approvedEnvironment,
+    ...childEnvironment(process.env, approvedEnvironment, runtimeId),
     PATH: runtimeSearchPath(),
     NO_COLOR: '1'
   };

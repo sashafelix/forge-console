@@ -17,7 +17,7 @@ python3 scripts/validate-runtime-configuration.py /path/to/runtime-configuration
 
 An import first shows a review dialog, then creates new providers and a new profile with fresh identities. It does not reuse existing credentials, import diagnostic claims, contact endpoints or replace existing profiles. Exports and saves are checked against the current registry revision so another window cannot silently replace the configuration you reviewed.
 
-The current provider/profile drafts survive reopening the screen or app on the same installation; entered secrets do not. Selecting another saved item replaces that item's unsaved editor draft, so save before switching. Saved profiles may contain incomplete routing, but export requires all governed roles to have a primary model. The separate **Project facts** form retains its existing new-profile workflow.
+Provider/profile drafts survive reopening the screen or app; entered secrets do not. Selecting another saved item replaces its unsaved editor draft, so save before switching. Export requires a primary model for every governed role. Project facts have separate persistent non-secret drafts and reviewed imports; acknowledgement never persists.
 
 ## Protocol support
 
@@ -46,7 +46,7 @@ Runtime configuration schema `1.0` is separate from the project-facts schema. It
 
 The pipeline validator independently checks the schema, cross-references, local-only policy and complete role mapping. Optional read-only route preflight additionally requires an independently trusted runtime inventory tied to exact provider/model binding hashes. Host registrations must satisfy the canonical stage/role capabilities. A configuration file cannot register its own adapter or promote repository content into operator authority.
 
-The UI's existing RGR execution guards remain active. Its existing CLI runtimes, connection profiles and unrelated agent workflows continue separately; the legacy Self hosted LLM connection is not automatically migrated or injected into these profiles.
+Generic RGR execution guards remain active. The separate [cockpit](cockpit.md) can control an independently registered governed host with reviewed policy/inventory/risk inputs. Credentials are released only for exact registry/provider bindings or explicit operator environment references. The legacy Self hosted LLM connection is not automatically migrated into model profiles.
 
 ## Verification scope
 

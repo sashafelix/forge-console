@@ -2,11 +2,11 @@
 
 ## Local RGR will not launch from the workbench
 
-This is expected. Recognised Local RGR packs and agents are configuration-only; prepare, start and reply/resume are blocked in the main process. Export reviewed project/model configuration and validate it in the pipeline repository. History and cancellation remain available. See [the configuration handoff](pipeline-configuration.md).
+Generic controllers deliberately block recognised Local RGR pack/agent execution. Use the separate **Forge cockpit** with a registered governed host and reviewed operator inputs, or run your existing adapter in its coding environment. See [the integration guide](cockpit.md).
 
 ## A model test passed but execution is unavailable
 
-Discovery and synthetic capability tests only check the configured provider. Neither the model registry nor the legacy Self hosted LLM connection installs a controller-mediated HTTP execution loop. Execute the pipeline in its supported coding environment; see [model configuration](model-configuration.md) for preflight and capability limits.
+Discovery/probes are diagnostics. The cockpit needs reviewed Forge code, Python, a reachable Linux Docker engine, an installed immutable image, execution policy, risk facts and independently established adapter registrations. Check Doctor and the exact binding hashes; a passing probe cannot supply those grants.
 
 ## Claude Code or Copilot is unavailable
 
@@ -18,7 +18,7 @@ The Connections vault supplies declared service variables; it does not replace p
 
 Check the selected protocol, endpoint/base URL, model ID and provider credential. A provider may support manual model IDs even when listing is unavailable. Review the diagnostic result and run a synthetic test explicitly; do not infer capability from a model name.
 
-The model registry refuses credential storage if a supported encrypted keyring is unavailable, including Linux `basic_text`. Configure an OS keyring rather than weakening storage checks. The legacy Connections vault has different fallback checks; see [security](security.md).
+Both stores reject unavailable encryption and Linux `basic_text` when reading/saving credentials. Configure a secure keyring; re-enter legacy fallback credentials. See [security](security.md).
 
 Review proxy mode and endpoint access. Model-registry requests use Electron networking and OS trust; the optional child-process CA setting does not automatically configure an equivalent custom CA for those requests. Do not bypass certificate verification.
 
@@ -26,7 +26,7 @@ Review proxy mode and endpoint access. Model-registry requests use Electron netw
 
 Exports create new files and never overwrite an existing file, even if the native dialog offers replacement. Choose a fresh filename. Model exports require the registry revision reviewed by the operator; review again after changing it.
 
-Project facts are a new-profile form, not an existing-file editor. Switching to Models or leaving configuration discards unsaved project facts. Preview and export while the form is open. Model-profile draft persistence is separate.
+Non-secret project facts persist locally across navigation/restarts. Imported profiles preserve supported fields and show changed fields. Review acknowledgement always resets; preview/review again before create-only export. A corrupt or excessive draft is discarded safely.
 
 ## A run was interrupted
 

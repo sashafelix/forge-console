@@ -2,6 +2,7 @@ import { app } from 'electron';
 import { spawn } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { childEnvironment } from './child-environment';
 import type { ProjectSelection } from '../shared/contracts';
 import { findExecutable, runtimeSearchPath } from './runtime';
 
@@ -23,7 +24,7 @@ function runCommand(executable: string, args: string[], cwd: string, options: Co
     const child = spawn(executable, args, {
       cwd,
       env: {
-        ...process.env,
+        ...childEnvironment(),
         PATH: runtimeSearchPath(),
         NO_COLOR: '1',
         ...(options.environment ?? {})

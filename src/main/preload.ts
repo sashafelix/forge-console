@@ -16,6 +16,18 @@ import type {
 // Keep runtime values in this file so the emitted preload has no local module dependency.
 // Type-only imports above are erased by TypeScript.
 const IPC_CHANNELS = {
+  selectProjectProfile: 'configuration:select-project-profile',
+  getForgeSetup: 'forge:setup',
+  configureForgeHost: 'forge:configure-host',
+  selectForgeInputs: 'forge:select-inputs',
+  doctorForgeHost: 'forge:doctor',
+  prepareForgeRun: 'forge:prepare',
+  forgeAction: 'forge:action',
+  listForgeRuns: 'forge:list',
+  importForgeBundle: 'forge:import',
+  getForgeRun: 'forge:get',
+  getForgeEvents: 'forge:events',
+  getForgeArtifact: 'forge:artifact',
   listModelConfiguration: 'models:list',
   saveModelProvider: 'models:save-provider',
   saveModelProfile: 'models:save-profile',
@@ -64,6 +76,18 @@ const IPC_CHANNELS = {
 } as const;
 
 const api: DesktopApi = {
+  selectProjectProfile: () => ipcRenderer.invoke(IPC_CHANNELS.selectProjectProfile),
+  getForgeSetup: () => ipcRenderer.invoke(IPC_CHANNELS.getForgeSetup),
+  configureForgeHost: () => ipcRenderer.invoke(IPC_CHANNELS.configureForgeHost),
+  selectForgeInputs: () => ipcRenderer.invoke(IPC_CHANNELS.selectForgeInputs),
+  doctorForgeHost: () => ipcRenderer.invoke(IPC_CHANNELS.doctorForgeHost),
+  prepareForgeRun: (request) => ipcRenderer.invoke(IPC_CHANNELS.prepareForgeRun, request),
+  forgeAction: (request) => ipcRenderer.invoke(IPC_CHANNELS.forgeAction, request),
+  listForgeRuns: () => ipcRenderer.invoke(IPC_CHANNELS.listForgeRuns),
+  importForgeBundle: () => ipcRenderer.invoke(IPC_CHANNELS.importForgeBundle),
+  getForgeRun: (id) => ipcRenderer.invoke(IPC_CHANNELS.getForgeRun, id),
+  getForgeEvents: (request) => ipcRenderer.invoke(IPC_CHANNELS.getForgeEvents, request),
+  getForgeArtifact: (request) => ipcRenderer.invoke(IPC_CHANNELS.getForgeArtifact, request),
   listModelConfiguration: () => ipcRenderer.invoke(IPC_CHANNELS.listModelConfiguration),
   saveModelProvider: (request) => ipcRenderer.invoke(IPC_CHANNELS.saveModelProvider, request),
   saveModelProfile: (request) => ipcRenderer.invoke(IPC_CHANNELS.saveModelProfile, request),

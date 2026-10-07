@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { RunPermissions } from './RunPermissions';
 import type {
   AgentDefinition,
   AgentExecutionRun,
@@ -10,6 +11,7 @@ import type {
 } from '../shared/contracts';
 import { AgentWorkbench } from './AgentWorkbench';
 import { ConfigurationWorkbench } from './ConfigurationWorkbench';
+import { ForgeCockpit } from './ForgeCockpit';
 import { isConfigurationOnlyPipeline, RGR_CONFIGURATION_MESSAGE } from '../shared/pipeline-boundary';
 
 const ACTIVE_RUN_STORAGE_KEY = 'agent-pipeline-ui.active-agent-run';
@@ -129,6 +131,7 @@ function runHeading(status: AgentExecutionRun['status']): string {
 }
 
 export function TaskWorkbench() {
+  const [cockpitMode, setCockpitMode] = useState(false);
   const [configurationMode, setConfigurationMode] = useState(false);
   const [advancedMode, setAdvancedMode] = useState(false);
   const [library, setLibrary] = useState<AgentLibrarySelection | null>(null);
@@ -346,6 +349,7 @@ export function TaskWorkbench() {
     if (refreshed) setRun(refreshed);
   }
 
+  if (cockpitMode) return <ForgeCockpit onBack={() => setCockpitMode(false)} />;
   if (configurationMode) return <ConfigurationWorkbench onBack={() => setConfigurationMode(false)} />;
 
   if (advancedMode) {
@@ -377,6 +381,7 @@ export function TaskWorkbench() {
           <p>Choose a workflow, provide the ticket or task, and let the workbench guide the rest.</p>
         </div>
         <div className="task-header-actions">
+          <button type="button" onClick={() => setCockpitMode(true)}>Forge cockpit</button>
           <button type="button" disabled={active} onClick={() => setConfigurationMode(true)}>Pipeline configuration</button>
           <button type="button" onClick={() => { void openConnections(); }}>Connections</button>
           <button type="button" onClick={() => setAdvancedMode(true)}>Advanced</button>
@@ -461,7 +466,7 @@ export function TaskWorkbench() {
         {run?.status === 'awaiting_approval' && (
           <section className="task-confirmation">
             <span className="task-confirm-icon">✓</span>
-            <div><h2>Ready to start</h2><p>The workbench prepared a safe, isolated copy of <strong>{runTargetName}</strong>. It will run <strong>{runDisplayName}</strong> and will not commit, push, merge or deploy anything.</p>{run.runtimePolicy.missingEnvironment.length > 0 && <div className="task-alert warning">Connections still required: {run.runtimePolicy.missingEnvironment.join(', ')}</div>}</div>
+            <div><h2>Ready to start</h2><p>The workbench prepared a separate Git worktree of <strong>{runTargetName}</strong> for <strong>{runDisplayName}</strong>.</p><RunPermissions run={run}/>{run.runtimePolicy.missingEnvironment.length > 0 && <div className="task-alert warning">Connections still required: {run.runtimePolicy.missingEnvironment.join(', ')}</div>}</div>
             <div className="task-confirm-actions"><button type="button" onClick={cancel}>Cancel</button><button className="task-primary" type="button" disabled={busy || run.runtimePolicy.missingEnvironment.length > 0} onClick={start}>{busy && <span className="task-inline-spinner" aria-hidden="true" />}{busy ? 'Starting…' : 'Start task'}</button></div>
           </section>
         )}

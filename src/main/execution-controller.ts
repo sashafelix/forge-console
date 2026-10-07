@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { constants as fsConstants, promises as fs } from 'node:fs';
 import path from 'node:path';
+import { childEnvironment } from './child-environment';
+import { redactEvidence } from '../shared/redaction-preview';
 import { assertWorkbenchExecutionAllowed } from '../shared/pipeline-boundary';
 import type {
   CreateRunDraftRequest,
@@ -116,7 +118,7 @@ async function createEventWriter(
     publishOutput(type, message) {
       if (outputEvents < MAX_OUTPUT_EVENTS) {
         outputEvents += 1;
-        publish(type, message);
+        publish(type, redactEvidence(message).text);
       } else if (!truncationPublished) {
         truncationPublished = true;
         publish('runtime.stderr', `Output event limit of ${MAX_OUTPUT_EVENTS} reached; additional provider or validation output was omitted.`);
@@ -234,7 +236,7 @@ function runValidationCommand(
     const startedAt = new Date().toISOString();
     const child = spawn(executable, command.args, {
       cwd,
-      env: { ...process.env, PATH: runtimeSearchPath(), NO_COLOR: '1', CI: '1' },
+      env: { ...childEnvironment(), PATH: runtimeSearchPath(), NO_COLOR: '1', CI: '1' },
       shell: requiresCommandShell(executable),
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe']

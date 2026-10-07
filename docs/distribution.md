@@ -49,7 +49,11 @@ npm run package:dir
 
 ## Signing status
 
-Current packaging produces unsigned development builds. The version is taken from `package.json` (currently `0.8.6`), not from a separate distribution version.
+Default packaging produces unsigned development builds. Version comes from `package.json` (`0.9.0`, currently unreleased). The manual workflow now offers **sign_artifacts** for macOS/Windows; missing certificates/notarization credentials block signed mode instead of silently producing unsigned packages. Tag builds remain unsigned by default. No certificate or verified signed installer is bundled.
+
+Configure repository secrets `MAC_CSC_LINK`, `MAC_CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` for Developer ID signing/notarization, and `WIN_CSC_LINK`, `WIN_CSC_KEY_PASSWORD` for Windows signing. Certificate links use electron-builder's supported P12/PFX/base64 format; never commit certificates or keys. Select signed mode only after configuring them. Linux packages receive checksums rather than macOS/Windows signing. See [electron-builder signing](https://www.electron.build/docs/features/code-signing/) and [notarization](https://www.electron.build/docs/features/code-signing/notarization/); the repository pins electron-builder 26 and uses its `mac.notarize`/`forceCodeSigning` options.
+
+Every packaging run writes `SHA256SUMS` and `SOURCE_REVISION` alongside artifacts. These establish source/byte correspondence, not a SLSA attestation or updater trust. The workflow never publishes a release automatically. Signature/notarization verification on the intended OS remains a release check requiring real credentials.
 
 Consequences:
 

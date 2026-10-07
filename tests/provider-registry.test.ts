@@ -13,6 +13,17 @@ function vault(available = true): CredentialVault {
   return { available: () => available, encrypt(value) { const iv = randomBytes(12); const cipher = createCipheriv('aes-256-gcm', key, iv); const body = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]); return Buffer.concat([iv, cipher.getAuthTag(), body]); },
     decrypt(value) { const cipher = createDecipheriv('aes-256-gcm', key, value.subarray(0, 12)); cipher.setAuthTag(value.subarray(12, 28)); return Buffer.concat([cipher.update(value.subarray(28)), cipher.final()]).toString('utf8'); } };
 }
+
+test('host credentials require the exact provider binding and remain absent from public views', async (context) => {
+  const { registry, provider, profile, view } = await setup(context);
+  const authenticated = { ...provider, auth:{ mode:'bearer' as const, header:'Authorization',credentialRef:'env:HOST_MODEL_KEY' } };
+  const saved = await registry.saveProvider({ expectedRevision:view.revision,provider:authenticated,secret:'host-fixture-private-key' });
+  const configuration = exportConfiguration(profile,[authenticated]);
+  assert.deepEqual(await registry.environmentForBindings(configuration),{ HOST_MODEL_KEY:'host-fixture-private-key' });
+  configuration.providers[0].baseUrl = 'https://changed.example.test/v1';
+  assert.deepEqual(await registry.environmentForBindings(configuration),{});
+  assert.doesNotMatch(JSON.stringify(saved),/host-fixture-private-key/);
+});
 async function setup(context: { after(fn: () => Promise<void>): void }, fetcher: ProviderFetch = async () => Response.json({ choices: [{ message: { content: 'PROBE_OK' } }] }), available = true) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'provider-registry-')); context.after(() => fs.rm(directory, { recursive: true, force: true }));
   const registry = new ProviderRegistry(directory, vault(available), fetcher);

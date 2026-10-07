@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { RunPermissions } from './RunPermissions';
 import type {
   AgentDefinition,
   AgentExecutionRun,
@@ -338,20 +339,8 @@ export function AgentWorkbench() {
                     <div><dt>Worktree</dt><dd>{run.worktreePath}</dd></div>
                     <div><dt>Branch</dt><dd>{run.branchName}</dd></div>
                   </dl>
-                  <div className="policy-grid">
-                    <div><strong>File writes</strong><span>{run.runtimePolicy.fileWrites === 'worktree-only' ? 'Isolated worktree only' : 'Denied'}</span></div>
-                    <div><strong>Model shell</strong><span>{run.runtimePolicy.shell === 'allowed-to-model' ? 'Allowed for trusted agent' : 'Denied'}</span></div>
-                    <div><strong>Network</strong><span>{run.runtimePolicy.network === 'allowed-through-approved-tools' ? 'Allowed through agent tools' : 'Denied'}</span></div>
-                    <div><strong>Publication</strong><span>No commit, push, merge or deploy</span></div>
-                  </div>
-                  {run.runtimePolicy.shell === 'allowed-to-model' && <div className="trust-warning"><strong>Trusted-agent warning</strong><span>Shell access is not an operating-system sandbox. Only approve agent definitions you trust and review the resulting worktree.</span></div>}
-                  <div className="environment-list">
-                    <h4>Required environment variables</h4>
-                    {run.runtimePolicy.requiredEnvironment.length === 0 ? <p>None declared.</p> : run.runtimePolicy.requiredEnvironment.map((name) => (
-                      <div key={name}><code>{name}</code><span className={run.runtimePolicy.missingEnvironment.includes(name) ? 'missing' : 'present'}>{run.runtimePolicy.missingEnvironment.includes(name) ? 'Missing' : 'Available'}</span></div>
-                    ))}
-                  </div>
-                  {run.runtimePolicy.missingEnvironment.length > 0 && <div className="runtime-hint">Configure {run.runtimePolicy.missingEnvironment.join(', ')} before starting. The upcoming credential vault will provide these without repository `.env` files.</div>}
+                  <RunPermissions run={run}/>
+                  {run.runtimePolicy.missingEnvironment.length > 0 && <div className="runtime-hint">Configure the missing credentials in Connections before starting.</div>}
                   <label className="approval-check"><input type="checkbox" checked={approvalAcknowledged} onChange={(event) => setApprovalAcknowledged(event.target.checked)} /><span>I trust this agent definition and approve the displayed tools against the isolated target worktree.</span></label>
                   <div className="approval-actions">
                     <button className="secondary" type="button" onClick={() => window.agentPipeline.openPath(run.worktreePath)}>Open worktree</button>

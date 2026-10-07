@@ -1,4 +1,5 @@
-import { app, dialog, ipcMain, net, safeStorage } from 'electron';
+import { app, dialog, net, safeStorage } from 'electron';
+import { guardedIpcMain as ipcMain } from './secure-ipc';
 import { promises as fs } from 'node:fs';
 import { IPC_CHANNELS } from '../shared/channels';
 import { validateConfiguration } from '../shared/providers';
@@ -6,11 +7,15 @@ import type { ProbeRequest, SaveProfileRequest, SaveProviderRequest } from '../s
 import { ProviderRegistry, readBoundedJson } from './provider-registry';
 import { applyElectronNetworkSettings } from './network-settings';
 
-export function registerProviderIpc(): void {
-  const registry = new ProviderRegistry(app.getPath('userData'), {
+export function createProviderRegistry(): ProviderRegistry {
+  return new ProviderRegistry(app.getPath('userData'), {
     available: () => safeStorage.isEncryptionAvailable() && (process.platform !== 'linux' || safeStorage.getSelectedStorageBackend() !== 'basic_text'),
     encrypt: (value) => safeStorage.encryptString(value), decrypt: (value) => safeStorage.decryptString(value)
   }, (url, init) => net.fetch(url, init));
+}
+
+export function registerProviderIpc(): void {
+  const registry = createProviderRegistry();
   // Settings updates already reconfigure Electron centrally. Initialize once here;
   // reapplying for every probe would close another window's active connections.
   let networkReady: Promise<void> | undefined;

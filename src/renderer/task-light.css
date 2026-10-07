@@ -433,3 +433,8 @@ body {
   .task-confirmation { grid-template-columns: 48px 1fr; }
   .task-confirm-actions { grid-column: 1 / -1; }
 }
+ .permission-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; margin:16px 0; }
+ .permission-grid div { min-width:0; }
+ .permission-grid dt { font-size:.8rem; font-weight:600; color:#526773; }
+ .permission-grid dd { margin:4px 0 0; overflow-wrap:anywhere; }
+ .run-permissions { margin-top:20px; border-top:1px solid #d8e3e7; padding-top:12px; font-size:.9rem; }

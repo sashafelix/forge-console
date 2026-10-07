@@ -75,6 +75,28 @@ export class ProviderRegistry {
     return { ...publicLibrary, credentials: Object.fromEntries(library.providers.map((p) => [p.id, Boolean(keys[secretSlots[p.id]])])) };
   }
   list(): Promise<ProviderLibraryView> { return this.serialize(async () => this.view(await this.load())); }
+  /** Main process only: release a credential solely to its exact reviewed provider binding. */
+  environmentForBindings(value: unknown): Promise<Record<string, string>> {
+    return this.serialize(async () => {
+      const configuration = validateConfiguration(value), library = await this.load();
+      const result: Record<string, string> = {};
+      const canonical = (value: unknown): string => JSON.stringify(value, Object.keys(value as object).sort());
+      let secrets: Record<string, string> | undefined;
+      for (const provider of configuration.providers) {
+        const stored = library.providers.find((p) => p.id === provider.id);
+        if (!stored || provider.auth.mode === 'none' || !provider.auth.credentialRef) continue;
+        const comparable = (p: Provider) => ({ ...p, auth: JSON.stringify(p.auth, Object.keys(p.auth).sort()) });
+        if (canonical(comparable(stored)) !== canonical(comparable(provider))) continue;
+        const slot = library.secretSlots[provider.id];
+        if (!slot) continue;
+        secrets ??= await this.secrets();
+        const name = provider.auth.credentialRef.slice(4);
+        if (secrets[slot] && result[name] && result[name] !== secrets[slot]) throw new Error('Provider bindings use one credential reference for different vault values. Choose distinct references.');
+        if (secrets[slot]) result[name] = secrets[slot];
+      }
+      return result;
+    });
+  }
   private assertRevision(library: ProviderLibrary, expected: number) {
     if (library.revision !== expected) throw new Error('Configuration changed in another window. Refresh before saving; your draft is preserved.');
   }

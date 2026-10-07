@@ -6,9 +6,9 @@ The desktop companion for **[Forge](https://github.com/sashafelix/forge)** and a
 
 Use **Pipeline configuration** to manage providers, model profiles and role routing, or prepare a Local RGR `project-profile.json`. Models can be discovered or entered manually using OpenAI Responses, OpenAI-compatible Chat Completions, Anthropic Messages or Gemini protocols. The UI provides explicit synthetic capability tests, encrypted credentials, reusable profiles and reviewed secret-free exports.
 
-Validate and explicitly supply exported files to [Forge](https://github.com/sashafelix/forge) in your usual coding environment. Execution, stage authority, risk policy and approvals remain owned by the pipeline. HTTP execution adapters are not installed by the configuration screen. See [model configuration](docs/model-configuration.md) and [the configuration boundary](docs/pipeline-configuration.md).
+Validate and explicitly supply exported files to [Forge](https://github.com/sashafelix/forge). The separate **Forge cockpit** can inspect evidence or control runs through an independently registered governed Forge host. The host owns execution, stages, policy, approvals and receipts. Configuration/probes alone grant no authority. Start with [the cockpit guide](docs/cockpit.md), [model configuration](docs/model-configuration.md) and [the integration boundary](docs/pipeline-configuration.md).
 
-Known Local RGR packs and agents are configuration-only in this app: the main process rejects prepare, start and reply/resume for recognised identifiers and filenames. Run the pipeline in its own coding environment. The standalone execution capabilities below apply to other agent definitions.
+Known Local RGR packs and agents remain blocked in generic workbench controllers: the main process rejects prepare, start and reply/resume for recognised identifiers and filenames. The new cockpit uses the separately selected governed host. Standalone execution below applies to other definitions.
 
 A cross-platform, repository-first desktop workbench for discovering, configuring, running and monitoring standalone agents and multi-agent workflows with interchangeable AI runtimes.
 
@@ -17,6 +17,9 @@ The application is deliberately independent of any one pipeline, agent library, 
 ## Current capabilities
 
 - Electron desktop shell for macOS, Windows and Linux
+- Forge cockpit with nine-stage progress, criterion/test/log trace, read-only diff, artifact inspection, event filters, run comparison and host-owned approvals/recovery
+- native registration of pinned Forge code/Python/operator inputs; imported bundles remain read-only
+- persistent project-facts drafts and lossless schema-1.0 profile import with changed-field review
 - task-first guided workbench with an advanced specialist-agent view
 - repository-native agent discovery from:
   - `agents/`
@@ -29,7 +32,7 @@ The application is deliberately independent of any one pipeline, agent library, 
 - runtime discovery, readiness checks and execution for Claude Code and GitHub Copilot CLI
 - multiple provider/model profiles with capability diagnostics, per-role fallbacks and local-only policy
 - encrypted Jira, Confluence and Self hosted LLM connection profiles
-- managed connection-secret additions based on declared environment-variable requirements; child processes also inherit the launcher environment
+- explicitly required credentials and a minimal platform/network child environment; unrelated launcher secrets and code-injection variables are excluded
 - configurable proxy, `NO_PROXY` and corporate CA settings
 - local run records, prompts, conversations and append-only event logs; output redaction is best-effort and records need review before sharing
 - recovery of interrupted-run records/worktrees and interactive agent questions; interrupted active processes are marked failed, not automatically restarted
@@ -67,9 +70,9 @@ Available connection profiles:
 - Confluence
 - Self hosted LLM
 
-Connection tokens are encrypted with Electron `safeStorage` when encryption is available. This legacy connection store does not reject Linux’s `basic_text` backend; the separate model registry does. See [security limitations](docs/security.md). The renderer receives only configured/not-configured metadata; saved secret values are never returned to the UI.
+Connection tokens use Electron `safeStorage` with a secure OS keyring. Both stores reject unavailable encryption and Linux's `basic_text` fallback when saving/reading secrets. See [security](docs/security.md). The renderer receives configured/not-configured metadata, never saved secret values.
 
-When an approved agent declares a supported environment variable such as `JIRA_TOKEN`, `CONFLUENCE_TOKEN` or `SELF_HOSTED_LLM_TOKEN`, the main process decrypts only the required value and injects it into that runtime process. The connection layer does not directly add saved values to prompts or run records. The child still inherits the launcher environment, and runtime output may echo sensitive data; this is not a guarantee that persisted records are secret-free.
+When an approved agent declares a supported variable such as `JIRA_TOKEN`, `CONFLUENCE_TOKEN` or `SELF_HOSTED_LLM_TOKEN`, the main process resolves only the required value. Children receive platform/network essentials, supported CLI authentication and explicitly approved variables. Output redaction remains best-effort; inspect records before sharing.
 
 The Self hosted LLM profile supports endpoint, model and authentication configuration plus a `/v1/models` connectivity check. Direct agent execution through the HTTP adapter remains disabled until the controller-mediated HTTP execution loop is implemented.
 
@@ -117,10 +120,12 @@ The **Package desktop** GitHub Actions workflow builds independent artifacts for
 
 Current packages are unsigned development builds, so macOS Gatekeeper and Windows SmartScreen may warn until signing and notarisation are configured.
 
+The workflow now offers an explicit signed macOS/Windows mode and macOS notarization using repository secrets, and records package checksums/source revision. No certificate is bundled or signing claimed without it. See [distribution](docs/distribution.md).
+
 ## Architecture and security
 
 See [docs/architecture.md](docs/architecture.md), [docs/security.md](docs/security.md), [docs/distribution.md](docs/distribution.md) and [docs/troubleshooting.md](docs/troubleshooting.md).
 
 ## Status
 
-The workbench provides the task-first repository workbench, secure connection vault, network/proxy configuration, interactive agent runs and recovery of interrupted work. The model registry and legacy Self hosted LLM connection are configuration/test-only; controller-mediated HTTP execution, stronger sandboxing and signed distribution remain incremental milestones.
+Version `0.9.0` is unreleased. The Forge cockpit adds opt-in governed host execution and read-only evidence review alongside existing agent workflows. The model editor/probes and legacy Self hosted LLM connection remain separate configuration features. Live model/native keyring qualification and certificate-backed distribution require testing on the intended machine. See [CHANGELOG.md](CHANGELOG.md).

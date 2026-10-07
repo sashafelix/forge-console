@@ -6,13 +6,15 @@ Forge Console is a local orchestration workbench. It does not treat an AI runtim
 
 - Electron renderers run with `nodeIntegration: false`, `contextIsolation: true` and `sandbox: true`.
 - The preload exposes a narrow, typed API.
+- Every IPC handler checks the registered application window, exact page URL and main frame. Navigation, new windows, webviews and permission requests are denied outside the registered app pages.
 - There is no renderer-accessible arbitrary shell endpoint.
 - Local paths are selected through native dialogs and re-resolved in the main process.
+- Folder opening accepts selected/application directories only; evidence inspection rejects unsafe paths, symlinks, oversized files and excessive nesting.
 - Connection secret values are never returned through the renderer API.
 
 ## Pipeline execution
 
-Known Local RGR packs/agents are blocked from execution by the main-process boundary checks. The UI only prepares their project/model configuration; see [the pipeline boundary](pipeline-configuration.md). The following describes other executable packs.
+Recognised Local RGR packs/agents stay blocked in generic controllers. The opt-in [cockpit](cockpit.md) separately invokes the selected Forge governed host. Its native bridge pins code/Python and operator input bytes; managed runs obtain authority only from the private host state. Imported bundles never gain action handles. Commands run in Forge's Docker boundary; provider calls occur in the trusted host. The following describes other executable packs.
 
 Executable pipeline packs must declare a schema `1.1` execution contract. The controller:
 
@@ -51,14 +53,14 @@ Future hardening should replace broad model shell access with controller-mediate
 Jira, Confluence and Self hosted LLM connection profiles are persisted by the main process.
 
 - connection metadata such as service URL, authentication header and model name is stored separately from secrets;
-- legacy connection secrets use Electron `safeStorage` when `isEncryptionAvailable()` succeeds; unlike the model registry, this store does not reject Linux `basic_text`, so do not assume equivalent keyring protection;
+- both credential stores require available OS encryption and reject Linux `basic_text` when reading/saving secrets; configure a supported keyring and re-enter credentials previously stored through the insecure fallback;
 - saved secrets are never returned to the renderer;
-- the connection layer adds managed values only for environment variables declared by the approved agent; the process also inherits the launcher environment, so this is not a full environment allowlist;
+- child environments allow platform/network essentials, the selected CLI's supported authentication variables and explicitly approved required variables; unrelated launcher credentials and code-injection variables are excluded;
 - inherited environment variables take precedence only when the same declared variable is already present in the launcher environment;
 - secrets are not written into prompts, repositories, run records or persisted event messages by the connection layer;
 - removing a connection deletes both its metadata and encrypted secret entry.
 
-Standalone run output uses pattern-based redaction, which cannot detect every secret. Legacy preview stdout/stderr is written to events without that sanitizer. Agents, tools and external services may echo sensitive inputs; inspect prompts, conversations and output before sharing run records.
+Standalone output and legacy preview/validation stdout/stderr use pattern-based redaction, which cannot detect every secret. Agents, tools and external services may echo sensitive inputs; inspect prompts, conversations and output before sharing run records.
 
 Claude Code and manifest/preview prompts are sent on stdin. Standalone Copilot passes the prompt through `--prompt`/`-p` without shell interpolation; local process inspection may expose those arguments.
 
@@ -78,5 +80,7 @@ The built-in controllers do not publish agent changes onto the source branch, pu
 ## Model configuration registry
 
 The separate provider registry supports multiple encrypted credentials, refuses Linux's `basic_text` fallback and returns credential-presence metadata only. Secret values are excluded from renderer drafts, imports, exports and diagnostic messages. Removing a credential drops its active reference; unreferenced encrypted slots are reclaimed on subsequent credential writes. Provider and profile writes are serialized and revision checked. Reviewed exports require the same registry revision.
+
+The Forge bridge supplies a vault credential only when the complete exported provider object matches its saved registry entry. Changed endpoints/identity/headers cannot reuse that credential. Host HTTP calls reject redirects; credentials stay outside argv, renderer state and Docker mounts. Locality remains operator-declared and unknown embedded source/output secrets may evade pattern redaction. Protect the local account, host ledger/key, trusted Python, Docker daemon and image; this is not remote attestation or hosted identity management.
 
 Imports assign fresh provider identities and never bind an imported endpoint to an existing credential. Probes reject redirects, use bounded responses and timeouts, and send synthetic prompts only. Tool-call tests inspect output without invoking tools. These checks are diagnostics, not trusted capability registrations. See [model configuration](model-configuration.md) for protocol, certificate and execution limitations.

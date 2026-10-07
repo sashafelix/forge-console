@@ -3,11 +3,22 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { buildProjectProfile, emptyProjectProfileDraft, validateProjectProfileDraft } from '../src/shared/project-profile';
+import { buildProjectProfile, emptyProjectProfileDraft, validateProjectProfileDraft, importProjectProfile } from '../src/shared/project-profile';
 import { writeProjectProfile } from '../src/main/project-profile';
 
 const draft = { ...emptyProjectProfileDraft(), projectId: 'example', issuedBy: 'Example operator',
   stack: 'Python\r\nPython\nTypeScript', test: 'python -m unittest', constraints: 'Keep compatibility' };
+
+test('project profile import preserves modules, decisions and source references', () => {
+  const original = buildProjectProfile({ ...draft, sourceRef:'https://docs.example.test/project',
+    modules:'[{"name":"API","path":"src/api","purpose":"Public API"}]', decisions:'{"database":"postgres"}' });
+  const reissued = buildProjectProfile(importProjectProfile(original));
+  assert.deepEqual(reissued.project, original.project);
+  assert.deepEqual(reissued.decisions, original.decisions);
+  assert.equal(reissued.provenance.source_ref, original.provenance.source_ref);
+  assert.throws(() => importProjectProfile({ ...original, unsupported:'never silently drop' }), /Unsupported/);
+  assert.throws(() => buildProjectProfile({ ...draft, decisions:'{"approval":"granted"}' }), /authority/);
+});
 
 test('exports the existing pipeline project-facts contract without execution authority', () => {
   const profile = buildProjectProfile(draft, '2026-10-01T09:00:00Z');
