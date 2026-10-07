@@ -53,7 +53,8 @@ export const IPC_CHANNELS = {
   getLatestAgentExecutionRun: 'agents:get-latest-execution',
   getAgentExecutionEvents: 'agents:get-execution-events',
   cancelAgentExecution: 'agents:cancel-execution',
-  openAgentWorkbench: 'windows:open-agent-workbench',
+  openConnections: 'navigation:open-connections',
+  workspaceNavigate: 'navigation:workspace',
   runEvent: 'runs:event',
   openPath: 'shell:open-path'
 } as const;

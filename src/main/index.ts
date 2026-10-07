@@ -5,9 +5,11 @@ import { registerTrustedSender } from './trusted-senders';
 import { terminateAllAgentProcesses } from './agent-processes';
 import { recoverInterruptedAgentRuns } from './interrupted-run-recovery';
 import { registerIpcHandlers } from './ipc';
+import { IPC_CHANNELS } from '../shared/channels';
+import type { WorkspacePage } from '../shared/contracts';
 
 let mainWindow: BrowserWindow | null = null;
-let connectionsWindow: BrowserWindow | null = null;
+const loadedWindows = new WeakSet<BrowserWindow>();
 let providerShutdownStarted = false;
 
 function stopProviderProcesses(): void {
@@ -33,13 +35,15 @@ function windowOptions(title: string): Electron.BrowserWindowConstructorOptions 
   };
 }
 
-function loadRenderer(window: BrowserWindow, page: 'index.html' | 'connections.html'): void {
+function loadRenderer(window: BrowserWindow, page: 'index.html'): void {
   const developmentUrl = process.env.VITE_DEV_SERVER_URL;
   const target = developmentUrl
     ? new URL(page, developmentUrl.endsWith('/') ? developmentUrl : `${developmentUrl}/`).toString()
     : pathToFileURL(path.join(__dirname, '..', '..', 'renderer', page)).toString();
   const unregister = registerTrustedSender(window.webContents.id, [target]);
   window.once('closed', unregister);
+  window.webContents.on('did-start-loading', () => loadedWindows.delete(window));
+  window.webContents.on('did-finish-load', () => loadedWindows.add(window));
   window.webContents.on('will-navigate', (event, url) => { const parsed = new URL(url); parsed.hash = ''; if (parsed.toString() !== target) event.preventDefault(); });
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-attach-webview', (event) => event.preventDefault());
@@ -54,6 +58,7 @@ function loadRenderer(window: BrowserWindow, page: 'index.html' | 'connections.h
 
 function createMainWindow(): BrowserWindow {
   if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.focus();
     return mainWindow;
   }
@@ -63,15 +68,13 @@ function createMainWindow(): BrowserWindow {
   return mainWindow;
 }
 
-function createConnectionsWindow(): BrowserWindow {
-  if (connectionsWindow && !connectionsWindow.isDestroyed()) {
-    connectionsWindow.focus();
-    return connectionsWindow;
-  }
-  connectionsWindow = new BrowserWindow(windowOptions('Forge Console — Connections'));
-  loadRenderer(connectionsWindow, 'connections.html');
-  connectionsWindow.on('closed', () => { connectionsWindow = null; });
-  return connectionsWindow;
+function openWorkspace(page: WorkspacePage): void {
+  const window = createMainWindow();
+  const navigate = () => {
+    if (!window.isDestroyed()) window.webContents.send(IPC_CHANNELS.workspaceNavigate, page);
+  };
+  if (!loadedWindows.has(window)) window.webContents.once('did-finish-load', navigate);
+  else navigate();
 }
 
 function installApplicationMenu(): void {
@@ -96,8 +99,8 @@ function installApplicationMenu(): void {
     {
       label: 'Workspaces',
       submenu: [
-        { label: 'Quality Workbench', accelerator: 'CmdOrCtrl+1', click: () => { createMainWindow(); } },
-        { label: 'Connections', accelerator: 'CmdOrCtrl+,', click: () => { createConnectionsWindow(); } }
+        { label: 'Quality Workbench', accelerator: 'CmdOrCtrl+1', click: () => { openWorkspace('workbench'); } },
+        { label: 'Connections', accelerator: 'CmdOrCtrl+,', click: () => { openWorkspace('connections'); } }
       ]
     },
     {
@@ -123,7 +126,7 @@ function installApplicationMenu(): void {
 app.whenReady().then(async () => {
   const recoveredRuns = await recoverInterruptedAgentRuns();
   if (recoveredRuns > 0) console.warn(`Recovered ${recoveredRuns} agent run(s) interrupted by a previous app shutdown.`);
-  registerIpcHandlers(() => { createConnectionsWindow(); });
+  registerIpcHandlers(() => { openWorkspace('connections'); });
   app.setAboutPanelOptions({ applicationName: 'Forge Console' });
   installApplicationMenu();
   createMainWindow();

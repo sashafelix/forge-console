@@ -1,45 +1,48 @@
 .connections-shell {
   min-height: 100vh;
+  color-scheme: light;
+}
+.connections-shell[data-theme="dark"] { color-scheme: dark; }
+@media (prefers-color-scheme: dark) {
+  .connections-shell[data-theme="system"] { color-scheme: dark; }
 }
 
-.connections-content {
-  padding: 0 24px 32px;
+.connections-shell .connections-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 32px;
 }
 
-.security-note,
-.success-banner {
-  border: 1px solid #244b55;
-  background: #0d2027;
+.connections-shell .security-note {
+  border: 1px solid var(--line);
+  background: var(--green-soft);
   border-radius: 14px;
   padding: 14px 16px;
   display: flex;
   gap: 12px;
   align-items: flex-start;
-  color: #bcecd8;
+  color: var(--green);
 }
 
-.security-note {
+.connections-shell .security-note {
   margin-bottom: 18px;
 }
 
-.security-note strong {
+.connections-shell .security-note strong {
   white-space: nowrap;
-  color: #7ef0bd;
+  color: var(--green);
 }
 
-.success-banner {
-  margin: 0 24px 18px;
-}
-
-.connection-grid {
+.connections-shell .connection-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
   gap: 18px;
 }
 
-.connection-card {
-  border: 1px solid #22314f;
-  background: #0b1426;
+.connections-shell .connection-card {
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: var(--panel);
   border-radius: 18px;
   padding: 20px;
   display: flex;
@@ -47,208 +50,226 @@
   gap: 15px;
 }
 
-.network-card {
+.connections-shell .network-card {
   margin-bottom: 18px;
 }
 
-.connection-heading {
+.connections-shell .connection-heading {
   display: flex;
   justify-content: space-between;
   gap: 16px;
   align-items: flex-start;
 }
 
-.connection-heading h2 {
+.connections-shell .connection-heading h2 {
   margin: 5px 0 6px;
+  font-size: 18px;
 }
 
-.connection-heading p {
+.connections-shell .connection-heading p {
   margin: 0;
-  color: #95a1bc;
+  color: var(--muted);
   line-height: 1.45;
 }
 
-.connection-status {
+.connections-shell .connection-status {
   border-radius: 999px;
   padding: 5px 9px;
   font-size: 12px;
   font-weight: 700;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
-.connection-status.configured {
-  border: 1px solid #236947;
-  background: #10291f;
-  color: #6ff0ad;
+.connections-shell .connection-status.configured {
+  border: 1px solid var(--green);
+  background: var(--green-soft);
+  color: var(--green);
 }
 
-.connection-status.missing {
-  border: 1px solid #6d5627;
-  background: #2b2110;
-  color: #ffc75a;
+.connections-shell .connection-status.missing {
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--muted);
 }
 
-.connection-auth-grid,
-.network-proxy-grid {
+.connections-shell .connection-auth-grid,
+.connections-shell .network-proxy-grid {
   display: grid;
-  grid-template-columns: 1.3fr 1fr;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
   gap: 12px;
 }
 
-.network-mode-field small,
-.network-ca-row small {
+.connections-shell .network-mode-field small,
+.connections-shell .network-ca-row small {
   line-height: 1.45;
 }
 
-.network-ca-row {
+.connections-shell .network-ca-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   align-items: end;
 }
 
-.network-ca-row > button {
+.connections-shell .network-ca-row > button {
   margin-bottom: 1px;
   border-radius: 10px;
   padding: 10px 13px;
   cursor: pointer;
 }
 
-.provider-test-grid {
+.connections-shell .provider-test-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-  border-top: 1px solid #1d2940;
+  border-top: 1px solid var(--line);
   padding-top: 15px;
 }
 
-.provider-test {
+.connections-shell .provider-test {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  border: 1px solid #22314f;
+  border: 1px solid var(--line);
   border-radius: 12px;
-  background: #0d172a;
+  background: var(--bg);
   padding: 13px;
 }
 
-.provider-test > div {
+.connections-shell .provider-test > div {
   min-width: 0;
 }
 
-.provider-test strong,
-.provider-test span,
-.provider-test small {
+.connections-shell .provider-test strong,
+.connections-shell .provider-test span,
+.connections-shell .provider-test small {
   display: block;
 }
 
-.provider-test span {
+.connections-shell .provider-test span {
   margin-top: 4px;
-  color: #8e9ab3;
+  color: var(--muted);
   font-size: 12px;
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
 
-.provider-test span.ok {
-  color: #69e6a5;
+.connections-shell .provider-test span.ok {
+  color: var(--green);
 }
 
-.provider-test span.failed {
-  color: #ff8d9b;
+.connections-shell .provider-test span.failed {
+  color: var(--red);
 }
 
-.provider-test small {
+.connections-shell .provider-test small {
   margin-top: 4px;
 }
 
-.provider-test button {
+.connections-shell .provider-test button {
   flex: 0 0 auto;
   border-radius: 9px;
   padding: 8px 11px;
   cursor: pointer;
 }
 
-.network-actions {
+.connections-shell .network-actions {
   display: flex;
   justify-content: flex-end;
 }
 
-.network-actions button {
+.connections-shell .network-actions button {
   border-radius: 10px;
   padding: 10px 15px;
   cursor: pointer;
 }
 
-.connection-test-state {
+.connections-shell .connection-test-state {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 4px 10px;
   align-items: center;
-  border-top: 1px solid #1d2940;
+  border-top: 1px solid var(--line);
   padding-top: 13px;
 }
 
-.connection-test-state span {
+.connections-shell .connection-test-state span {
   text-align: right;
 }
 
-.connection-test-state span.ok {
-  color: #69e6a5;
+.connections-shell .connection-test-state span.ok {
+  color: var(--green);
 }
 
-.connection-test-state span.failed {
-  color: #ff8d9b;
+.connections-shell .connection-test-state span.failed {
+  color: var(--red);
 }
 
-.connection-test-state small {
+.connections-shell .connection-test-state small {
   grid-column: 1 / -1;
-  color: #75829e;
+  color: var(--muted);
 }
 
-.adapter-warning {
-  border: 1px solid #665225;
-  background: #271f10;
+.connections-shell .adapter-warning {
+  border: 1px solid var(--amber);
+  background: var(--amber-soft);
   border-radius: 10px;
   padding: 11px 12px;
-  color: #f0ca72;
+  color: var(--amber);
   line-height: 1.4;
   font-size: 13px;
 }
 
-.connection-actions {
+.connections-shell .connection-actions {
   display: flex;
   justify-content: flex-end;
   gap: 9px;
   margin-top: auto;
 }
 
-button.danger {
-  border-color: #60303b;
-  color: #ff96a4;
+.connections-shell button.danger {
+  border-color: var(--red);
+  color: var(--red);
 }
 
 @media (max-width: 900px) {
-  .provider-test-grid {
+  .connections-shell .provider-test-grid {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 700px) {
-  .connection-auth-grid,
-  .network-proxy-grid,
-  .network-ca-row {
+  .connections-shell .connection-auth-grid,
+  .connections-shell .network-proxy-grid,
+  .connections-shell .network-ca-row {
     grid-template-columns: 1fr;
   }
 
-  .connection-heading,
-  .security-note,
-  .provider-test {
+  .connections-shell .connection-heading,
+  .connections-shell .security-note,
+  .connections-shell .provider-test {
     flex-direction: column;
   }
 
-  .provider-test {
+  .connections-shell .provider-test {
     align-items: stretch;
   }
+}
+
+.connections-shell .field { color: var(--ink); }
+.connections-shell .field input,
+.connections-shell .field select { width: 100%; min-width: 0; background: var(--panel); color: var(--ink); border-color: var(--line); }
+.connections-shell .field small { color: var(--muted); }
+.connections-shell .connection-actions { flex-wrap: wrap; }
+.connections-shell .connection-actions .danger { color: var(--red); border-color: var(--red); }
+.connections-shell .forge-page-title p { color: var(--muted); }
+.connections-shell .forge-page-title > small { white-space: nowrap; }
+.connections-shell .connection-heading > div { min-width: 0; }
+.connections-shell .connection-heading { flex-wrap: wrap; }
+.connections-shell .connection-status { align-self: flex-start; }
+.connections-shell .connection-heading p { overflow-wrap: anywhere; }
+@media (max-width: 700px) {
+  .connections-shell .connections-content { padding: 24px 18px; }
+  .connections-shell .connection-card { padding: 18px; }
 }

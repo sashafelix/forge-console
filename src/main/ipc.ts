@@ -157,7 +157,7 @@ function rendererEmitter(event: Electron.IpcMainInvokeEvent): (runEvent: RunEven
   };
 }
 
-export function registerIpcHandlers(openAgentWorkbench: () => void): void {
+export function registerIpcHandlers(openConnections: () => void): void {
   registerProviderIpc();
   registerForgeIpc(approvedProjects);
   ipcMain.handle(IPC_CHANNELS.selectProjectProfile, async () => {
@@ -256,6 +256,6 @@ export function registerIpcHandlers(openAgentWorkbench: () => void): void {
   ipcMain.handle(IPC_CHANNELS.getLatestAgentExecutionRun, () => agentRuns.getLatest());
   ipcMain.handle(IPC_CHANNELS.getAgentExecutionEvents, (_event, runId: string) => agentRuns.getEvents(runId));
   ipcMain.handle(IPC_CHANNELS.cancelAgentExecution, (event, runId: string) => agentRuns.cancel(runId, rendererEmitter(event)));
-  ipcMain.handle(IPC_CHANNELS.openAgentWorkbench, () => openAgentWorkbench());
+  ipcMain.handle(IPC_CHANNELS.openConnections, () => openConnections());
   ipcMain.handle(IPC_CHANNELS.openPath, async (_event, targetPath: string) => shell.openPath(await approvedOpenDirectory(targetPath, [...approvedProjects, app.getPath('userData')])));
 }

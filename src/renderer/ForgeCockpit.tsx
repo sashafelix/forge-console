@@ -3,6 +3,7 @@ import type { ForgeAction, ForgeDoctor, ForgeEvent, ForgeRunSnapshot, ForgeSetup
 import { FORGE_STAGES } from '../shared/forge';
 import type { ProjectSelection } from '../shared/contracts';
 import { AccessibleDialog } from './AccessibleDialog';
+import { useConsoleTheme } from './useConsoleTheme';
 import { DiffViewer } from './DiffViewer';
 import './forge-cockpit.css';
 
@@ -61,7 +62,8 @@ export function ForgeCockpit({ onBack, onConfigure }: { onBack: () => void; onCo
   const [comparison, setComparison] = useState<ForgeRunSnapshot | null>(null);
   const [retryStage, setRetryStage] = useState<ForgeStage>('quality_gate');
   const [palette, setPalette] = useState(false);
-  const [theme, setTheme] = useState(() => localStorage.getItem('forge-console.cockpit-theme') ?? 'system');
+  const [theme, setTheme] = useConsoleTheme();
+  const root = useRef<HTMLDivElement>(null);
   const selectedId = useRef('');
   const tabButtons = useRef<(HTMLButtonElement | null)[]>([]);
   const cursorRef = useRef(0);
@@ -76,12 +78,12 @@ export function ForgeCockpit({ onBack, onConfigure }: { onBack: () => void; onCo
       if (initial) void selectRun(initial.id);
     }).catch((reason) => alive && setError(errorText(reason)));
     const handler = (event: KeyboardEvent) => {
+      if (root.current?.closest('[hidden]')) return;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); setPalette((value) => !value); }
     };
     document.addEventListener('keydown',handler);
     return () => { alive = false; document.removeEventListener('keydown',handler); selectedId.current = ''; };
   }, []);
-  useEffect(() => { try { localStorage.setItem('forge-console.cockpit-theme',theme); } catch { /* Theme remains usable in memory. */ } },[theme]);
 
   function installSnapshot(next: ForgeRunSnapshot) {
     if (selectedId.current !== next.id) return;
@@ -199,7 +201,7 @@ export function ForgeCockpit({ onBack, onConfigure }: { onBack: () => void; onCo
     ? run.host?.status === 'failed' && run.host.stage === 'quality_gate' ? 'Blocked' : 'Pending'
     : run?.verdict;
 
-  return <div className="forge-cockpit" data-theme={activeTheme}>
+  return <div ref={root} className="forge-cockpit" data-theme={activeTheme}>
     <header className="forge-header">
       <div className="forge-brand"><span aria-hidden="true">F</span><div><strong>Forge Console</strong><small>Run and review Forge</small></div></div>
       <div className="forge-header-actions">

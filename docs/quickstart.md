@@ -24,6 +24,7 @@ Choose the path that matches your goal:
 5. Click **Use GitHub Copilot for a workflow** or **Use Claude Code for a workflow**. Console returns to Workflows with that runtime selected. The CLI's configured model is used; Console does not force a specific model.
 
 For corporate proxy/VPN/certificate setup, open **Connections → Network & Proxy** before testing. See [troubleshooting](troubleshooting.md).
+Connections stays in the main window. Save your settings, then use **Back to previous page** to return to your setup screen without losing its inputs. `Cmd/Ctrl+,` opens Connections from any page.
 
 On Windows, choose the installed native CLI `.exe`. Console rejects `.cmd`/`.bat` launchers for agent runs to keep task text and agent definitions out of a command shell.
 

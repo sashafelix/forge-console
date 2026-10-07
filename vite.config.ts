@@ -16,8 +16,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         repository: path.resolve(__dirname, 'index.html'),
-        agent: path.resolve(__dirname, 'agent.html'),
-        connections: path.resolve(__dirname, 'connections.html')
+        agent: path.resolve(__dirname, 'agent.html')
       }
     }
   }

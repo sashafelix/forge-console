@@ -275,7 +275,7 @@ export function TaskWorkbench() {
   async function openConnections(): Promise<void> {
     setError('');
     try {
-      await window.agentPipeline.openAgentWorkbench();
+      await window.agentPipeline.openConnections();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
     }

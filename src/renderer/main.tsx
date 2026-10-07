@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { TaskWorkbench } from './TaskWorkbench';
+import { WorkspaceShell } from './WorkspaceShell';
 import './styles.css';
 import './repository.css';
 import './task-light.css';
@@ -13,6 +14,6 @@ if (!root) throw new Error('Root element not found');
 
 createRoot(root).render(
   <StrictMode>
-    <TaskWorkbench />
+    <WorkspaceShell><TaskWorkbench /></WorkspaceShell>
   </StrictMode>
 );
