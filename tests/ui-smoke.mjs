@@ -58,6 +58,7 @@ try {
   await page.getByRole('button',{ name:/Back to guided workbench/ }).click();
   assert.equal(await theme().inputValue(),'light');
   assert.equal(await colour('.task-step'),'rgb(255, 255, 255)');
+  assert.equal(await colour('.task-card'),'rgb(255, 255, 255)');
   await page.screenshot({ path:directory+'/workflows-light.png',fullPage:true });
   await page.reload();
   await page.getByRole('heading',{ name:'What would you like help with?' }).waitFor();
@@ -68,7 +69,11 @@ try {
   assert.equal(await colour('body'),'rgb(16, 24, 34)');
   await theme().selectOption('light');
   assert.equal(await colour('body'),'rgb(246, 247, 251)');
+  assert.equal(await colour('.task-card'),'rgb(255, 255, 255)');
+  assert.equal(await colour('.task-card','color'),'rgb(24, 37, 53)');
   await theme().selectOption('dark');
+  assert.equal(await colour('.task-card'),'rgb(23, 35, 51)');
+  assert.equal(await colour('.task-card','color'),'rgb(237, 243, 250)');
   await page.setViewportSize({ width:390,height:844 });
   await page.screenshot({ path:directory+'/workflows-mobile-dark.png',fullPage:true });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),true);

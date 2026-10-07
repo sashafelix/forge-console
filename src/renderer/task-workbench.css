@@ -158,7 +158,7 @@
   padding: 16px;
   text-align: left;
   cursor: pointer;
-  transition: .18s ease;
+  transition: border-color .18s ease, transform .18s ease, box-shadow .18s ease;
 }
 
 .task-card:hover {
