@@ -32,7 +32,8 @@ p { color: var(--muted); line-height: 1.55; }
 .sidebar-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; }
 .sidebar-title button { border: 0; background: transparent; color: var(--accent); padding: 2px 0; font-size: 11px; cursor: pointer; }
 .sidebar-title button:disabled { opacity: .45; cursor: not-allowed; }
-.project-button, .option { width: 100%; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); text-align: left; cursor: pointer; transition: .18s ease; }
+/* Theme foreground and background colours must change together to retain contrast. */
+.project-button, .option { width: 100%; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); text-align: left; cursor: pointer; transition: border-color .18s ease, transform .18s ease; }
 .project-button { display: flex; gap: 12px; align-items: center; margin-top: 9px; padding: 13px; }
 .project-button:hover, .option:hover { border-color: var(--accent); transform: translateY(-1px); }
 .project-button:disabled, .option:disabled { opacity: .65; cursor: not-allowed; transform: none; }

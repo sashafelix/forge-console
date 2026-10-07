@@ -34,11 +34,27 @@ try {
   assert.equal(await colour('.field input'),'rgb(23, 35, 51)');
   assert.equal(await colour('.field input','color'),'rgb(237, 243, 250)');
   await page.screenshot({ path:directory+'/advanced-dark.png',fullPage:true });
+  const assertAdvancedControls = async (panel,selected,ink) => {
+    for (const selector of ['.sidebar .project-button','.sidebar .option:not(.active)']) {
+      assert.equal(await colour(selector),panel);
+      assert.equal(await colour(selector+' strong','color'),ink);
+    }
+    assert.equal(await colour('.sidebar .option.active'),selected);
+    assert.equal(await colour('.sidebar .option.active strong','color'),ink);
+  };
+  // Even with animations enabled, changing theme must not fade through unreadable colours.
+  await page.emulateMedia({ reducedMotion:'no-preference' });
   await theme().selectOption('light');
+  await assertAdvancedControls('rgb(255, 255, 255)','rgb(234, 240, 255)','rgb(24, 37, 53)');
+  await theme().selectOption('dark');
+  await assertAdvancedControls('rgb(23, 35, 51)','rgb(37, 56, 89)','rgb(237, 243, 250)');
+  await theme().selectOption('light');
+  await assertAdvancedControls('rgb(255, 255, 255)','rgb(234, 240, 255)','rgb(24, 37, 53)');
   assert.equal(await colour('body'),'rgb(246, 247, 251)');
   assert.equal(await colour('.sidebar'),'rgb(255, 255, 255)');
   assert.equal(await colour('.field input','color'),'rgb(24, 37, 53)');
   await page.screenshot({ path:directory+'/advanced-light.png',fullPage:true });
+  await page.emulateMedia({ reducedMotion:'reduce' });
   await page.getByRole('button',{ name:/Back to guided workbench/ }).click();
   assert.equal(await theme().inputValue(),'light');
   assert.equal(await colour('.task-step'),'rgb(255, 255, 255)');
