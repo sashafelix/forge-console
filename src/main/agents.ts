@@ -1,10 +1,10 @@
 import { promises as fs, type Dirent } from 'node:fs';
 import path from 'node:path';
 import type { AgentDefinition, AgentInputDefinition, Capability, ProcessRuntimeId } from '../shared/contracts';
+import { AGENT_DIRECTORIES, agentDirectoryPriority, assertSafeLibraryPath, safeAgentRelativePath } from './agent-library-paths';
 
 const MAX_AGENT_FILES = 250;
 const MAX_AGENT_FILE_BYTES = 768 * 1024;
-const AGENT_DIRECTORIES = ['agents', path.join('.github', 'agents'), path.join('.claude', 'agents')];
 const SUPPORTED_RUNTIMES: ProcessRuntimeId[] = ['claude-code', 'github-copilot'];
 
 function humanize(value: string): string {
@@ -177,23 +177,25 @@ function parseAgent(sourceRoot: string, sourcePath: string, source: string): Age
   };
 }
 
-function assertRelativeAgentPath(relativePath: string): void {
-  if (!relativePath || path.isAbsolute(relativePath)) throw new Error('Agent path must be relative to its source repository');
-  const normalized = path.normalize(relativePath);
-  if (normalized === '..' || normalized.startsWith(`..${path.sep}`)) throw new Error('Agent path escapes its source repository');
-}
-
-export async function resolveAgentDefinition(sourceRoot: string, relativePath: string): Promise<{ definition: AgentDefinition; source: string }> {
-  assertRelativeAgentPath(relativePath);
+export async function readAgentDocument(sourceRoot: string, relativePath: string): Promise<{ definition: AgentDefinition; source: string }> {
+  safeAgentRelativePath(relativePath);
   const realRoot = await fs.realpath(path.resolve(sourceRoot));
+  assertSafeLibraryPath(realRoot, path.resolve(realRoot, relativePath));
   const realPath = await fs.realpath(path.resolve(realRoot, relativePath));
   if (realPath !== realRoot && !realPath.startsWith(`${realRoot}${path.sep}`)) throw new Error('Agent path escapes its source repository');
   const details = await fs.lstat(realPath);
   if (!details.isFile() || details.isSymbolicLink()) throw new Error('Agent definition must be a regular file');
   if (details.size > MAX_AGENT_FILE_BYTES) throw new Error('Agent definition is too large');
-  let source = await fs.readFile(realPath, 'utf8');
+  const source = await fs.readFile(realPath, 'utf8');
   if (!isAgentDocument(realPath, source)) throw new Error('Selected Markdown file is not a valid agent definition');
   const definition = parseAgent(realRoot, realPath, source);
+  return { definition, source };
+}
+
+export async function resolveAgentDefinition(sourceRoot: string, relativePath: string): Promise<{ definition: AgentDefinition; source: string }> {
+  const result = await readAgentDocument(sourceRoot, relativePath);
+  const { definition } = result;
+  let { source } = result;
   if (definition.inputs.some((input) => input.name === 'task') && !/\$\{input:task\}/.test(source)) {
     source = `${source.trim()}\n\n## Operator task\n\n\${input:task}\n`;
   }
@@ -203,6 +205,7 @@ export async function resolveAgentDefinition(sourceRoot: string, relativePath: s
 async function collectAgentFiles(root: string): Promise<string[]> {
   const files: string[] = [];
   const visit = async (directory: string): Promise<void> => {
+    assertSafeLibraryPath(root, directory);
     let entries: Dirent[];
     try {
       entries = await fs.readdir(directory, { withFileTypes: true });
@@ -210,7 +213,7 @@ async function collectAgentFiles(root: string): Promise<string[]> {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
       throw error;
     }
-    for (const entry of entries) {
+    for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
       if (files.length >= MAX_AGENT_FILES) throw new Error(`Agent library exceeds the limit of ${MAX_AGENT_FILES} agent files`);
       const candidate = path.join(directory, entry.name);
       if (entry.isSymbolicLink()) continue;
@@ -219,19 +222,27 @@ async function collectAgentFiles(root: string): Promise<string[]> {
     }
   };
   for (const relativeDirectory of AGENT_DIRECTORIES) await visit(path.join(root, relativeDirectory));
-  return [...new Set(files)].sort();
+  return files;
 }
 
 export async function discoverAgents(sourceRoot: string): Promise<AgentDefinition[]> {
   const realRoot = await fs.realpath(path.resolve(sourceRoot));
   const files = await collectAgentFiles(realRoot);
-  const agents: AgentDefinition[] = [];
+  const agents = new Map<string, AgentDefinition>();
   for (const sourcePath of files) {
     const details = await fs.lstat(sourcePath);
     if (details.size > MAX_AGENT_FILE_BYTES) continue;
     const source = await fs.readFile(sourcePath, 'utf8');
     if (!isAgentDocument(sourcePath, source)) continue;
-    agents.push(parseAgent(realRoot, sourcePath, source));
+    const agent = parseAgent(realRoot, sourcePath, source);
+    const existing = agents.get(agent.id);
+    if (existing) {
+      if (agentDirectoryPriority(existing.relativePath) === agentDirectoryPriority(agent.relativePath)) {
+        throw new Error(`Duplicate agent identity ${agent.id}: ${existing.relativePath} and ${agent.relativePath}`);
+      }
+      continue;
+    }
+    agents.set(agent.id, agent);
   }
-  return agents.sort((left, right) => left.name.localeCompare(right.name) || left.relativePath.localeCompare(right.relativePath));
+  return [...agents.values()].sort((left, right) => left.name.localeCompare(right.name) || left.relativePath.localeCompare(right.relativePath));
 }

@@ -16,7 +16,7 @@ export function restoreProjectDraft(): ProjectProfileDraft {
   } catch { return emptyProjectProfileDraft(); }
 }
 
-export function PipelineConfiguration({ onBack }: { onBack: () => void }) {
+export function PipelineConfiguration({ onBack, embedded = false }: { onBack: () => void; embedded?: boolean }) {
   const [draft, setDraft] = useState(restoreProjectDraft);
   const [reviewed, setReviewed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -58,7 +58,7 @@ export function PipelineConfiguration({ onBack }: { onBack: () => void }) {
         <h1>Prepare your project profile</h1>
         <p>Describe your project, review the file, then supply it to the pipeline in your usual coding environment.</p>
       </div>
-      <div><button type="button" disabled={busy} onClick={importProfile}>Import project profile</button><button type="button" disabled={busy} onClick={onBack}>Back to workbench</button></div>
+      <div><button type="button" disabled={busy} onClick={importProfile}>Import project profile</button>{!embedded && <button type="button" disabled={busy} onClick={onBack}>Back to workbench</button>}</div>
     </header>
     <main>
       <p className="configuration-boundary">Execution, stage transitions, risk selection and approvals stay with Forge. Exporting a profile saves project facts only. Your draft is saved on this device.</p>

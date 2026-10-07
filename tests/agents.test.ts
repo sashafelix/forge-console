@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { discoverAgents, resolveAgentDefinition } from '../src/main/agents';
@@ -164,4 +164,28 @@ test('rejects agent paths that escape the selected library', async () => {
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test('canonical agents win over legacy mirrors and ambiguous canonical identities fail', async (context) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'canonical-agents-'));
+  context.after(() => rm(root, { recursive: true, force: true }));
+  for (const directory of ['agents', '.github/agents', '.claude/agents']) {
+    await mkdir(path.join(root, directory), { recursive: true });
+    await writeFile(path.join(root, directory, 'evaluator.md'), INPUT_FREE_SPECIALIST);
+  }
+  const found = await discoverAgents(root);
+  assert.equal(found.length, 1);
+  assert.equal(found[0].relativePath, path.join('agents', 'evaluator.md'));
+  await writeFile(path.join(root, 'agents', 'duplicate.md'), INPUT_FREE_SPECIALIST);
+  await assert.rejects(discoverAgents(root), /Duplicate agent identity/);
+});
+
+test('symlinked agent roots and selected definitions cannot escape discovery', async (context) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'symlink-agents-'));
+  context.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(path.join(root, 'outside'));
+  await writeFile(path.join(root, 'outside', 'example.md'), INPUT_FREE_SPECIALIST);
+  await symlink(path.join(root, 'outside'), path.join(root, 'agents'), 'junction');
+  await assert.rejects(discoverAgents(root), /symlinks/);
+  await assert.rejects(resolveAgentDefinition(root, 'agents/example.md'), /symlinks/);
 });

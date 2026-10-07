@@ -1,15 +1,15 @@
 .pipeline-configuration { max-width: 1120px; margin: 0 auto; }
 .pipeline-configuration main { display: grid; gap: 24px; }
-.pipeline-configuration fieldset, .configuration-review { border: 1px solid #cbd5e1; border-radius: 12px; padding: 24px; background: #fff; color: #17233a; min-width: 0; }
+.pipeline-configuration fieldset, .configuration-review { border: 1px solid var(--line, #cbd5e1); border-radius: 12px; padding: 24px; background: var(--panel, #fff); color: var(--ink, #17233a); min-width: 0; }
 .pipeline-configuration legend { font-weight: 700; padding: 0 8px; }
-.configuration-boundary { padding: 16px 20px; background: #e9f2ff; border-left: 3px solid #3166bd; color: #18365f; }
+.configuration-boundary { padding: 16px 20px; background: var(--accent-soft, #e9f2ff); border-left: 3px solid var(--accent, #3166bd); color: var(--ink, #18365f); }
 .configuration-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
 .configuration-fields label { display: grid; gap: 8px; font-weight: 600; }
-.configuration-fields input, .configuration-fields textarea { box-sizing: border-box; width: 100%; border: 1px solid #94a3b8; border-radius: 6px; padding: 10px; color: #17233a; background: #fff; font: inherit; font-weight: 400; }
+.configuration-fields input, .configuration-fields textarea { box-sizing: border-box; width: 100%; border: 1px solid var(--line, #94a3b8); border-radius: 6px; padding: 10px; color: var(--ink, #17233a); background: var(--panel, #fff); font: inherit; font-weight: 400; }
 .configuration-fields textarea { resize: vertical; }
 .configuration-review { margin-top: 24px; }
-.configuration-review pre { overflow: auto; max-height: 420px; padding: 16px; background: #f1f5f9; white-space: pre-wrap; overflow-wrap: anywhere; }
+.configuration-review pre { overflow: auto; max-height: 420px; padding: 16px; background: var(--bg, #f1f5f9); white-space: pre-wrap; overflow-wrap: anywhere; }
 .configuration-confirm { display: flex; align-items: start; gap: 10px; margin: 20px 0; }
 .configuration-confirm input { width: auto; margin-top: 4px; }
-.pipeline-configuration :focus-visible { outline: 3px solid #3166bd; outline-offset: 3px; }
+.pipeline-configuration :focus-visible { outline: 3px solid var(--accent, #3166bd); outline-offset: 3px; }
 @media (max-width: 720px) { .configuration-fields { grid-template-columns: 1fr; } }

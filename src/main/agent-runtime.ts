@@ -7,6 +7,8 @@ import { manageAgentProcess } from './agent-processes';
 import { createCopilotAgentOverlay } from './copilot-agent-overlay';
 import { applyConfiguredNetworkEnvironment } from './network-settings';
 import { discoverRuntimeAdapters, requiresCommandShell, runtimeSearchPath } from './runtime';
+import { discoverAgents } from './agents';
+import { assertSafeLibraryPath, copilotAgentRelativePath, libraryInstructions } from './agent-library-paths';
 
 export interface AgentRuntimeLaunch {
   runtimeId: ProcessRuntimeId;
@@ -86,7 +88,7 @@ async function runtimeEnvironment(
   return env;
 }
 
-async function claudeArgs(launch: AgentRuntimeLaunch): Promise<string[]> {
+export async function buildClaudeArgs(launch: AgentRuntimeLaunch): Promise<string[]> {
   const normalizedTools = new Set(launch.requestedTools.map((tool) => tool.toLowerCase()));
   const allowedTools = ['Read', 'Glob', 'Grep'];
   if (launch.permissions.allowWrite) allowedTools.push('Write', 'Edit');
@@ -100,6 +102,11 @@ async function claudeArgs(launch: AgentRuntimeLaunch): Promise<string[]> {
   if (!launch.permissions.allowWrite) deniedTools.push('Write', 'Edit');
   if (!launch.permissions.allowShell) deniedTools.push('Bash');
 
+  const definitions = Object.fromEntries((await discoverAgents(launch.agentSourceRoot)).map((agent) => [agent.id, {
+    description: agent.description,
+    prompt: `${libraryInstructions(agent.sourceRoot)}\nRead the full canonical agent instructions at ${agent.sourcePath} before starting. Follow that role and its required outputs.`
+  }]));
+
   return [
     '-p',
     '--input-format', 'text',
@@ -109,6 +116,7 @@ async function claudeArgs(launch: AgentRuntimeLaunch): Promise<string[]> {
     '--permission-mode', launch.permissions.allowWrite ? 'acceptEdits' : 'plan',
     '--allowedTools', [...new Set(allowedTools)].join(','),
     '--disallowedTools', deniedTools.join(','),
+    ...(Object.keys(definitions).length ? ['--agents', JSON.stringify(definitions)] : []),
     ...(path.resolve(launch.agentSourceRoot) !== path.resolve(launch.cwd) ? ['--add-dir', launch.agentSourceRoot] : []),
     ...(mcp.path ? ['--mcp-config', mcp.path] : []),
     ...(launch.sessionId ? ['--resume', launch.sessionId] : [])
@@ -123,25 +131,12 @@ function agentRelativePathFromPrompt(prompt: string): string | undefined {
   return prompt.match(/^- Selected agent:\s*(.+)$/m)?.[1]?.trim();
 }
 
-function safeAgentRelativePath(relativePath: string): string {
-  if (!relativePath || path.isAbsolute(relativePath)) throw new Error('Copilot agent path must be relative to its repository');
-  const normalized = path.normalize(relativePath);
-  if (normalized === '..' || normalized.startsWith(`..${path.sep}`)) throw new Error('Copilot agent path escapes its repository');
-  const githubAgents = path.join('.github', 'agents');
-  const claudeAgents = path.join('.claude', 'agents');
-  if (normalized !== githubAgents && normalized !== claudeAgents
-    && !normalized.startsWith(`${githubAgents}${path.sep}`)
-    && !normalized.startsWith(`${claudeAgents}${path.sep}`)) {
-    throw new Error('Copilot custom agents must be stored under .github/agents or .claude/agents');
-  }
-  return normalized;
-}
-
 async function resolveCopilotAgentId(launch: AgentRuntimeLaunch): Promise<string> {
   const requestedPath = launch.agentRelativePath ?? agentRelativePathFromPrompt(launch.prompt);
   if (!requestedPath) throw new Error('The selected Copilot agent path was not supplied to the runtime');
-  const relativePath = safeAgentRelativePath(requestedPath);
+  const relativePath = copilotAgentRelativePath(requestedPath);
   const worktreeRoot = await fs.realpath(path.resolve(launch.cwd));
+  assertSafeLibraryPath(worktreeRoot, path.resolve(worktreeRoot, relativePath));
   let worktreeAgentPath: string;
   try {
     worktreeAgentPath = await fs.realpath(path.resolve(worktreeRoot, relativePath));
@@ -243,7 +238,8 @@ export async function buildCopilotArgs(
   optionalFlag(args, capabilities, '--no-remote-export');
   args.push(`--agent=${selectedAgent}`);
 
-  if (path.resolve(launch.agentSourceRoot) !== path.resolve(launch.cwd) && supports(capabilities, '--add-dir')) {
+  if (path.resolve(launch.agentSourceRoot) !== path.resolve(launch.cwd)) {
+    requireOption(capabilities, '--add-dir', 'read the selected agent and skill library');
     args.push('--add-dir', launch.agentSourceRoot);
   }
   if (mcp.path) {
@@ -274,7 +270,7 @@ export async function spawnAgentRuntime(launch: AgentRuntimeLaunch): Promise<Chi
 
   try {
     const args = launch.runtimeId === 'claude-code'
-      ? await claudeArgs(launch)
+      ? await buildClaudeArgs(launch)
       : await buildCopilotArgs(launch, await collectHelpCapabilities(executable, environment));
     const child = manageAgentProcess(spawn(executable, args, {
       cwd: launch.cwd,
@@ -290,7 +286,8 @@ export async function spawnAgentRuntime(launch: AgentRuntimeLaunch): Promise<Chi
     const cleanup = () => {
       if (cleaned) return;
       cleaned = true;
-      overlay?.cleanup();
+      try { overlay?.cleanup(); }
+      catch (error) { child.emit('error', error); }
     };
     child.once('close', cleanup);
     child.once('error', cleanup);

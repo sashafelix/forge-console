@@ -1,6 +1,13 @@
 /** Browser fixture only: no native filesystem, credential or execution bridge. */
 import { createRoot } from 'react-dom/client';
+import { useState } from 'react';
 import { ForgeCockpit } from '../../src/renderer/ForgeCockpit';
+import { ConfigurationWorkbench } from '../../src/renderer/ConfigurationWorkbench';
+import '../../src/renderer/styles.css';
+import '../../src/renderer/task-light.css';
+import '../../src/renderer/state-navigation.css';
+import '../../src/renderer/advanced-light.css';
+import '../../src/renderer/interactive-runs.css';
 import type { DesktopApi } from '../../src/shared/contracts';
 import { FORGE_STAGES, type ForgeRunSnapshot, type HostView } from '../../src/shared/forge';
 
@@ -36,6 +43,10 @@ const events = [
 const patch = '--- a/src/api.py\n+++ b/src/api.py\n@@ -1,2 +1,4 @@\n def result(value):\n-    return None\n+    if not isinstance(value, int):\n+        raise ValueError("Expected an integer")\n+    return value * 2\n';
 const runs = [run,managed];
 window.agentPipeline = {
+  listModelConfiguration:async () => ({ schemaVersion:'1.0',revision:0,providers:[],profiles:[],diagnostics:[],credentials:{} }),
+  listRuntimes:async () => [{ id:'github-copilot',name:'GitHub Copilot',kind:'process',status:'available',capabilities:[],description:'Fixture runtime',executablePath:'/fixture/bin/copilot',version:'Fixture version' },
+    { id:'claude-code',name:'Claude Code',kind:'process',status:'unavailable',capabilities:[],description:'Fixture runtime',configurationHint:'Select the installed Claude Code executable.' }],
+  testRuntimeConnection:async () => ({ runtimeId:'github-copilot',ok:true,testedAt:'2026-10-07T00:00:00Z',message:'Synthetic connection succeeded.' }),
   getForgeSetup:async () => ({ host:null,inputs:null }),listForgeRuns:async () => runs,
   getForgeRun:async (selected:string) => runs.find((r) => r.id===selected)!,
   getForgeEvents:async ({after}:{after:number}) => ({ events:events.filter((e) => e.sequence>after),nextCursor:2 }),
@@ -43,4 +54,9 @@ window.agentPipeline = {
   importForgeBundle:async () => run,
   forgeAction:async () => { throw new Error('UI fixture never executes a host action.'); }
 } as unknown as DesktopApi;
-createRoot(document.getElementById('root')!).render(<ForgeCockpit onBack={() => undefined} />);
+function VisualApp() {
+  const [configuration,setConfiguration] = useState(new URLSearchParams(location.search).get('screen') === 'configuration');
+  return configuration ? <ConfigurationWorkbench onBack={() => setConfiguration(false)} onOpenCockpit={() => setConfiguration(false)} onUseRuntime={() => undefined} />
+    : <ForgeCockpit onBack={() => setConfiguration(true)} />;
+}
+createRoot(document.getElementById('root')!).render(<VisualApp />);

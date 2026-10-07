@@ -20,7 +20,7 @@ The model registry stores providers and named routing profiles, keeps encrypted 
 
 ## Repository-native agents
 
-The workbench discovers Markdown agent definitions from `agents/`, `.github/agents/` and `.claude/agents/`. Agent frontmatter and instructions are parsed into a provider-neutral contract describing inputs, requested tools, declared writes, required environment variables and execution characteristics.
+The workbench discovers Markdown agent definitions from `agents/`, `.github/agents/` and `.claude/agents/`, in that priority order. One identity appears once; ambiguous identities in the same tier fail discovery. Claude receives small session discovery definitions that read the canonical source. Copilot stages bounded discovery files in the isolated worktree, masks stale native Markdown, and restores its original bytes/modes on exit. Symlinked roots/ancestors are rejected. Canonical agents read applicable `skills/<name>/SKILL.md` from the supplied library root. No generated mirror is written to the source library. Agent frontmatter and instructions are parsed into a provider-neutral contract describing inputs, requested tools, declared writes, required environment variables and execution characteristics.
 
 The workflow repository is never treated as automatically trusted. Shell, network, credential and write requirements are surfaced before execution.
 

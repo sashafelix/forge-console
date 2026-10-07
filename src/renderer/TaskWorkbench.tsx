@@ -10,7 +10,7 @@ import type {
   RuntimeAdapterDescriptor
 } from '../shared/contracts';
 import { AgentWorkbench } from './AgentWorkbench';
-import { ConfigurationWorkbench } from './ConfigurationWorkbench';
+import { ConfigurationWorkbench, type ConfigurationSection } from './ConfigurationWorkbench';
 import { ForgeCockpit } from './ForgeCockpit';
 import { isConfigurationOnlyPipeline, RGR_CONFIGURATION_MESSAGE } from '../shared/pipeline-boundary';
 
@@ -133,6 +133,7 @@ function runHeading(status: AgentExecutionRun['status']): string {
 export function TaskWorkbench() {
   const [cockpitMode, setCockpitMode] = useState(false);
   const [configurationMode, setConfigurationMode] = useState(false);
+  const [configurationSection, setConfigurationSection] = useState<ConfigurationSection>('overview');
   const [advancedMode, setAdvancedMode] = useState(false);
   const [library, setLibrary] = useState<AgentLibrarySelection | null>(null);
   const [selectedKey, setSelectedKey] = useState('');
@@ -350,7 +351,9 @@ export function TaskWorkbench() {
   }
 
   if (cockpitMode) return <ForgeCockpit onBack={() => setCockpitMode(false)} />;
-  if (configurationMode) return <ConfigurationWorkbench onBack={() => setConfigurationMode(false)} />;
+  if (configurationMode) return <ConfigurationWorkbench initialSection={configurationSection} onBack={() => setConfigurationMode(false)}
+    onOpenCockpit={() => { setConfigurationMode(false); setCockpitMode(true); }} onOpenConnections={() => { void openConnections(); }}
+    onUseRuntime={(id) => { setRuntimeId(id); setConfigurationMode(false); void window.agentPipeline.listRuntimes().then(setRuntimes).catch((reason) => setError(String(reason))); }} />;
 
   if (advancedMode) {
     return (
@@ -382,7 +385,8 @@ export function TaskWorkbench() {
         </div>
         <div className="task-header-actions">
           <button type="button" onClick={() => setCockpitMode(true)}>Forge cockpit</button>
-          <button type="button" disabled={active} onClick={() => setConfigurationMode(true)}>Pipeline configuration</button>
+          <button type="button" disabled={active} onClick={() => { setConfigurationSection('overview'); setConfigurationMode(true); }}>Pipeline configuration</button>
+          <button type="button" disabled={active} onClick={() => { setConfigurationSection('guides'); setConfigurationMode(true); }}>Quickstart guides</button>
           <button type="button" onClick={() => { void openConnections(); }}>Connections</button>
           <button type="button" onClick={() => setAdvancedMode(true)}>Advanced</button>
         </div>

@@ -33,4 +33,13 @@ test('host selection pins executable code and input bytes before a diagnostic', 
   await bridge.selectInputs(paths);
   await fs.appendFile(script,'# changed host\n');
   await assert.rejects(bridge.doctor(),/Forge code or Python changed/);
+  for (const relative of ['AGENTS.md', 'skills/skill-review/SKILL.md', 'docs/conventions/testing.md']) {
+    await bridge.configure(root,probe.stdout.trim());
+    await fs.mkdir(path.dirname(path.join(root,relative)),{ recursive:true });
+    await fs.writeFile(path.join(root,relative),'New trusted guidance\n');
+    await assert.rejects(bridge.doctor(),/Forge code or Python changed/);
+    await bridge.configure(root,probe.stdout.trim());
+    await fs.appendFile(path.join(root,relative),'Changed guidance\n');
+    await assert.rejects(bridge.doctor(),/Forge code or Python changed/);
+  }
 });

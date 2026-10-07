@@ -2,6 +2,10 @@
 
 The desktop companion for **[Forge](https://github.com/sashafelix/forge)** and a standalone repository-agent workbench. Formerly Agent Pipeline UI; existing settings, credentials, run history and technical identifiers are retained.
 
+## Start here
+
+Open **Pipeline configuration** for the setup hub, or **Quickstart guides** for guided instructions. The [quickstart](docs/quickstart.md) covers a first Copilot/Claude agent run, a governed Forge run, and read-only evidence review. A small [README review agent](examples/agents/readme-review.md) is included.
+
 ## Forge configuration
 
 Use **Pipeline configuration** to manage providers, model profiles and role routing, or prepare a Local RGR `project-profile.json`. Models can be discovered or entered manually using OpenAI Responses, OpenAI-compatible Chat Completions, Anthropic Messages or Gemini protocols. The UI provides explicit synthetic capability tests, encrypted credentials, reusable profiles and reviewed secret-free exports.
@@ -84,7 +88,7 @@ Schema `1.1` packs may declare an isolated execution contract. The controller cr
 
 ## Runtime setup
 
-The app searches the inherited `PATH` plus common local CLI locations. A runtime executable can also be selected explicitly in the UI. Install Git and the selected Claude Code or GitHub Copilot CLI separately, authenticate that CLI and confirm it works against the selected repository. Provider login belongs to that CLI; the Connections vault supplies declared service variables. HTTP provider credentials belong to the separate model registry. Copilot custom-agent execution requires an agent under `.github/agents/` or `.claude/agents/`; discovery under `agents/` alone does not make it runnable by Copilot.
+The app searches the inherited `PATH` plus common local CLI locations. A runtime executable can also be selected explicitly in the UI. Install Git and the selected Claude Code or GitHub Copilot CLI separately, authenticate that CLI and confirm it works against the selected repository. Provider login belongs to that CLI; the Connections vault supplies declared service variables. HTTP provider credentials belong to the separate model registry. Open **Pipeline configuration → CLI runtimes** to select an executable, test the connection and return to Workflows with Copilot or Claude selected. Canonical `agents/` definitions run through both CLI adapters: Claude receives session discovery instructions; Copilot uses temporary worktree discovery files restored on exit. `skills/<name>/SKILL.md` stays in the selected source library. Legacy native directories remain supported; canonical identities take precedence. Copilot CLI is currently a standalone runtime and cannot be selected as an HTTP model route for the governed Forge host.
 
 ## Development
 

@@ -9,6 +9,7 @@ import { validateConfiguration } from '../shared/providers';
 import { childEnvironment } from './child-environment';
 import { inspectBundle, boundedFile, readEvents } from './bundle-reader';
 import { redactEvidence } from '../shared/redaction-preview';
+import { assertSafeLibraryPath } from './agent-library-paths';
 
 type HostRegistration = NonNullable<ForgeSetup['host']>;
 type InputRegistration = { paths: Record<'configuration'|'policy'|'inventory'|'facts', string>; hashes: Record<string,string>; view: NonNullable<ForgeSetup['inputs']> };
@@ -24,8 +25,18 @@ async function jsonFile(filename: string): Promise<any> {
 async function fingerprint(root: string, python: string) {
   const digest = createHash('sha256');
   let count = 0, bytes = 0;
+  async function file(relative: string) {
+    const target = path.join(root, relative);
+    assertSafeLibraryPath(root, target);
+    const info = await fs.lstat(target);
+    if (!info.isFile()) throw new Error('Trusted host inputs must be regular files.');
+    if (++count > 2000 || info.size > 4*1024*1024 || (bytes += info.size) > 32*1024*1024) throw new Error('Host registration size limit exceeded.');
+    digest.update(relative + '\0' + info.size + '\0').update(await fs.readFile(target));
+  }
   async function walk(folder: string, depth = 0) {
     if (depth > 10) throw new Error('Host registration nesting limit exceeded.');
+    assertSafeLibraryPath(root, path.join(root, folder));
+    digest.update('directory:' + folder + '\0');
     for (const entry of (await fs.readdir(path.join(root, folder))).sort()) {
       if (entry === '__pycache__') continue;
       const relative = folder + '/' + entry;
@@ -33,12 +44,24 @@ async function fingerprint(root: string, python: string) {
       if (info.isSymbolicLink()) throw new Error('Trusted host files cannot be symlinks.');
       if (info.isDirectory()) await walk(relative, depth + 1);
       else if (info.isFile() && /\.(py|json|md)$/.test(entry)) {
-        if (++count > 2000 || info.size > 4*1024*1024 || (bytes += info.size) > 32*1024*1024) throw new Error('Host registration size limit exceeded.');
-        digest.update(relative + '\0').update(await fs.readFile(path.join(root, relative)));
+        await file(relative);
       }
     }
   }
   for (const folder of ['scripts','agents','docs/agent']) await walk(folder);
+  // Older hosts may lack the canonical skill library; additions/removals also change the pin.
+  for (const relative of ['skills', 'docs/conventions', 'packs', 'AGENTS.md', 'CLAUDE.md', 'README.md',
+    'CONTRIBUTING.md', 'docs/enforcement.md', 'docs/model-portability.md']) {
+    assertSafeLibraryPath(root, path.join(root, relative));
+    let info;
+    try { info = await fs.lstat(path.join(root, relative)); }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      digest.update('missing:' + relative + '\0'); continue;
+    }
+    if (info.isDirectory()) await walk(relative);
+    else await file(relative);
+  }
   const binary = await fs.stat(python);
   if (!binary.isFile() || binary.size > 32*1024*1024) throw new Error('Select the Python executable.');
   digest.update(python + '\0').update(await fs.readFile(python));

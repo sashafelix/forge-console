@@ -23,7 +23,7 @@ function restored(): { provider: Provider | null; profile: ModelProfile | null }
 }
 function pretty(value: unknown) { return JSON.stringify(value, null, 2); }
 
-export function ModelConfiguration({ onBack }: { onBack: () => void }) {
+export function ModelConfiguration({ onBack, embedded = false, onOpenRuntimes }: { onBack: () => void; embedded?: boolean; onOpenRuntimes?: () => void }) {
   const [initial] = useState(restored);
   const [library, setLibrary] = useState<ProviderLibraryView>(EMPTY);
   const [provider, setProvider] = useState<Provider | null>(initial.provider);
@@ -91,7 +91,7 @@ export function ModelConfiguration({ onBack }: { onBack: () => void }) {
     </div>;
   }
   return <div className="task-shell models-shell">
-    <header className="task-header"><div><span className="task-kicker">PIPELINE CONFIGURATION</span><h1>Models, providers and routing</h1><p>Connect your services, check individual models and prepare reusable configurations.</p></div><button disabled={busy} onClick={onBack}>Back to workbench</button></header>
+    <header className="task-header"><div><span className="task-kicker">GOVERNED FORGE RUNS</span><h1>Models, providers and routing</h1><p>Connect a provider, choose your models and review which roles use them.</p></div>{!embedded && <button disabled={busy} onClick={onBack}>Back to workbench</button>}</header>
     <div className="models-toolbar"><div role="tablist" aria-label="Model configuration sections">
       <button role="tab" aria-selected={tab === 'providers'} disabled={busy} onClick={() => setTab('providers')}>1 · Providers</button>
       <button role="tab" aria-selected={tab === 'profiles'} disabled={busy} onClick={() => setTab('profiles')}>2 · Profiles & routing</button></div>
@@ -100,12 +100,12 @@ export function ModelConfiguration({ onBack }: { onBack: () => void }) {
     </div>
     {error && <div role="alert" className="task-alert error">{error}</div>}
     {message && <div role="status" className="task-alert info">{message}</div>}
-    <p className="model-boundary">Configuration and diagnostic probes only. The pipeline retains execution, independent verification and approval. HTTP execution adapters are not installed by this screen.</p>
+    <p className="model-boundary">Save a provider, add models to a profile, then export it for the Forge cockpit. {onOpenRuntimes && <button onClick={onOpenRuntimes}>Using Copilot or Claude Code? Set up a CLI runtime</button>}</p>
     {!loaded && <p role="status">Loading saved configuration…</p>}
     {tab === 'providers' ? <div className="models-layout"><aside className="models-sidebar"><h2>Saved providers</h2>
       {library.providers.map((p) => <button disabled={busy} className={provider?.id === p.id ? 'selected' : ''} key={p.id} onClick={() => chooseProvider(p)}><strong>{p.name}</strong><small>{p.locality} · {p.auth.mode === 'none' ? 'No authentication' : library.credentials[p.id] ? 'Credential saved' : 'Credential needed'}</small></button>)}
       <h3>Add a provider</h3><div className="provider-presets">{Object.entries(PROVIDER_PRESETS).map(([key, preset]) => <button disabled={busy} key={key} onClick={() => chooseProvider(newProvider(crypto.randomUUID(), key))}>{preset.label}</button>)}</div>
-    </aside><main className="model-panel">{!provider ? <div className="models-empty"><h2>Start with a provider</h2><p>Choose a preset or a custom gateway. You can add several providers and use several models from each.</p><p>Existing CLI runtimes and the legacy connection remain available in Connections.</p></div> : <>
+    </aside><main className="model-panel">{!provider ? <div className="models-empty"><span className="configuration-icon">01</span><h2>Connect your first provider</h2><p>Choose a cloud provider or local gateway from the list. Save its connection, then discover models or enter the model ID you want to use.</p><ol><li>Connect and save a provider</li><li>Add a model and assign it to roles</li><li>Test, review and export your profile</li></ol><small>Your provider credentials stay in the native vault. Exports contain references only.</small></div> : <>
       <div className="model-panel-heading"><h2>{provider.name || 'New provider'}</h2><span className="model-badge">{providerDirty ? 'Unsaved draft' : 'Saved'}</span></div>
       <fieldset disabled={busy || !loaded}><legend>Connection</legend><div className="model-fields">
         <label>Name<input value={provider.name} maxLength={120} onChange={(e) => editProvider({ name: e.target.value })} /></label>
