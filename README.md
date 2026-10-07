@@ -123,9 +123,12 @@ Requirements:
 - npm
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
+
+Use the committed `package-lock.json` for source installations. When intentionally
+updating dependencies, commit the updated lockfile together with `package.json`.
 
 Quality checks:
 
