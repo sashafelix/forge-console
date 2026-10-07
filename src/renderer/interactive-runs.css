@@ -1,10 +1,10 @@
 .task-progress.waiting_for_input {
-  border-color: #9eb8db;
-  background: #fbfdff;
+  border-color: var(--line);
+  background: var(--panel);
 }
 
 .task-progress.waiting_for_input .task-progress-dot {
-  background: #d88720;
+  background: var(--amber);
   box-shadow: 0 0 0 5px rgba(216, 135, 32, .14);
 }
 
@@ -13,26 +13,26 @@
   gap: 12px;
   max-height: 440px;
   overflow-y: auto;
-  border: 1px solid #dfe6ef;
+  border: 1px solid var(--line);
   border-radius: 14px;
-  background: #f7f9fc;
+  background: var(--panel);
   padding: 16px;
 }
 
 .task-message {
   width: min(78%, 780px);
-  border: 1px solid #d9e2ee;
+  border: 1px solid var(--line);
   border-radius: 14px 14px 14px 4px;
-  background: #fff;
+  background: var(--panel);
   padding: 12px 14px;
   box-shadow: 0 4px 12px rgba(36, 51, 79, .05);
 }
 
 .task-message.user {
   justify-self: end;
-  border-color: #9fbae0;
+  border-color: var(--line);
   border-radius: 14px 14px 4px 14px;
-  background: #edf4ff;
+  background: var(--accent-soft);
 }
 
 .task-message.system {
@@ -43,7 +43,7 @@
 }
 
 .task-message > span {
-  color: #3568aa;
+  color: var(--accent);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: .06em;
@@ -52,22 +52,22 @@
 
 .task-message p {
   margin: 5px 0 7px;
-  color: #24334f;
+  color: var(--ink);
   line-height: 1.55;
   white-space: pre-wrap;
 }
 
 .task-message time {
-  color: #8794a7;
+  color: var(--muted);
   font-size: 11px;
 }
 
 .task-reply-panel {
   display: grid;
   gap: 16px;
-  border: 1px solid #9eb8db;
+  border: 1px solid var(--line);
   border-radius: 16px;
-  background: #f1f6fd;
+  background: var(--accent-soft);
   padding: 18px;
   box-shadow: 0 8px 22px rgba(48, 91, 148, .08);
 }
@@ -85,21 +85,21 @@
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: #dfeaff;
-  color: #2e65ad;
+  background: var(--accent-soft);
+  color: var(--accent);
   font-size: 19px;
   font-weight: 900;
 }
 
 .task-question-heading strong {
-  color: #17233d;
+  color: var(--ink);
   font-size: 17px;
   line-height: 1.4;
 }
 
 .task-question-heading p {
   margin: 6px 0 0;
-  color: #64758e;
+  color: var(--muted);
   line-height: 1.5;
 }
 
@@ -110,10 +110,10 @@
 }
 
 .task-reply-choices button {
-  border: 1px solid #b9c8dc;
+  border: 1px solid var(--line);
   border-radius: 999px;
-  background: #fff;
-  color: #304563;
+  background: var(--panel);
+  color: var(--ink);
   padding: 9px 14px;
   cursor: pointer;
   font-weight: 700;
@@ -121,15 +121,15 @@
 
 .task-reply-choices button:hover,
 .task-reply-choices button.selected {
-  border-color: #3973bc;
-  background: #e4efff;
-  color: #215a9e;
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .task-reply-field {
   display: grid;
   gap: 7px;
-  color: #384861;
+  color: var(--ink);
   font-size: 13px;
   font-weight: 700;
 }
@@ -137,18 +137,18 @@
 .task-reply-field textarea {
   width: 100%;
   resize: vertical;
-  border: 1px solid #bfcde0;
+  border: 1px solid var(--line);
   border-radius: 12px;
   outline: none;
-  background: #fff;
-  color: #172033;
+  background: var(--panel);
+  color: var(--ink);
   padding: 13px;
   font: inherit;
   line-height: 1.5;
 }
 
 .task-reply-field textarea:focus {
-  border-color: #4f7fbe;
+  border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(79, 127, 190, .13);
 }
 
@@ -160,16 +160,16 @@
 }
 
 .task-reply-actions small {
-  color: #6f7e94;
+  color: var(--muted);
 }
 
 .task-progress-details {
-  border-top: 1px solid #e3e8f0;
+  border-top: 1px solid var(--line);
   padding-top: 13px;
 }
 
 .task-progress-details summary {
-  color: #50617b;
+  color: var(--muted);
   cursor: pointer;
   font-size: 13px;
   font-weight: 700;
@@ -180,19 +180,19 @@
 }
 
 .task-result-summary {
-  border: 1px solid #a7cdb8;
+  border: 1px solid var(--green);
   border-radius: 13px;
-  background: #f1fbf5;
+  background: var(--green-soft);
   padding: 15px;
 }
 
 .task-result-summary strong {
-  color: #256a49;
+  color: var(--green);
 }
 
 .task-result-summary p {
   margin: 6px 0 0;
-  color: #375d4a;
+  color: var(--green);
   line-height: 1.55;
   white-space: pre-wrap;
 }

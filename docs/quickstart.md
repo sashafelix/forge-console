@@ -1,6 +1,6 @@
 # Get your first result in Forge Console
 
-Open **Quickstart guides** from the workbench, or **Pipeline configuration → Get started**. Configuration, the cockpit and the embedded guides share the same light/dark/system theme.
+Open **Quickstart guides** from the workbench, or **Pipeline configuration → Get started**. Console defaults to **Dark**. The **Theme** picker in each screen header switches the whole app to **Light**, **Dark** or **System** and remembers your choice, including on the first screen and Advanced.
 
 Choose the path that matches your goal:
 

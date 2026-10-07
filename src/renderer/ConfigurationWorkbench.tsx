@@ -3,6 +3,7 @@ import type { ProcessRuntimeId, RuntimeAdapterDescriptor, RuntimeConnectionTestR
 import { ModelConfiguration } from './ModelConfiguration';
 import { PipelineConfiguration } from './PipelineConfiguration';
 import { useConsoleTheme } from './useConsoleTheme';
+import { ThemePicker } from './ThemePicker';
 import './forge-cockpit.css';
 import './configuration-workbench.css';
 
@@ -75,10 +76,10 @@ function QuickstartGuides({ navigate, onBack, onOpenCockpit }: { navigate: (sect
 
 export function ConfigurationWorkbench({ onBack, onOpenCockpit, onUseRuntime, onOpenConnections, initialSection = 'overview' }: Props) {
   const [section, setSection] = useState<ConfigurationSection>(initialSection);
-  const [theme, setTheme] = useConsoleTheme();
+  const [theme] = useConsoleTheme();
   return <div className="forge-cockpit configuration-workbench" data-theme={theme}>
     <header className="forge-header"><div className="forge-brand"><span>F</span><div><strong>Forge Console</strong><small>Configure your workspace</small></div></div><div className="forge-header-actions">
-      <label className="forge-theme"><span className="forge-sr">Colour theme</span><select value={theme} onChange={(event) => setTheme(event.target.value)}><option value="system">System theme</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+      <ThemePicker />
       {onOpenCockpit && <button onClick={onOpenCockpit}>Forge cockpit</button>}<button onClick={onBack}>Back to workflows</button></div></header>
     <div className="configuration-layout"><aside className="configuration-navigation"><span className="forge-eyebrow">PIPELINE CONFIGURATION</span><nav aria-label="Configuration pages">{SECTIONS.map(([id, name, hint]) => <button key={id} aria-current={section === id ? 'page' : undefined} onClick={() => setSection(id)}><strong>{name}</strong><small>{hint}</small></button>)}</nav>
       <label className="configuration-mobile-navigation"><span>Configuration page</span><select aria-label="Configuration page" value={section} onChange={(event) => setSection(event.target.value as ConfigurationSection)}>{SECTIONS.map(([id,name]) => <option key={id} value={id}>{name}</option>)}</select></label>

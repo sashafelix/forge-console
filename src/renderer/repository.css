@@ -1,6 +1,6 @@
 .repository-workbench-shell {
   min-height: 100vh;
-  background: #08101f;
+  background: var(--panel);
 }
 
 .repository-workbench-nav {
@@ -9,8 +9,8 @@
   z-index: 30;
   min-height: 54px;
   padding: 9px 20px;
-  border-bottom: 1px solid #1c2940;
-  background: rgba(8, 16, 31, 0.96);
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel) 96%, transparent);
   backdrop-filter: blur(16px);
   display: flex;
   align-items: center;
@@ -24,18 +24,18 @@
 }
 
 .repository-workbench-nav strong {
-  color: #eef4ff;
+  color: var(--ink);
 }
 
 .repository-workbench-nav span {
-  color: #8997b4;
+  color: var(--muted);
   font-size: 12px;
 }
 
 .repository-workbench-nav button {
-  border: 1px solid #365789;
-  background: #14233e;
-  color: #dbe9ff;
+  border: 1px solid var(--accent);
+  background: var(--panel);
+  color: var(--ink);
   border-radius: 9px;
   padding: 8px 13px;
   font-weight: 700;

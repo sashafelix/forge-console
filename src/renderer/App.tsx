@@ -1,3 +1,4 @@
+import { ThemePicker } from './ThemePicker';
 import { useEffect, useMemo, useState } from 'react';
 import type {
   ExecutionRun,
@@ -371,10 +372,10 @@ export function App() {
           <h1>Forge Console</h1>
           <p>Preview any compatible pipeline, or explicitly approve isolated write execution for packs that declare a validated execution contract.</p>
         </div>
-        <div className="system-pill">
+        <div className="console-header-actions"><ThemePicker /><div className="system-pill">
           <span className="status-dot" />
           {system ? `${system.platform} · ${system.arch} · v${system.appVersion}` : 'Loading system…'}
-        </div>
+        </div></div>
       </header>
 
       {error && <div className="error-banner" role="alert">{error}</div>}

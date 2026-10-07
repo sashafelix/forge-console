@@ -6,7 +6,7 @@ test('main renderer mounts the task-first workbench by default', async () => {
   const source = await readFile(new URL('../src/renderer/main.tsx', import.meta.url), 'utf8');
   assert.match(source, /import \{ TaskWorkbench \}/);
   assert.match(source, /<TaskWorkbench \/>/);
-  assert.match(source, /task-light\.css/);
+  assert.match(source, /task-workbench\.css/);
   assert.doesNotMatch(source, /<RepositoryWorkbench \/>/);
 });
 

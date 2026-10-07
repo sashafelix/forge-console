@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useConsoleTheme } from './useConsoleTheme';
+import { ThemePicker } from './ThemePicker';
 import './forge-cockpit.css';
 import './connections.css';
 import type {
@@ -63,7 +64,7 @@ function providerName(runtimeId: ProcessRuntimeId): string {
 }
 
 export function ConnectionsWorkbench({ onBack }: { onBack: () => void }) {
-  const [theme, setTheme] = useConsoleTheme();
+  const [theme] = useConsoleTheme();
   const [system, setSystem] = useState<SystemInfo | null>(null);
   const [connections, setConnections] = useState<ConnectionSummary[]>([]);
   const [drafts, setDrafts] = useState<Partial<Record<ConnectionId, ConnectionDraft>>>({});
@@ -229,7 +230,7 @@ export function ConnectionsWorkbench({ onBack }: { onBack: () => void }) {
       <header className="forge-header">
         <div className="forge-brand"><span aria-hidden="true">F</span><div><strong>Forge Console</strong><small>Connections & network</small></div></div>
         <div className="forge-header-actions">
-          <label className="forge-theme"><span className="forge-sr">Colour theme</span><select value={theme} onChange={(event) => setTheme(event.target.value)}><option value="system">System theme</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+          <ThemePicker />
           <button type="button" onClick={onBack}>← Back to previous page</button>
         </div>
       </header>

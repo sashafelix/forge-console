@@ -103,3 +103,29 @@ test('a retained cockpit ignores global commands while Connections is visible', 
   fireEvent.keyDown(document, { key: 'k', ctrlKey: true });
   assert.ok(screen.getByRole('dialog'));
 });
+
+test('a fresh Console defaults to dark and one theme choice persists across every main screen and a remount', async () => {
+  const api = setup();
+  const picker = () => screen.getByRole('combobox', { name: 'Colour theme' }) as HTMLSelectElement;
+  assert.equal(picker().value, 'dark');
+  assert.equal(document.documentElement.dataset.theme, 'dark');
+  fireEvent.click(screen.getByRole('button', { name: 'Advanced' }));
+  await screen.findByText('linux · x64 · vtest');
+  assert.equal(picker().value, 'dark');
+  fireEvent.change(picker(), { target: { value: 'light' } });
+  assert.equal(document.documentElement.dataset.theme, 'light');
+  fireEvent.click(screen.getByRole('button', { name: /Back to guided workbench/ }));
+  assert.equal(picker().value, 'light');
+  fireEvent.click(screen.getByRole('button', { name: 'Pipeline configuration' }));
+  assert.equal(picker().value, 'light');
+  fireEvent.click(screen.getByRole('button', { name: 'Forge cockpit' }));
+  await screen.findByRole('heading', { name: 'Every change has a trace.' });
+  assert.equal(picker().value, 'light');
+  api.navigate('connections');
+  await screen.findByRole('heading', { name: 'Connections' });
+  assert.equal(picker().value, 'light');
+  assert.equal(localStorage.getItem('forge-console.cockpit-theme'), 'light');
+  cleanup(); setup();
+  assert.equal(picker().value, 'light');
+  assert.equal(document.documentElement.dataset.theme, 'light');
+});

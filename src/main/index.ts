@@ -25,7 +25,7 @@ function windowOptions(title: string): Electron.BrowserWindowConstructorOptions 
     minWidth: 980,
     minHeight: 680,
     title,
-    backgroundColor: '#f4f7fb',
+    backgroundColor: '#101822',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

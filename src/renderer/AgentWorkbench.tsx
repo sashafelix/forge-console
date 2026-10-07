@@ -1,3 +1,4 @@
+import { ThemePicker } from './ThemePicker';
 import { useEffect, useMemo, useState } from 'react';
 import { RunPermissions } from './RunPermissions';
 import type {
@@ -229,7 +230,7 @@ export function AgentWorkbench() {
           <h1>Single Agent Runner</h1>
           <p>Load one agent from an agent library and run it against a separate target code repository.</p>
         </div>
-        <div className="system-pill"><span className="status-dot" />{system ? `${system.platform} · ${system.arch} · v${system.appVersion}` : 'Loading system…'}</div>
+        <div className="console-header-actions"><ThemePicker /><div className="system-pill"><span className="status-dot" />{system ? `${system.platform} · ${system.arch} · v${system.appVersion}` : 'Loading system…'}</div></div>
       </header>
 
       {error && <div className="error-banner" role="alert">{error}</div>}
