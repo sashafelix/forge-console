@@ -14,6 +14,8 @@ Install and authenticate the selected CLI separately, and confirm Git and that C
 
 The Connections vault supplies declared service variables; it does not replace provider CLI login. Review inherited environment variables as well as the approved connection requirements.
 
+On Windows, select the runtime's native `.exe` for standalone agent runs. Console rejects `.cmd`/`.bat` wrappers so task text and generated agent JSON cannot be interpreted as shell commands. A wrapper may pass executable discovery or a connection check while still being unsuitable for an agent run. Install the native CLI or use the CLI directly in WSL.
+
 ## Where is Copilot in the configurator?
 
 Choose **CLI runtimes** or **Set up Copilot or Claude**. Copilot uses its CLI login and runs standalone workflows. **Models & providers** configures HTTP models for the governed Forge host; a Copilot subscription is not a provider API key. The [quickstart](quickstart.md) explains both paths.

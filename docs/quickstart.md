@@ -25,6 +25,8 @@ Choose the path that matches your goal:
 
 For corporate proxy/VPN/certificate setup, open **Connections → Network & Proxy** before testing. See [troubleshooting](troubleshooting.md).
 
+On Windows, choose the installed native CLI `.exe`. Console rejects `.cmd`/`.bat` launchers for agent runs to keep task text and agent definitions out of a command shell.
+
 ### Select a library and target
 
 A **workflow library** contains instructions. A **target repository** contains the code to inspect or change. They can be different repositories.

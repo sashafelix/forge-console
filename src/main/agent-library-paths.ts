@@ -3,6 +3,12 @@ import path from 'node:path';
 
 export const AGENT_DIRECTORIES = ['agents', path.join('.github', 'agents'), path.join('.claude', 'agents')];
 
+export function requireNativeAgentExecutable(executable: string, platform: NodeJS.Platform = process.platform): void {
+  if (platform === 'win32' && /\.(cmd|bat)$/i.test(executable)) {
+    throw new Error('Agent instructions cannot be passed safely through a Windows batch launcher. Choose the native CLI .exe in Pipeline configuration → CLI runtimes.');
+  }
+}
+
 export function agentDirectoryPriority(relativePath: string): number {
   return AGENT_DIRECTORIES.findIndex((directory) => relativePath.startsWith(`${directory}${path.sep}`));
 }

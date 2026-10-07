@@ -5,6 +5,15 @@ import path from 'node:path';
 import test from 'node:test';
 import { buildClaudeArgs, buildCopilotArgs, type AgentRuntimeLaunch } from '../src/main/agent-runtime';
 import { createCopilotAgentOverlay } from '../src/main/copilot-agent-overlay';
+import { requireNativeAgentExecutable } from '../src/main/agent-library-paths';
+
+test('Windows agent runs reject batch shells before prompt or discovery JSON can be interpreted as commands', () => {
+  for (const executable of ['C:\\Tools\\claude.cmd', 'C:\\Tools\\copilot.BAT']) {
+    assert.throws(() => requireNativeAgentExecutable(executable, 'win32'), /native CLI .exe/);
+  }
+  assert.doesNotThrow(() => requireNativeAgentExecutable('C:\\Program Files\\Copilot\\copilot.exe', 'win32'));
+  assert.doesNotThrow(() => requireNativeAgentExecutable('/usr/local/bin/claude', 'darwin'));
+});
 
 async function fixture(context: { after: (callback: () => Promise<unknown>) => void }) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'canonical-runtime-'));

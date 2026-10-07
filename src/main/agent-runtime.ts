@@ -8,7 +8,7 @@ import { createCopilotAgentOverlay } from './copilot-agent-overlay';
 import { applyConfiguredNetworkEnvironment } from './network-settings';
 import { discoverRuntimeAdapters, requiresCommandShell, runtimeSearchPath } from './runtime';
 import { discoverAgents } from './agents';
-import { assertSafeLibraryPath, copilotAgentRelativePath, libraryInstructions } from './agent-library-paths';
+import { assertSafeLibraryPath, copilotAgentRelativePath, libraryInstructions, requireNativeAgentExecutable } from './agent-library-paths';
 
 export interface AgentRuntimeLaunch {
   runtimeId: ProcessRuntimeId;
@@ -263,6 +263,7 @@ export async function spawnAgentRuntime(launch: AgentRuntimeLaunch): Promise<Chi
     throw new Error('maxTurns must be from 1 to 100');
   }
   const executable = await resolveExecutable(launch.runtimeId);
+  requireNativeAgentExecutable(executable);
   const environment = await runtimeEnvironment(launch.runtimeId, launch.environment);
   const overlay = launch.runtimeId === 'github-copilot'
     ? await createCopilotAgentOverlay(launch.agentSourceRoot, launch.cwd)
@@ -275,7 +276,7 @@ export async function spawnAgentRuntime(launch: AgentRuntimeLaunch): Promise<Chi
     const child = manageAgentProcess(spawn(executable, args, {
       cwd: launch.cwd,
       env: environment,
-      shell: requiresCommandShell(executable),
+      shell: false,
       windowsHide: true,
       stdio: ['pipe', 'pipe', 'pipe']
     }));
